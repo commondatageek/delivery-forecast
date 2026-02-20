@@ -8,8 +8,34 @@ import (
 	"math/rand"
 	"os"
 	"sort"
+	"strconv"
+	"strings"
 	"time"
 )
+
+// percentileList is a flag.Value for a comma-separated list of ints.
+type percentileList []int
+
+func (p *percentileList) String() string {
+	parts := make([]string, len(*p))
+	for i, v := range *p {
+		parts[i] = strconv.Itoa(v)
+	}
+	return strings.Join(parts, ",")
+}
+
+func (p *percentileList) Set(s string) error {
+	*p = nil
+	for _, part := range strings.Split(s, ",") {
+		part = strings.TrimSpace(part)
+		v, err := strconv.Atoi(part)
+		if err != nil {
+			return fmt.Errorf("invalid percentile %q: %w", part, err)
+		}
+		*p = append(*p, v)
+	}
+	return nil
+}
 
 // --- Data loading ---
 
@@ -222,6 +248,8 @@ func cmdItems(args []string) error {
 	engineers := cmd.Int("engineers", 3, "number of engineers")
 	days := cmd.Int("days", 30, "number of days")
 	simulations := cmd.Int("simulations", 10_000, "number of Monte Carlo simulations to run")
+	var percentiles percentileList
+	cmd.Var(&percentiles, "percentile", "comma-separated percentiles to output (default: 5,10,...,95)")
 	cmd.Parse(args)
 
 	pool, err := loadPool(*issuesFile)
@@ -231,9 +259,15 @@ func cmdItems(args []string) error {
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 	dist := SimulateItemsInDays(pool, *engineers, *days, *simulations, rng)
 	fmt.Printf("%d engineers, %d days -> how many items?\n", *engineers, *days)
-	fmt.Printf("  50th percentile: %d items\n", Percentile(dist, 50))
-	fmt.Printf("  85th percentile: %d items\n", Percentile(dist, 85))
-	fmt.Printf("  95th percentile: %d items\n", Percentile(dist, 95))
+	if len(percentiles) > 0 {
+		for _, p := range percentiles {
+			fmt.Printf("  %dth percentile: %d items\n", p, Percentile(dist, float64(p)))
+		}
+	} else {
+		for p := 5; p <= 95; p += 5 {
+			fmt.Printf("  %dth percentile: %d items\n", p, Percentile(dist, float64(p)))
+		}
+	}
 	return nil
 }
 
@@ -243,6 +277,8 @@ func cmdDays(args []string) error {
 	engineers := cmd.Int("engineers", 3, "number of engineers")
 	items := cmd.Int("items", 50, "number of items to complete")
 	simulations := cmd.Int("simulations", 10_000, "number of Monte Carlo simulations to run")
+	var percentiles percentileList
+	cmd.Var(&percentiles, "percentile", "comma-separated percentiles to output (default: 5,10,...,95)")
 	cmd.Parse(args)
 
 	pool, err := loadPool(*issuesFile)
@@ -252,9 +288,15 @@ func cmdDays(args []string) error {
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 	dist := SimulateDaysToComplete(pool, *engineers, *items, *simulations, rng)
 	fmt.Printf("%d engineers, %d items -> how many days?\n", *engineers, *items)
-	fmt.Printf("  50th percentile: %d days\n", Percentile(dist, 50))
-	fmt.Printf("  85th percentile: %d days\n", Percentile(dist, 85))
-	fmt.Printf("  95th percentile: %d days\n", Percentile(dist, 95))
+	if len(percentiles) > 0 {
+		for _, p := range percentiles {
+			fmt.Printf("  %dth percentile: %d days\n", p, Percentile(dist, float64(p)))
+		}
+	} else {
+		for p := 5; p <= 95; p += 5 {
+			fmt.Printf("  %dth percentile: %d days\n", p, Percentile(dist, float64(p)))
+		}
+	}
 	return nil
 }
 

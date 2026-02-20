@@ -1,4 +1,4 @@
-version: '3'
+version: "3"
 
 tasks:
   generate:
@@ -8,7 +8,7 @@ tasks:
   build:
     desc: Build all Go commands to bin/
     cmds:
-      - go build -C sim -o ../bin/throughput-sim .
+      - go build -C sim -o ../bin/sim .
       - go build -C linear-fetch -o ../bin/linear-fetch .
 
   fetch:

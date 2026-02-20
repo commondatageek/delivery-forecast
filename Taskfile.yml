@@ -4,3 +4,13 @@ tasks:
   generate:
     desc: Generate issues.json in the project root
     cmd: python generate-issues/main.py > issues.json
+
+  build:
+    desc: Build the throughput-sim Go command
+    dir: sim
+    cmd: go build -o ../throughput-sim .
+
+  fetch:
+    desc: Fetch completed issues from Linear and write to issues.json (requires LINEAR_API_KEY)
+    dir: linear-fetch
+    cmd: go run . > ../issues.json

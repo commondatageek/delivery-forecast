@@ -1,0 +1,6 @@
+version: '3'
+
+tasks:
+  generate:
+    desc: Generate issues.json in the project root
+    cmd: python generate-issues/main.py > issues.json

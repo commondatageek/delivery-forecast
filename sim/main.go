@@ -271,7 +271,7 @@ func cmdItems(args []string) error {
 	sampleStart := cmd.String("sample-start", defaultStart, "sample data start date (YYYY-MM-DD)")
 	sampleEnd := cmd.String("sample-end", defaultEnd, "sample data end date (YYYY-MM-DD)")
 	var percentiles percentileList
-	cmd.Var(&percentiles, "percentile", "comma-separated percentiles to output (default: 5,10,...,95)")
+	cmd.Var(&percentiles, "percentile", "comma-separated percentiles to output (default: 5,25,50,75,95)")
 	var include stringList
 	cmd.Var(&include, "include", "comma-separated list of engineer names to include (default: all)")
 	cmd.Parse(args)
@@ -292,14 +292,11 @@ func cmdItems(args []string) error {
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 	dist := SimulateItemsInDays(pool, *engineers, *days, *simulations, rng)
 	fmt.Printf("%d engineers, %d days -> how many items?\n", *engineers, *days)
-	if len(percentiles) > 0 {
-		for _, p := range percentiles {
-			fmt.Printf("  %dth percentile: %d items\n", p, Percentile(dist, float64(p)))
-		}
-	} else {
-		for p := 5; p <= 95; p += 5 {
-			fmt.Printf("  %dth percentile: %d items\n", p, Percentile(dist, float64(p)))
-		}
+	if len(percentiles) == 0 {
+		percentiles = percentileList{5, 25, 50, 75, 95}
+	}
+	for _, p := range percentiles {
+		fmt.Printf("  %dth percentile: %d items\n", p, Percentile(dist, float64(p)))
 	}
 	return nil
 }
@@ -315,7 +312,7 @@ func cmdDays(args []string) error {
 	sampleStart := cmd.String("sample-start", defaultSampleStart, "sample data start date (YYYY-MM-DD)")
 	sampleEnd := cmd.String("sample-end", defaultSampleEnd, "sample data end date (YYYY-MM-DD)")
 	var percentiles percentileList
-	cmd.Var(&percentiles, "percentile", "comma-separated percentiles to output (default: 5,10,...,95)")
+	cmd.Var(&percentiles, "percentile", "comma-separated percentiles to output (default: 50,75,85,95)")
 	var include stringList
 	cmd.Var(&include, "include", "comma-separated list of engineer names to include (default: all)")
 	cmd.Parse(args)
@@ -336,14 +333,11 @@ func cmdDays(args []string) error {
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 	dist := SimulateDaysToComplete(pool, *engineers, *items, *simulations, rng)
 	fmt.Printf("%d engineers, %d items -> how many days?\n", *engineers, *items)
-	if len(percentiles) > 0 {
-		for _, p := range percentiles {
-			fmt.Printf("  %dth percentile: %d days\n", p, Percentile(dist, float64(p)))
-		}
-	} else {
-		for p := 5; p <= 95; p += 5 {
-			fmt.Printf("  %dth percentile: %d days\n", p, Percentile(dist, float64(p)))
-		}
+	if len(percentiles) == 0 {
+		percentiles = percentileList{50, 75, 85, 95}
+	}
+	for _, p := range percentiles {
+		fmt.Printf("  %dth percentile: %d days\n", p, Percentile(dist, float64(p)))
 	}
 	return nil
 }

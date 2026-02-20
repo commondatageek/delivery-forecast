@@ -192,15 +192,23 @@ func main() {
 		issues = append(issues, issue)
 	}
 
-	// Build and save cache
-	startDate := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
-	endDate := time.Date(2024, 12, 31, 0, 0, 0, 0, time.UTC)
-	globalExcluded := []string{"2024-12-23", "2024-12-24", "2024-12-25", "2024-12-26"}
+	// Load cache from disk if it exists, otherwise build and save it
+	var cache *SimCache
+	if cacheData, err := os.ReadFile("cache.json"); err == nil {
+		cache = &SimCache{}
+		if err := json.Unmarshal(cacheData, cache); err != nil {
+			panic(err)
+		}
+	} else {
+		startDate := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+		endDate := time.Date(2024, 12, 31, 0, 0, 0, 0, time.UTC)
+		globalExcluded := []string{"2024-12-23", "2024-12-24", "2024-12-25", "2024-12-26"}
 
-	cache := buildCache(issues, startDate, endDate, globalExcluded)
+		cache = buildCache(issues, startDate, endDate, globalExcluded)
 
-	cacheData, _ := json.MarshalIndent(cache, "", "  ")
-	os.WriteFile("cache.json", cacheData, 0644)
+		cacheData, _ := json.MarshalIndent(cache, "", "  ")
+		os.WriteFile("cache.json", cacheData, 0644)
+	}
 
 	// Load pool
 	pool, err := loadPooledSamples(cache)

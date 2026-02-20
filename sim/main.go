@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"math/rand"
 	"os"
@@ -172,67 +173,111 @@ func Percentile(sorted []int, p float64) int {
 	return sorted[idx]
 }
 
-// --- Main (example usage) ---
+// --- Main ---
 
-func main() {
-	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+func usage() {
+	fmt.Fprintf(os.Stderr, "Usage: sim <command> [flags]\n\n")
+	fmt.Fprintf(os.Stderr, "Commands:\n")
+	fmt.Fprintf(os.Stderr, "  items   How many items can N engineers complete in D days?\n")
+	fmt.Fprintf(os.Stderr, "  days    How many days for N engineers to complete I items?\n\n")
+	fmt.Fprintf(os.Stderr, "Run 'sim <command> -help' for command-specific flags.\n")
+}
 
-	// Load raw issues
-	data, err := os.ReadFile("issues.json")
+func loadPool(issuesFile string) (*SamplePool, error) {
+	data, err := os.ReadFile(issuesFile)
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("reading issues file: %w", err)
 	}
 	var issues []RawIssue
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	for decoder.More() {
 		var issue RawIssue
 		if err := decoder.Decode(&issue); err != nil {
-			panic(err)
+			return nil, fmt.Errorf("decoding issue: %w", err)
 		}
 		issues = append(issues, issue)
 	}
 
-	// Load cache from disk if it exists, otherwise build and save it
 	var cache *SimCache
 	if cacheData, err := os.ReadFile("cache.json"); err == nil {
 		cache = &SimCache{}
 		if err := json.Unmarshal(cacheData, cache); err != nil {
-			panic(err)
+			return nil, fmt.Errorf("reading cache: %w", err)
 		}
 	} else {
 		startDate := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 		endDate := time.Date(2024, 12, 31, 0, 0, 0, 0, time.UTC)
 		globalExcluded := []string{"2024-12-23", "2024-12-24", "2024-12-25", "2024-12-26"}
-
 		cache = buildCache(issues, startDate, endDate, globalExcluded)
-
 		cacheData, _ := json.MarshalIndent(cache, "", "  ")
 		os.WriteFile("cache.json", cacheData, 0644)
 	}
 
-	// Load pool
-	pool, err := loadPooledSamples(cache)
+	return loadPooledSamples(cache)
+}
+
+func cmdItems(args []string) error {
+	cmd := flag.NewFlagSet("items", flag.ExitOnError)
+	issuesFile := cmd.String("issues", "issues.json", "path to issues JSON file")
+	engineers := cmd.Int("engineers", 3, "number of engineers")
+	days := cmd.Int("days", 30, "number of days")
+	simulations := cmd.Int("simulations", 10_000, "number of Monte Carlo simulations to run")
+	cmd.Parse(args)
+
+	pool, err := loadPool(*issuesFile)
 	if err != nil {
-		panic(err)
+		return err
 	}
-	fmt.Printf("Pool size: %d samples\n", len(pool.Samples))
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	dist := SimulateItemsInDays(pool, *engineers, *days, *simulations, rng)
+	fmt.Printf("%d engineers, %d days -> how many items?\n", *engineers, *days)
+	fmt.Printf("  50th percentile: %d items\n", Percentile(dist, 50))
+	fmt.Printf("  85th percentile: %d items\n", Percentile(dist, 85))
+	fmt.Printf("  95th percentile: %d items\n", Percentile(dist, 95))
+	return nil
+}
 
-	const N = 10_000
-	engineers := 3
+func cmdDays(args []string) error {
+	cmd := flag.NewFlagSet("days", flag.ExitOnError)
+	issuesFile := cmd.String("issues", "issues.json", "path to issues JSON file")
+	engineers := cmd.Int("engineers", 3, "number of engineers")
+	items := cmd.Int("items", 50, "number of items to complete")
+	simulations := cmd.Int("simulations", 10_000, "number of Monte Carlo simulations to run")
+	cmd.Parse(args)
 
-	// Question 1: How many items in 30 days?
-	days := 30
-	itemDist := SimulateItemsInDays(pool, engineers, days, N, rng)
-	fmt.Printf("\n%d engineers, %d days:\n", engineers, days)
-	fmt.Printf("  50th percentile: %d items\n", Percentile(itemDist, 50))
-	fmt.Printf("  85th percentile: %d items\n", Percentile(itemDist, 85))
-	fmt.Printf("  95th percentile: %d items\n", Percentile(itemDist, 95))
+	pool, err := loadPool(*issuesFile)
+	if err != nil {
+		return err
+	}
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	dist := SimulateDaysToComplete(pool, *engineers, *items, *simulations, rng)
+	fmt.Printf("%d engineers, %d items -> how many days?\n", *engineers, *items)
+	fmt.Printf("  50th percentile: %d days\n", Percentile(dist, 50))
+	fmt.Printf("  85th percentile: %d days\n", Percentile(dist, 85))
+	fmt.Printf("  95th percentile: %d days\n", Percentile(dist, 95))
+	return nil
+}
 
-	// Question 2: How many days to complete 50 items?
-	items := 50
-	dayDist := SimulateDaysToComplete(pool, engineers, items, N, rng)
-	fmt.Printf("\n%d engineers, %d items:\n", engineers, items)
-	fmt.Printf("  50th percentile: %d days\n", Percentile(dayDist, 50))
-	fmt.Printf("  85th percentile: %d days\n", Percentile(dayDist, 85))
-	fmt.Printf("  95th percentile: %d days\n", Percentile(dayDist, 95))
+func main() {
+	if len(os.Args) < 2 {
+		usage()
+		os.Exit(1)
+	}
+
+	var err error
+	switch os.Args[1] {
+	case "items":
+		err = cmdItems(os.Args[2:])
+	case "days":
+		err = cmdDays(os.Args[2:])
+	default:
+		fmt.Fprintf(os.Stderr, "unknown command: %q\n\n", os.Args[1])
+		usage()
+		os.Exit(1)
+	}
+
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
+	}
 }

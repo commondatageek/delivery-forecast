@@ -355,7 +355,7 @@ func cmdProbability(args []string) error {
 	exclusionsFile := cmd.String("exclusions", "exclusions.json", "path to exclusions JSON file")
 	engineers := cmd.Int("engineers", 3, "number of engineers")
 	days := cmd.Int("days", 30, "number of days")
-	items := cmd.Int("items", 50, "number of items to complete")
+	items := cmd.Int("items", -1, "number of items to complete (omit to show full distribution)")
 	simulations := cmd.Int("simulations", 10_000, "number of Monte Carlo simulations to run")
 	sampleStart := cmd.String("sample-start", defaultStart, "sample data start date (YYYY-MM-DD)")
 	sampleEnd := cmd.String("sample-end", defaultEnd, "sample data end date (YYYY-MM-DD)")
@@ -379,16 +379,29 @@ func cmdProbability(args []string) error {
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 	dist := SimulateItemsInDays(pool, *engineers, *days, *simulations, rng)
 
-	count := 0
-	for _, v := range dist {
-		if v >= *items {
-			count++
+	probFor := func(n int) float64 {
+		count := 0
+		for _, v := range dist {
+			if v >= n {
+				count++
+			}
+		}
+		return float64(count) / float64(*simulations) * 100.0
+	}
+
+	if *items >= 0 {
+		fmt.Printf("%d engineers, %d days, %d items -> probability of completion?\n", *engineers, *days, *items)
+		fmt.Printf("  %.1f%%\n", probFor(*items))
+	} else {
+		fmt.Printf("%d engineers, %d days -> probability of completing N items\n", *engineers, *days)
+		for n := 1; ; n++ {
+			p := probFor(n)
+			fmt.Printf("  %d items: %.1f%%\n", n, p)
+			if p == 0 {
+				break
+			}
 		}
 	}
-	probability := float64(count) / float64(*simulations) * 100.0
-
-	fmt.Printf("%d engineers, %d days, %d items -> probability of completion?\n", *engineers, *days, *items)
-	fmt.Printf("  %.1f%%\n", probability)
 	return nil
 }
 

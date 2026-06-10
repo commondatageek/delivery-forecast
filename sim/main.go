@@ -100,11 +100,11 @@ func (p *SamplePool) Draw(rng *rand.Rand) int {
 
 // SimulateItemsInDays runs N simulations and returns the distribution of
 // total items completed in `days` days by `engineers` engineers.
-func SimulateItemsInDays(pool *SamplePool, numEngineers, days, numSimulations int, rng *rand.Rand) []int {
+func SimulateItemsInDays(pool *SamplePool, numDailyDraws, days, numSimulations int, rng *rand.Rand) []int {
 	results := make([]int, numSimulations)
 	for i := range results {
 		total := 0
-		for e := 0; e < numEngineers; e++ {
+		for e := 0; e < numDailyDraws; e++ {
 			for d := 0; d < days; d++ {
 				total += pool.Draw(rng)
 			}
@@ -187,6 +187,9 @@ func loadPool(issuesFile, exclusionsFile string, includeEngineers []string, star
 		if err != nil {
 			continue
 		}
+		// For each globally excluded date string, parse it as a date,
+		// compute its index relative to the sample start date, and mark
+		// that index as excluded in the globalExcluded map.
 		idx := int(t.Sub(startDate).Hours() / 24)
 		globalExcluded[idx] = true
 	}
@@ -284,11 +287,13 @@ func isFlagSet(fs *flag.FlagSet, name string) bool {
 	return found
 }
 
+// defaultDateRange returns a default date range of the last 6 months, formatted as YYYY-MM-DD.
 func defaultDateRange() (start, end string) {
 	now := time.Now().UTC()
 	return now.AddDate(0, -6, 0).Format("2006-01-02"), now.Format("2006-01-02")
 }
 
+// cmdItems
 func cmdItems(args []string) error {
 	defaultStart, defaultEnd := defaultDateRange()
 	cmd := flag.NewFlagSet("items", flag.ExitOnError)
@@ -325,16 +330,16 @@ func cmdItems(args []string) error {
 	}
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	numEngineers := *engineers
+	numDailyDraws := *engineers
 	if *wholeTeam {
-		numEngineers = 1
+		numDailyDraws = 1
 	}
 
-	dist := SimulateItemsInDays(pool, numEngineers, *days, *simulations, rng)
+	dist := SimulateItemsInDays(pool, numDailyDraws, *days, *simulations, rng)
 	if *wholeTeam {
 		fmt.Printf("whole-team throughput, %d days -> how many items?\n", *days)
 	} else {
-		fmt.Printf("%d engineers, %d days -> how many items?\n", numEngineers, *days)
+		fmt.Printf("%d engineers, %d days -> how many items?\n", numDailyDraws, *days)
 	}
 	if len(percentiles) == 0 {
 		percentiles = percentileList{5, 25, 50, 75, 95}

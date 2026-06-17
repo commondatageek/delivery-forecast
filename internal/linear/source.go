@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -65,28 +66,48 @@ func (s *Source) Fetch(ctx context.Context, since time.Time) ([]item.Item, error
 	return items, nil
 }
 
-// ListTeams writes accessible teams to the provided writer (for CLI use).
+// ListTeams writes accessible teams to the provided writer (for CLI use),
+// sorted in ascending alphabetical order by team key.
 func (s *Source) ListTeams(ctx context.Context, w io.Writer) error {
-	body, err := json.Marshal(gqlRequest{Query: teamsQuery})
-	if err != nil {
-		return fmt.Errorf("marshal request: %w", err)
+	var teams []teamNode
+	var cursor string
+
+	for {
+		vars := map[string]any{}
+		if cursor != "" {
+			vars["after"] = cursor
+		}
+
+		body, err := json.Marshal(gqlRequest{Query: teamsQuery, Variables: vars})
+		if err != nil {
+			return fmt.Errorf("marshal request: %w", err)
+		}
+
+		raw, err := s.do(ctx, body)
+		if err != nil {
+			return err
+		}
+
+		var resp teamsResponse
+		if err := json.Unmarshal(raw, &resp); err != nil {
+			return fmt.Errorf("unmarshal teams: %w", err)
+		}
+		if len(resp.Errors) > 0 {
+			return fmt.Errorf("graphql error: %s", resp.Errors[0].Message)
+		}
+
+		teams = append(teams, resp.Data.Teams.Nodes...)
+
+		if !resp.Data.Teams.PageInfo.HasNextPage {
+			break
+		}
+		cursor = resp.Data.Teams.PageInfo.EndCursor
 	}
 
-	raw, err := s.do(ctx, body)
-	if err != nil {
-		return err
-	}
+	sort.Slice(teams, func(i, j int) bool { return teams[i].Key < teams[j].Key })
 
-	var resp teamsResponse
-	if err := json.Unmarshal(raw, &resp); err != nil {
-		return fmt.Errorf("unmarshal teams: %w", err)
-	}
-	if len(resp.Errors) > 0 {
-		return fmt.Errorf("graphql error: %s", resp.Errors[0].Message)
-	}
-
-	fmt.Fprintf(w, "accessible teams (%d):\n", len(resp.Data.Teams.Nodes))
-	for _, t := range resp.Data.Teams.Nodes {
+	fmt.Fprintf(w, "accessible teams (%d):\n", len(teams))
+	for _, t := range teams {
 		fmt.Fprintf(w, "  %-12s %s\n", t.Key, t.Name)
 	}
 	return nil
@@ -296,11 +317,15 @@ type gqlResponse struct {
 // Teams query
 
 const teamsQuery = `
-query {
-  teams {
+query Teams($after: String) {
+  teams(first: 250, after: $after) {
     nodes {
       key
       name
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
     }
   }
 }
@@ -312,7 +337,8 @@ type teamNode struct {
 }
 
 type teamsConnection struct {
-	Nodes []teamNode `json:"nodes"`
+	Nodes    []teamNode `json:"nodes"`
+	PageInfo pageInfo   `json:"pageInfo"`
 }
 
 type teamsData struct {

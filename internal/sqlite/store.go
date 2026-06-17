@@ -122,6 +122,102 @@ func (s *Store) LatestUpdatedAt(ctx context.Context, source string) (time.Time, 
 	return ts.Time, nil
 }
 
+// CompletedBetween returns completed items whose completed_at falls within
+// [start, end] (inclusive). If assignees is non-empty, only items whose
+// assignee is in that set are returned.
+//
+// Returned items have Source, Identifier, Title, Assignee, Team, Project,
+// Status, StartedAt, CompletedAt, and UpdatedAt populated.
+func (s *Store) CompletedBetween(ctx context.Context, source string, start, end time.Time, assignees []string) ([]item.Item, error) {
+	q := `
+SELECT source, identifier, title, assignee, team, project, status,
+       started_at, completed_at, updated_at
+FROM items
+WHERE source = ?
+  AND status = 'completed'
+  AND completed_at >= ?
+  AND completed_at <= ?`
+
+	args := []any{source, start.UTC(), end.UTC()}
+
+	if len(assignees) > 0 {
+		placeholders := make([]byte, 0, len(assignees)*2)
+		for i, a := range assignees {
+			if i > 0 {
+				placeholders = append(placeholders, ',')
+			}
+			placeholders = append(placeholders, '?')
+			args = append(args, a)
+		}
+		q += " AND assignee IN (" + string(placeholders) + ")"
+	}
+
+	rows, err := s.db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, fmt.Errorf("CompletedBetween: %w", err)
+	}
+	defer rows.Close()
+
+	var items []item.Item
+	for rows.Next() {
+		var it item.Item
+		var startedAt, completedAt, updatedAt sql.NullTime
+		if err := rows.Scan(
+			&it.Source, &it.Identifier, &it.Title, &it.Assignee,
+			&it.Team, &it.Project, &it.Status,
+			&startedAt, &completedAt, &updatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("CompletedBetween scan: %w", err)
+		}
+		if startedAt.Valid {
+			it.StartedAt = startedAt.Time
+		}
+		if completedAt.Valid {
+			it.CompletedAt = completedAt.Time
+		}
+		if updatedAt.Valid {
+			it.UpdatedAt = updatedAt.Time
+		}
+		items = append(items, it)
+	}
+	return items, rows.Err()
+}
+
+// InProgress returns items whose status is 'in_progress' and that have a
+// non-NULL started_at. Results are ordered by started_at ascending.
+func (s *Store) InProgress(ctx context.Context, source string) ([]item.Item, error) {
+	const q = `
+SELECT source, identifier, title, assignee, team, project, status, started_at
+FROM items
+WHERE source = ?
+  AND status = 'in_progress'
+  AND started_at IS NOT NULL
+ORDER BY started_at ASC`
+
+	rows, err := s.db.QueryContext(ctx, q, source)
+	if err != nil {
+		return nil, fmt.Errorf("InProgress: %w", err)
+	}
+	defer rows.Close()
+
+	var items []item.Item
+	for rows.Next() {
+		var it item.Item
+		var startedAt sql.NullTime
+		if err := rows.Scan(
+			&it.Source, &it.Identifier, &it.Title, &it.Assignee,
+			&it.Team, &it.Project, &it.Status, &startedAt,
+		); err != nil {
+			return nil, fmt.Errorf("InProgress scan: %w", err)
+		}
+		if startedAt.Valid {
+			it.StartedAt = startedAt.Time
+		}
+		items = append(items, it)
+	}
+	return items, rows.Err()
+}
+
 // nullTime converts a time.Time to sql.NullTime, treating zero as NULL.
 func nullTime(t time.Time) sql.NullTime {
 	if t.IsZero() {

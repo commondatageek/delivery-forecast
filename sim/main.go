@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -12,6 +13,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"forecasting/internal/sqlite"
 )
 
 // stringList is a flag.Value for a comma-separated list of strings.
@@ -327,6 +330,95 @@ func loadPool(issuesFile, exclusionsFile string, includeEngineers []string, star
 	return pool, nil
 }
 
+// loadPoolFromDB builds a SamplePool by querying the SQLite store instead of
+// reading NDJSON. It is the preferred path when -db is provided.
+func loadPoolFromDB(dbPath, exclusionsFile string, includeEngineers []string, startDate, endDate time.Time, wholeTeam bool) (*SamplePool, error) {
+	store, err := sqlite.Open(dbPath)
+	if err != nil {
+		return nil, fmt.Errorf("open db: %w", err)
+	}
+	defer store.Close()
+
+	items, err := store.CompletedBetween(context.Background(), "linear", startDate, endDate, includeEngineers)
+	if err != nil {
+		return nil, fmt.Errorf("querying db: %w", err)
+	}
+
+	exc, err := loadExclusions(exclusionsFile)
+	if err != nil {
+		return nil, err
+	}
+
+	totalDays := int(endDate.Sub(startDate).Hours()/24) + 1
+
+	globalExcluded := make(map[int]bool)
+	for _, ds := range exc.Global {
+		t, err := time.ParseInLocation("2006-01-02", ds, time.UTC)
+		if err != nil {
+			continue
+		}
+		idx := int(t.Sub(startDate).Hours() / 24)
+		globalExcluded[idx] = true
+	}
+
+	type engData struct {
+		counts []int
+	}
+	engineers := make(map[string]*engData)
+	for _, it := range items {
+		if _, ok := engineers[it.Assignee]; !ok {
+			engineers[it.Assignee] = &engData{counts: make([]int, totalDays)}
+		}
+		t := it.CompletedAt.UTC().Truncate(24 * time.Hour)
+		idx := int(t.Sub(startDate).Hours() / 24)
+		if idx >= 0 && idx < totalDays {
+			engineers[it.Assignee].counts[idx]++
+		}
+	}
+
+	pool := &SamplePool{PerEngineer: make(map[string][]int)}
+
+	if wholeTeam {
+		teamCounts := make([]int, totalDays)
+		for _, eng := range engineers {
+			for i, count := range eng.counts {
+				teamCounts[i] += count
+			}
+		}
+		var teamSamples []int
+		for i, count := range teamCounts {
+			if !globalExcluded[i] {
+				teamSamples = append(teamSamples, count)
+			}
+		}
+		pool.PerEngineer["__whole_team__"] = teamSamples
+	} else {
+		for name, eng := range engineers {
+			excluded := make(map[int]bool, len(globalExcluded))
+			for k := range globalExcluded {
+				excluded[k] = true
+			}
+			for _, ds := range exc.Engineers[name] {
+				t, err := time.ParseInLocation("2006-01-02", ds, time.UTC)
+				if err != nil {
+					continue
+				}
+				idx := int(t.Sub(startDate).Hours() / 24)
+				excluded[idx] = true
+			}
+			var engineerSamples []int
+			for i, count := range eng.counts {
+				if !excluded[i] {
+					engineerSamples = append(engineerSamples, count)
+				}
+			}
+			pool.PerEngineer[name] = engineerSamples
+		}
+	}
+
+	return pool, nil
+}
+
 // isFlagSet reports whether a flag was explicitly provided on the command line.
 func isFlagSet(fs *flag.FlagSet, name string) bool {
 	found := false
@@ -336,6 +428,16 @@ func isFlagSet(fs *flag.FlagSet, name string) bool {
 		}
 	})
 	return found
+}
+
+// resolvePool picks the DB-backed loader when -db was explicitly set or when
+// -issues was not explicitly set (so -db is the new default). Falls back to
+// the NDJSON loader only when -issues is explicitly provided.
+func resolvePool(cmd *flag.FlagSet, dbPath, issuesFile, exclusionsFile string, include []string, startDate, endDate time.Time, wholeTeam bool) (*SamplePool, error) {
+	if isFlagSet(cmd, "issues") {
+		return loadPool(issuesFile, exclusionsFile, include, startDate, endDate, wholeTeam)
+	}
+	return loadPoolFromDB(dbPath, exclusionsFile, include, startDate, endDate, wholeTeam)
 }
 
 // defaultDateRange returns a default date range of the last 6 months, formatted as YYYY-MM-DD.
@@ -348,7 +450,8 @@ func defaultDateRange() (start, end string) {
 func cmdItems(args []string) error {
 	defaultStart, defaultEnd := defaultDateRange()
 	cmd := flag.NewFlagSet("items", flag.ExitOnError)
-	issuesFile := cmd.String("issues", "issues.json", "path to issues JSON file")
+	dbFile := cmd.String("db", "items.db", "path to SQLite database (default source)")
+	issuesFile := cmd.String("issues", "issues.json", "path to NDJSON issues file (overrides -db)")
 	exclusionsFile := cmd.String("exclusions", "exclusions.json", "path to exclusions JSON file")
 	engineers := cmd.Int("engineers", 3, "number of (equivalent) engineers")
 	days := cmd.Int("days", 30, "number of days")
@@ -383,7 +486,7 @@ func cmdItems(args []string) error {
 		return fmt.Errorf("invalid -sample-end date: %w", err)
 	}
 
-	pool, err := loadPool(*issuesFile, *exclusionsFile, include, startDate, endDate, *wholeTeam)
+	pool, err := resolvePool(cmd, *dbFile, *issuesFile, *exclusionsFile, include, startDate, endDate, *wholeTeam)
 	if err != nil {
 		return err
 	}
@@ -422,7 +525,8 @@ func cmdItems(args []string) error {
 func cmdDays(args []string) error {
 	defaultSampleStart, defaultSampleEnd := defaultDateRange()
 	cmd := flag.NewFlagSet("days", flag.ExitOnError)
-	issuesFile := cmd.String("issues", "issues.json", "path to issues JSON file")
+	dbFile := cmd.String("db", "items.db", "path to SQLite database (default source)")
+	issuesFile := cmd.String("issues", "issues.json", "path to NDJSON issues file (overrides -db)")
 	exclusionsFile := cmd.String("exclusions", "exclusions.json", "path to exclusions JSON file")
 	engineers := cmd.Int("engineers", 3, "number of (equivalent) engineers")
 	items := cmd.Int("items", 50, "number of items to complete")
@@ -457,7 +561,7 @@ func cmdDays(args []string) error {
 		return fmt.Errorf("invalid -sample-end date: %w", err)
 	}
 
-	pool, err := loadPool(*issuesFile, *exclusionsFile, include, startDate, endDate, *wholeTeam)
+	pool, err := resolvePool(cmd, *dbFile, *issuesFile, *exclusionsFile, include, startDate, endDate, *wholeTeam)
 	if err != nil {
 		return err
 	}
@@ -496,7 +600,8 @@ func cmdDays(args []string) error {
 func cmdProbability(args []string) error {
 	defaultStart, defaultEnd := defaultDateRange()
 	cmd := flag.NewFlagSet("probability", flag.ExitOnError)
-	issuesFile := cmd.String("issues", "issues.json", "path to issues JSON file")
+	dbFile := cmd.String("db", "items.db", "path to SQLite database (default source)")
+	issuesFile := cmd.String("issues", "issues.json", "path to NDJSON issues file (overrides -db)")
 	exclusionsFile := cmd.String("exclusions", "exclusions.json", "path to exclusions JSON file")
 	engineers := cmd.Int("engineers", 3, "number of (equivalent) engineers")
 	days := cmd.Int("days", 30, "number of days")
@@ -530,7 +635,7 @@ func cmdProbability(args []string) error {
 		return fmt.Errorf("invalid -sample-end date: %w", err)
 	}
 
-	pool, err := loadPool(*issuesFile, *exclusionsFile, include, startDate, endDate, *wholeTeam)
+	pool, err := resolvePool(cmd, *dbFile, *issuesFile, *exclusionsFile, include, startDate, endDate, *wholeTeam)
 	if err != nil {
 		return err
 	}

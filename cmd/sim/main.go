@@ -316,6 +316,7 @@ func loadPool(issuesFile, exclusionsFile string, includeEngineers []string, star
 	for _, issue := range issues {
 		engineerSeen[issue.Engineer] = true
 	}
+	warnUnmatchedIncludes(includeEngineers, engineerSeen)
 
 	// Build per-day counts per engineer
 	type engData struct {
@@ -407,6 +408,12 @@ func loadPoolFromDB(dbPath, exclusionsFile string, includeEngineers []string, st
 		return nil, fmt.Errorf("querying db: %w", err)
 	}
 
+	engineerSeen := make(map[string]bool, len(items))
+	for _, it := range items {
+		engineerSeen[it.Assignee] = true
+	}
+	warnUnmatchedIncludes(includeEngineers, engineerSeen)
+
 	exc, err := loadExclusions(exclusionsFile)
 	if err != nil {
 		return nil, err
@@ -480,6 +487,16 @@ func loadPoolFromDB(dbPath, exclusionsFile string, includeEngineers []string, st
 	}
 
 	return pool, nil
+}
+
+// warnUnmatchedIncludes logs a warning for any name in includeEngineers that
+// doesn't appear in seen, which usually indicates a typo in -include.
+func warnUnmatchedIncludes(includeEngineers []string, seen map[string]bool) {
+	for _, name := range includeEngineers {
+		if !seen[name] {
+			fmt.Fprintf(os.Stderr, "WARNING: -include engineer %q not found in data\n", name)
+		}
+	}
 }
 
 // isFlagSet reports whether a flag was explicitly provided on the command line.

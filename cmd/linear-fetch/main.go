@@ -12,20 +12,6 @@ import (
 	"forecasting/internal/linear"
 )
 
-type teamList []string
-
-func (t *teamList) String() string { return strings.Join(*t, ",") }
-func (t *teamList) Set(val string) error {
-	*t = nil
-	for _, part := range strings.Split(val, ",") {
-		part = strings.ToUpper(strings.TrimSpace(part))
-		if part != "" {
-			*t = append(*t, part)
-		}
-	}
-	return nil
-}
-
 // outputIssue preserves the existing issues.json wire format.
 type outputIssue struct {
 	Engineer    string `json:"engineer"`
@@ -39,7 +25,7 @@ type outputIssue struct {
 }
 
 func main() {
-	var teams teamList
+	var teams linear.KeyList
 	flag.Var(&teams, "teams", "comma-separated list of Linear team keys (e.g. ENG,DESIGN); required unless -all-teams")
 	allTeams := flag.Bool("all-teams", false, "fetch issues for all accessible teams; mutually exclusive with -teams")
 	listTeamsFlag := flag.Bool("list-teams", false, "list accessible teams and their keys, then exit")

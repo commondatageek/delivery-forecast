@@ -18,25 +18,26 @@ func main() {
 	flag.Var(&teams, "teams", "comma-separated team keys, e.g. ENG,DESIGN (source=linear only); required unless -all-teams")
 	allTeams := flag.Bool("all-teams", false, "fetch issues for all accessible teams (source=linear only); mutually exclusive with -teams")
 	listTeamsFlag := flag.Bool("list-teams", false, "list accessible teams and their keys, then exit (source=linear only)")
+	syncAll := flag.Bool("sync-all", false, "ignore the stored watermark and do a full reload from the source")
 	db := flag.String("db", "items.db", "path to SQLite database file")
 	flag.Parse()
 
-	if err := run(context.Background(), *source, teams, *allTeams, *listTeamsFlag, *db); err != nil {
+	if err := run(context.Background(), *source, teams, *allTeams, *listTeamsFlag, *syncAll, *db); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func run(ctx context.Context, source string, teams linear.KeyList, allTeams, listTeams bool, dbPath string) error {
+func run(ctx context.Context, source string, teams linear.KeyList, allTeams, listTeams, syncAll bool, dbPath string) error {
 	switch source {
 	case "linear":
-		return syncLinear(ctx, teams, allTeams, listTeams, dbPath)
+		return syncLinear(ctx, teams, allTeams, listTeams, syncAll, dbPath)
 	default:
 		return fmt.Errorf("unknown source %q; supported: linear", source)
 	}
 }
 
-func syncLinear(ctx context.Context, teams linear.KeyList, allTeams, listTeams bool, dbPath string) error {
+func syncLinear(ctx context.Context, teams linear.KeyList, allTeams, listTeams, syncAll bool, dbPath string) error {
 	apiKey := os.Getenv("LINEAR_API_KEY")
 	if apiKey == "" {
 		return fmt.Errorf("LINEAR_API_KEY environment variable is not set")
@@ -67,7 +68,7 @@ func syncLinear(ctx context.Context, teams linear.KeyList, allTeams, listTeams b
 	}
 	defer store.Close()
 
-	n, err := internalsync.Sync(ctx, src, store)
+	n, err := internalsync.Sync(ctx, src, store, syncAll)
 	if err != nil {
 		return err
 	}

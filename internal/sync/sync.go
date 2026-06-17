@@ -4,6 +4,7 @@ package sync
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"forecasting/internal/item"
 	"forecasting/internal/sqlite"
@@ -14,10 +15,15 @@ import (
 // trample each other.
 //
 // A zero watermark (no items stored yet for this source) triggers a full fetch.
-func Sync(ctx context.Context, src item.Source, store *sqlite.Store) (int, error) {
-	since, err := store.LatestUpdatedAt(ctx, src.Name())
-	if err != nil {
-		return 0, fmt.Errorf("watermark: %w", err)
+// If full is true, the watermark is ignored and every item is refetched.
+func Sync(ctx context.Context, src item.Source, store *sqlite.Store, full bool) (int, error) {
+	var since time.Time
+	if !full {
+		var err error
+		since, err = store.LatestUpdatedAt(ctx, src.Name())
+		if err != nil {
+			return 0, fmt.Errorf("watermark: %w", err)
+		}
 	}
 
 	items, err := src.Fetch(ctx, since)

@@ -271,6 +271,31 @@ func parseDate(s string) (time.Time, error) {
 	return time.ParseInLocation("2006-01-02", s, time.UTC)
 }
 
+// resolveEndDate returns the end of the sample window. If -sample-end was
+// explicitly passed, it's parsed as a calendar date (midnight, exclusive of
+// that whole day). Otherwise it defaults to the current moment, so that
+// today's already-completed work is included up to right now rather than
+// being dropped entirely by a midnight-of-today cutoff.
+func resolveEndDate(cmd *flag.FlagSet, sampleEnd string) (time.Time, error) {
+	if !isFlagSet(cmd, "sample-end") {
+		return time.Now().UTC(), nil
+	}
+	return parseDate(sampleEnd)
+}
+
+// daysBetween returns the number of per-day sample slots in [start, end).
+// end is normally a calendar date at midnight, in which case that day is
+// fully excluded. If end carries a time-of-day (e.g. it's "now"), the day
+// it falls on is partially in range, so it gets one inclusive slot.
+func daysBetween(start, end time.Time) int {
+	endDay := end.Truncate(24 * time.Hour)
+	days := int(endDay.Sub(start).Hours() / 24)
+	if !end.Equal(endDay) {
+		days++
+	}
+	return days
+}
+
 func loadPool(issuesFile, exclusionsFile string, includeEngineers []string, startDate, endDate time.Time, wholeTeam bool) (*SamplePool, error) {
 	data, err := os.ReadFile(issuesFile)
 	if err != nil {
@@ -291,7 +316,7 @@ func loadPool(issuesFile, exclusionsFile string, includeEngineers []string, star
 		return nil, err
 	}
 
-	totalDays := int(endDate.Sub(startDate).Hours()/24) + 1
+	totalDays := daysBetween(startDate, endDate)
 
 	// Build global excluded date index set
 	globalExcluded := make(map[int]bool)
@@ -419,7 +444,7 @@ func loadPoolFromDB(dbPath, exclusionsFile string, includeEngineers []string, st
 		return nil, err
 	}
 
-	totalDays := int(endDate.Sub(startDate).Hours()/24) + 1
+	totalDays := daysBetween(startDate, endDate)
 
 	globalExcluded := make(map[int]bool)
 	for _, ds := range exc.Global {
@@ -572,7 +597,7 @@ func cmdItems(args []string) error {
 	if err != nil {
 		return fmt.Errorf("invalid -sample-start date: %w", err)
 	}
-	endDate, err := parseDate(*sampleEnd)
+	endDate, err := resolveEndDate(cmd, *sampleEnd)
 	if err != nil {
 		return fmt.Errorf("invalid -sample-end date: %w", err)
 	}
@@ -649,7 +674,7 @@ func cmdDays(args []string) error {
 	if err != nil {
 		return fmt.Errorf("invalid -sample-start date: %w", err)
 	}
-	endDate, err := parseDate(*sampleEnd)
+	endDate, err := resolveEndDate(cmd, *sampleEnd)
 	if err != nil {
 		return fmt.Errorf("invalid -sample-end date: %w", err)
 	}
@@ -725,7 +750,7 @@ func cmdProbability(args []string) error {
 	if err != nil {
 		return fmt.Errorf("invalid -sample-start date: %w", err)
 	}
-	endDate, err := parseDate(*sampleEnd)
+	endDate, err := resolveEndDate(cmd, *sampleEnd)
 	if err != nil {
 		return fmt.Errorf("invalid -sample-end date: %w", err)
 	}

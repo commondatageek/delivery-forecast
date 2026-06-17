@@ -130,8 +130,8 @@ func (s *Store) LatestUpdatedAt(ctx context.Context, source string) (time.Time, 
 }
 
 // CompletedBetween returns completed items whose completed_at falls within
-// [start, end] (inclusive). If assignees is non-empty, only items whose
-// assignee is in that set are returned.
+// [start, end) — start inclusive, end exclusive. If assignees is non-empty,
+// only items whose assignee is in that set are returned.
 //
 // Returned items have Source, Identifier, Title, Assignee, Team, Project,
 // Status, StartedAt, CompletedAt, and UpdatedAt populated.
@@ -143,7 +143,7 @@ FROM items
 WHERE source = ?
   AND status = 'completed'
   AND completed_at >= ?
-  AND completed_at <= ?`
+  AND completed_at < ?`
 
 	args := []any{source, start.UTC(), end.UTC()}
 

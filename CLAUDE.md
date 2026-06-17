@@ -7,42 +7,68 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Uses [Task](https://taskfile.dev) for automation (`task` CLI required):
 
 ```bash
-task build       # Compile Go binaries to bin/
-task generate    # Generate synthetic issues.json via Python
-task fetch       # Fetch real data from Linear (requires LINEAR_API_KEY env var)
+task build       # Compile all Go binaries to bin/
+task generate    # Generate synthetic issues.json via Python (py/generate-issues)
+task fetch       # Sync completed/in-progress issues from Linear into items.db (requires LINEAR_API_KEY)
 ```
 
-Manual builds:
+Manual builds (mirrors `task build`):
 ```bash
-go build -C sim -o ../bin/sim .
-go build -C linear-fetch -o ../bin/linear-fetch .
+go build -C cmd/aging-report -o ../../bin/aging-report .
+go build -C cmd/linear-fetch -o ../../bin/linear-fetch .
+go build -C cmd/sim -o ../../bin/sim .
+go build -C cmd/sync -o ../../bin/sync .
 ```
 
-There are no automated tests or linting configured.
+Single Go module (`forecasting`, see `go.mod`) — no `go.work`. There are no automated tests or linting configured.
 
 ## Architecture
 
-Three independent components sharing a common newline-delimited JSON data format:
+This is a throughput-forecasting toolkit built around one vendor-neutral data model (`internal/item.Item`) that flows into a single SQLite store, which the simulation and reporting tools query.
 
-**`generate-issues/main.py`** — Python script that generates synthetic historical issue data for testing. Outputs to stdout. No dependencies.
+```
+Source (Linear API)  --Fetch-->  item.Item  --Upsert-->  sqlite.Store (items.db)
+                                                                |
+                                          +---------------------+----------------------+
+                                          |                                            |
+                                     cmd/sim                                  cmd/aging-report
+                              (Monte Carlo forecasts)                    (cycle-time / WIP-age report)
+```
 
-**`linear-fetch/main.go`** — Fetches completed issues from the Linear.app GraphQL API (paginated). Reads `LINEAR_API_KEY` from environment, outputs newline-delimited JSON to stdout, logs progress to stderr.
+**`internal/item`** — Defines `Item` (the common record: source, identifier, assignee, team, project, status, timestamps) and the `Source` interface (`Name() string`, `Fetch(ctx, since) ([]Item, error)`). Every upstream integration implements `Source`; everything downstream consumes `Item`. `since == zero time` means a full fetch.
 
-**`sim/main.go`** — The core Monte Carlo simulation engine. Three subcommands:
-- `items` — how many items can N engineers complete in D days?
-- `days` — how many days for N engineers to complete I items?
-- `probability` — what's the probability of completing I items in D days?
+**`internal/linear`** — Implements `item.Source` for the Linear.app GraphQL API (`Source.Fetch`, paginated, filters to `completed`/`started` issues with a non-null assignee). `KeyList` is a `flag.Value` for comma-separated, upper-cased team keys. In-progress issues without a `startedAt` are dropped (can't be used for aging).
 
-It reads `issues.json` and `exclusions.json`, builds a `SamplePool` of historical daily completion counts per engineer, then runs N simulations (default 10,000) by randomly sampling from that pool.
+**`internal/sqlite`** — The only place SQL lives. `Store` wraps a `database/sql` SQLite connection (via `modernc.org/sqlite`, pure Go, no cgo) with WAL mode and goose migrations embedded from `migrations/*.sql`. Key methods: `Upsert` (keyed on `source, identifier`), `LatestUpdatedAt` (per-source watermark for incremental sync), `CompletedBetween` (date-ranged, optionally assignee-filtered), `InProgress`.
+
+**`internal/sync`** — `Sync(ctx, src, store, full)` orchestrates fetch → upsert. Watermarks are derived per `src.Name()` from the items table itself (via `LatestUpdatedAt`), so a zero watermark triggers a full fetch and multiple sources never clobber each other's incremental state.
+
+### Commands (`cmd/`)
+
+- **`sync`** — Production path. Syncs an `item.Source` (currently only `linear`) into `items.db`. `-sync-all` forces a full reload ignoring the watermark; `-all-teams` vs `-teams` selects scope.
+- **`sim`** — The Monte Carlo engine. Three subcommands:
+  - `items` — how many items can N engineers complete in D days?
+  - `days` — how many days for N engineers to complete I items?
+  - `probability` — probability of completing I items in D days?
+
+  Builds a `SamplePool` (per-engineer slice of daily completion counts over `[sample-start, sample-end)`) and runs `-simulations` trials by resampling, parallelized across `-goroutines` workers (each with its own seeded `*rand.Rand` — never share one across goroutines). Three sampling modes, mutually exclusive: anonymous `-engineers N` (pools all engineers' samples together), named `-team a,b,c` (each engineer draws from their own history), and `-whole-team` (sums all engineers into one daily series, ignoring individual variance). Defaults to reading from `-db items.db`; passing `-issues` explicitly switches to the legacy NDJSON loader instead (see `resolvePool`/`isFlagSet` in `cmd/sim/main.go` — flag *presence*, not value, decides the source).
+- **`aging-report`** — WIP-age / cycle-time report. Computes the historical cycle-time distribution (`completed_at - started_at`) from completed issues, then ranks currently in-progress issues by percentile against that distribution. Same `-db` vs `-issues` dual-path convention as `sim`. Outputs `text`, `json`, or `html`.
+- **`linear-fetch`** — Thin one-shot CLI: fetches from Linear and prints NDJSON to stdout (no DB). Mostly superseded by `sync`, kept for ad-hoc/legacy NDJSON workflows.
+
+**`py/generate-issues/main.py`** — Generates synthetic NDJSON issue data for testing, in the same wire format `sim`/`aging-report` expect. No dependencies; managed with `uv` (see `pyproject.toml`/`uv.lock`).
+
+**`scripts/check-engineer-data.sh`** — Sanity-checks `items.db` for a set of engineers before trusting a `sim`/`aging-report` run (completed-item counts, distinct days with completions, zero-count days, lifetime first/last completion). Mirrors `sim`'s date semantics: start inclusive, end exclusive.
 
 ### Data formats
 
-**`issues.json`** (input to `sim`, output of `linear-fetch` and `generate-issues`):
+**`items.db`** (SQLite, the primary data store) — single `items` table, primary key `(source, identifier)`. Schema in `internal/sqlite/migrations/00001_create_items.sql`.
+
+**NDJSON issues file** (legacy/alternate input to `sim` and `aging-report`, output of `linear-fetch` and `generate-issues`) — one JSON object per line:
 ```json
-{"engineer": "alice", "title": "Fix bug", "completed_at": "2025-08-01T14:00:00Z"}
+{"engineer": "alice", "team": "ENG", "identifier": "ENG-123", "title": "Fix bug", "project": "Q3", "started_at": "2025-08-01T10:00:00Z", "completed_at": "2025-08-01T14:00:00Z", "status": "completed"}
 ```
 
-**`exclusions.json`** (optional input to `sim`):
+**`exclusions.json`** (optional input to `sim`, e.g. for holidays):
 ```json
 {
   "global": ["2024-12-25"],
@@ -50,31 +76,11 @@ It reads `issues.json` and `exclusions.json`, builds a `SamplePool` of historica
 }
 ```
 
-### Go workspace
+### Conventions worth knowing
 
-`go.work` defines a multi-module workspace with two modules: `sim/` and `linear-fetch/`. Neither has external dependencies.
-
-### Key `sim` flags
-
-| Flag | Description |
-|------|-------------|
-| `-issues` | Input data file path |
-| `-exclusions` | Exclusion dates file path |
-| `-engineers` | Team size (default: 3) |
-| `-days` / `-items` | Simulation parameters |
-| `-simulations` | Monte Carlo runs (default: 10,000) |
-| `-sample-start` / `-sample-end` | Historical data window |
-| `-percentile` | Which percentiles to output |
-| `-include` | Filter to specific engineers (comma-separated) |
-
-### Example usage
-
-```bash
-./bin/sim items -engineers 4 -days 30 -issues issues.json
-./bin/sim days -engineers 3 -items 80 -issues issues.json
-./bin/sim probability -engineers 5 -days 14 -items 40 -issues issues.json
-LINEAR_API_KEY=... ./bin/linear-fetch -teams ENG > issues.json
-```
+- `-db` vs `-issues`: across `sim` and `aging-report`, the SQLite path is the default; explicitly passing `-issues` switches to the NDJSON loader. This is decided by flag *presence* (`isFlagSet`), not by whether `-db` was also passed.
+- `-sample-end` semantics: if explicitly set, it's a calendar date (midnight, that day excluded). If omitted, it defaults to *now* so today's already-completed work counts (see `resolveEndDate`/`daysBetween` in `cmd/sim/main.go`).
+- Random seeding: `-random-seed` is time-based (non-deterministic) unless explicitly passed, via the same `isFlagSet` pattern.
 
 ## On-call modeling
 

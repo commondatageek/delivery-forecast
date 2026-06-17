@@ -9,9 +9,12 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"forecasting/internal/sqlite"
@@ -119,6 +122,7 @@ type progressBar struct {
 	enabled bool
 	total   int
 	step    int
+	mu      sync.Mutex
 }
 
 func newProgressBar(total int) *progressBar {
@@ -133,6 +137,8 @@ func (b *progressBar) update(done int) {
 	if !b.enabled || (done != b.total && done%b.step != 0) {
 		return
 	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
 	const width = 30
 	filled := width * done / b.total
 	fmt.Fprintf(os.Stderr, "\r[%s%s] %d/%d", strings.Repeat("=", filled), strings.Repeat(" ", width-filled), done, b.total)
@@ -143,51 +149,75 @@ func (b *progressBar) update(done int) {
 
 // --- Simulation ---
 
+// runSimulations runs numSimulations independent trials across numWorkers
+// goroutines and returns the sorted distribution of their results. Each worker
+// owns a disjoint range of the results slice (so no locking is needed on the
+// results) and gets its own *rand.Rand seeded from seed plus its worker index,
+// since rand.Rand is not safe for concurrent use.
+func runSimulations(numSimulations, numWorkers int, seed int64, trial func(rng *rand.Rand) int) []int {
+	if numWorkers < 1 {
+		numWorkers = 1
+	}
+	results := make([]int, numSimulations)
+	bar := newProgressBar(numSimulations)
+	var done atomic.Int64
+	var wg sync.WaitGroup
+
+	chunk := (numSimulations + numWorkers - 1) / numWorkers
+	for w := 0; w < numWorkers; w++ {
+		start := w * chunk
+		if start >= numSimulations {
+			break
+		}
+		end := min(start+chunk, numSimulations)
+		wg.Add(1)
+		go func(start, end, w int) {
+			defer wg.Done()
+			rng := rand.New(rand.NewSource(seed + int64(w)))
+			for i := start; i < end; i++ {
+				results[i] = trial(rng)
+				bar.update(int(done.Add(1)))
+			}
+		}(start, end, w)
+	}
+	wg.Wait()
+	sort.Ints(results)
+	return results
+}
+
 // SimulateItemsInDays runs N simulations and returns the distribution of
 // total items completed in `days` days by `numDailyDraws` equivalent engineers.
 // samples is a flat slice of daily completion counts to sample from.
-func SimulateItemsInDays(samples []int, numDailyDraws, days, numSimulations int, rng *rand.Rand) []int {
-	results := make([]int, numSimulations)
-	bar := newProgressBar(numSimulations)
-	for i := range results {
+func SimulateItemsInDays(samples []int, numDailyDraws, days, numSimulations, numWorkers int, seed int64) []int {
+	return runSimulations(numSimulations, numWorkers, seed, func(rng *rand.Rand) int {
 		total := 0
 		for e := 0; e < numDailyDraws; e++ {
 			for d := 0; d < days; d++ {
 				total += samples[rng.Intn(len(samples))]
 			}
 		}
-		results[i] = total
-		bar.update(i + 1)
-	}
-	sort.Ints(results)
-	return results
+		return total
+	})
 }
 
 // SimulateItemsInDaysPerEngineer runs N simulations for named engineers,
 // where each engineer samples from their own historical performance pool.
-func SimulateItemsInDaysPerEngineer(pool *SamplePool, teamMembers []string, days, numSimulations int, rng *rand.Rand) []int {
-	results := make([]int, numSimulations)
-	bar := newProgressBar(numSimulations)
-	for i := range results {
+func SimulateItemsInDaysPerEngineer(pool *SamplePool, teamMembers []string, days, numSimulations, numWorkers int, seed int64) []int {
+	return runSimulations(numSimulations, numWorkers, seed, func(rng *rand.Rand) int {
 		total := 0
 		for _, engineer := range teamMembers {
 			for d := 0; d < days; d++ {
 				total += pool.DrawFromEngineer(engineer, rng)
 			}
 		}
-		results[i] = total
-		bar.update(i + 1)
-	}
-	sort.Ints(results)
-	return results
+		return total
+	})
 }
 
 // SimulateDaysToCompletePerEngineer runs N simulations for named engineers,
 // where each engineer samples from their own historical performance pool.
-func SimulateDaysToCompletePerEngineer(pool *SamplePool, teamMembers []string, items, numSimulations int, rng *rand.Rand) []int {
-	results := make([]int, numSimulations)
-	bar := newProgressBar(numSimulations)
-	for i := range results {
+func SimulateDaysToCompletePerEngineer(pool *SamplePool, teamMembers []string, items, numSimulations, numWorkers int, seed int64) []int {
+	return runSimulations(numSimulations, numWorkers, seed, func(rng *rand.Rand) int {
 		completed := 0
 		days := 0
 		for completed < items {
@@ -196,20 +226,15 @@ func SimulateDaysToCompletePerEngineer(pool *SamplePool, teamMembers []string, i
 				completed += pool.DrawFromEngineer(engineer, rng)
 			}
 		}
-		results[i] = days
-		bar.update(i + 1)
-	}
-	sort.Ints(results)
-	return results
+		return days
+	})
 }
 
 // SimulateDaysToComplete runs N simulations and returns the distribution of
 // days needed for `numEngineers` equivalent engineers to complete `items` items.
 // samples is a flat slice of daily completion counts to sample from.
-func SimulateDaysToComplete(samples []int, numEngineers, items, numSimulations int, rng *rand.Rand) []int {
-	results := make([]int, numSimulations)
-	bar := newProgressBar(numSimulations)
-	for i := range results {
+func SimulateDaysToComplete(samples []int, numEngineers, items, numSimulations, numWorkers int, seed int64) []int {
+	return runSimulations(numSimulations, numWorkers, seed, func(rng *rand.Rand) int {
 		completed := 0
 		days := 0
 		for completed < items {
@@ -218,11 +243,8 @@ func SimulateDaysToComplete(samples []int, numEngineers, items, numSimulations i
 				completed += samples[rng.Intn(len(samples))]
 			}
 		}
-		results[i] = days
-		bar.update(i + 1)
-	}
-	sort.Ints(results)
-	return results
+		return days
+	})
 }
 
 // Percentile returns the value at the given percentile (0-100) from a sorted slice.
@@ -498,6 +520,7 @@ func cmdItems(args []string) error {
 	days := cmd.Int("days", 30, "number of days")
 	wholeTeam := cmd.Bool("whole-team", false, "use whole-team daily throughput from historical data (ignores -engineers)")
 	simulations := cmd.Int("simulations", 10_000, "number of Monte Carlo simulations to run")
+	goroutines := cmd.Int("goroutines", runtime.NumCPU(), "number of parallel worker goroutines")
 	sampleStart := cmd.String("sample-start", defaultStart, "sample data start date (YYYY-MM-DD)")
 	sampleEnd := cmd.String("sample-end", defaultEnd, "sample data end date (YYYY-MM-DD)")
 	var percentiles percentileList
@@ -531,7 +554,7 @@ func cmdItems(args []string) error {
 	if err != nil {
 		return err
 	}
-	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	seed := time.Now().UnixNano()
 
 	var dist []int
 	if len(team) > 0 {
@@ -541,16 +564,16 @@ func cmdItems(args []string) error {
 				return fmt.Errorf("engineer %q not found in data", name)
 			}
 		}
-		dist = SimulateItemsInDaysPerEngineer(pool, team, *days, *simulations, rng)
+		dist = SimulateItemsInDaysPerEngineer(pool, team, *days, *simulations, *goroutines, seed)
 		fmt.Printf("Team [%s], %d days -> how many items?\n", strings.Join(team, ", "), *days)
 	} else if *wholeTeam {
 		// Whole team mode
-		dist = SimulateItemsInDays(pool.PerEngineer["__whole_team__"], 1, *days, *simulations, rng)
+		dist = SimulateItemsInDays(pool.PerEngineer["__whole_team__"], 1, *days, *simulations, *goroutines, seed)
 		fmt.Printf("whole-team throughput, %d days -> how many items?\n", *days)
 	} else {
 		// Anonymous engineers mode
 		combinedSamples := pool.GetCombinedSamples()
-		dist = SimulateItemsInDays(combinedSamples, *engineers, *days, *simulations, rng)
+		dist = SimulateItemsInDays(combinedSamples, *engineers, *days, *simulations, *goroutines, seed)
 		fmt.Printf("%d engineers, %d days -> how many items?\n", *engineers, *days)
 	}
 
@@ -573,6 +596,7 @@ func cmdDays(args []string) error {
 	items := cmd.Int("items", 50, "number of items to complete")
 	wholeTeam := cmd.Bool("whole-team", false, "use whole-team daily throughput from historical data (ignores -engineers)")
 	simulations := cmd.Int("simulations", 10_000, "number of Monte Carlo simulations to run")
+	goroutines := cmd.Int("goroutines", runtime.NumCPU(), "number of parallel worker goroutines")
 	sampleStart := cmd.String("sample-start", defaultSampleStart, "sample data start date (YYYY-MM-DD)")
 	sampleEnd := cmd.String("sample-end", defaultSampleEnd, "sample data end date (YYYY-MM-DD)")
 	var percentiles percentileList
@@ -606,7 +630,7 @@ func cmdDays(args []string) error {
 	if err != nil {
 		return err
 	}
-	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	seed := time.Now().UnixNano()
 
 	var dist []int
 	if len(team) > 0 {
@@ -616,16 +640,16 @@ func cmdDays(args []string) error {
 				return fmt.Errorf("engineer %q not found in data", name)
 			}
 		}
-		dist = SimulateDaysToCompletePerEngineer(pool, team, *items, *simulations, rng)
+		dist = SimulateDaysToCompletePerEngineer(pool, team, *items, *simulations, *goroutines, seed)
 		fmt.Printf("Team [%s], %d items -> how many days?\n", strings.Join(team, ", "), *items)
 	} else if *wholeTeam {
 		// Whole team mode
-		dist = SimulateDaysToComplete(pool.PerEngineer["__whole_team__"], 1, *items, *simulations, rng)
+		dist = SimulateDaysToComplete(pool.PerEngineer["__whole_team__"], 1, *items, *simulations, *goroutines, seed)
 		fmt.Printf("whole-team throughput, %d items -> how many days?\n", *items)
 	} else {
 		// Anonymous engineers mode
 		combinedSamples := pool.GetCombinedSamples()
-		dist = SimulateDaysToComplete(combinedSamples, *engineers, *items, *simulations, rng)
+		dist = SimulateDaysToComplete(combinedSamples, *engineers, *items, *simulations, *goroutines, seed)
 		fmt.Printf("%d engineers, %d items -> how many days?\n", *engineers, *items)
 	}
 
@@ -649,6 +673,7 @@ func cmdProbability(args []string) error {
 	items := cmd.Int("items", -1, "number of items to complete (omit to show full distribution)")
 	wholeTeam := cmd.Bool("whole-team", false, "use whole-team daily throughput from historical data (ignores -engineers)")
 	simulations := cmd.Int("simulations", 10_000, "number of Monte Carlo simulations to run")
+	goroutines := cmd.Int("goroutines", runtime.NumCPU(), "number of parallel worker goroutines")
 	sampleStart := cmd.String("sample-start", defaultStart, "sample data start date (YYYY-MM-DD)")
 	sampleEnd := cmd.String("sample-end", defaultEnd, "sample data end date (YYYY-MM-DD)")
 	var include stringList
@@ -680,7 +705,7 @@ func cmdProbability(args []string) error {
 	if err != nil {
 		return err
 	}
-	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	seed := time.Now().UnixNano()
 
 	var dist []int
 	var modeDescription string
@@ -692,16 +717,16 @@ func cmdProbability(args []string) error {
 				return fmt.Errorf("engineer %q not found in data", name)
 			}
 		}
-		dist = SimulateItemsInDaysPerEngineer(pool, team, *days, *simulations, rng)
+		dist = SimulateItemsInDaysPerEngineer(pool, team, *days, *simulations, *goroutines, seed)
 		modeDescription = fmt.Sprintf("Team [%s]", strings.Join(team, ", "))
 	} else if *wholeTeam {
 		// Whole team mode
-		dist = SimulateItemsInDays(pool.PerEngineer["__whole_team__"], 1, *days, *simulations, rng)
+		dist = SimulateItemsInDays(pool.PerEngineer["__whole_team__"], 1, *days, *simulations, *goroutines, seed)
 		modeDescription = "whole-team throughput"
 	} else {
 		// Anonymous engineers mode
 		combinedSamples := pool.GetCombinedSamples()
-		dist = SimulateItemsInDays(combinedSamples, *engineers, *days, *simulations, rng)
+		dist = SimulateItemsInDays(combinedSamples, *engineers, *days, *simulations, *goroutines, seed)
 		modeDescription = fmt.Sprintf("%d engineers", *engineers)
 	}
 

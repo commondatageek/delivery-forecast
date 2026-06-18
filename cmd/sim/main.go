@@ -468,74 +468,12 @@ func loadPoolFromDB(dbPath, exclusionsFile string, includeEngineers []string, st
 		return nil, err
 	}
 
-	totalDays := daysBetween(startDate, endDate)
-
-	globalExcluded := make(map[int]bool)
-	for _, ds := range exc.Global {
-		t, err := time.ParseInLocation("2006-01-02", ds, time.UTC)
-		if err != nil {
-			continue
-		}
-		idx := int(t.Sub(startDate).Hours() / 24)
-		globalExcluded[idx] = true
+	records := make([]completion, len(items))
+	for i, it := range items {
+		records[i] = completion{Engineer: it.Assignee, CompletedAt: it.CompletedAt}
 	}
 
-	type engData struct {
-		counts []int
-	}
-	engineers := make(map[string]*engData)
-	for _, it := range items {
-		if _, ok := engineers[it.Assignee]; !ok {
-			engineers[it.Assignee] = &engData{counts: make([]int, totalDays)}
-		}
-		t := it.CompletedAt.UTC().Truncate(24 * time.Hour)
-		idx := int(t.Sub(startDate).Hours() / 24)
-		if idx >= 0 && idx < totalDays {
-			engineers[it.Assignee].counts[idx]++
-		}
-	}
-
-	pool := &SamplePool{PerEngineer: make(map[string][]int)}
-
-	if wholeTeam {
-		teamCounts := make([]int, totalDays)
-		for _, eng := range engineers {
-			for i, count := range eng.counts {
-				teamCounts[i] += count
-			}
-		}
-		var teamSamples []int
-		for i, count := range teamCounts {
-			if !globalExcluded[i] {
-				teamSamples = append(teamSamples, count)
-			}
-		}
-		pool.PerEngineer["__whole_team__"] = teamSamples
-	} else {
-		for name, eng := range engineers {
-			excluded := make(map[int]bool, len(globalExcluded))
-			for k := range globalExcluded {
-				excluded[k] = true
-			}
-			for _, ds := range exc.Engineers[name] {
-				t, err := time.ParseInLocation("2006-01-02", ds, time.UTC)
-				if err != nil {
-					continue
-				}
-				idx := int(t.Sub(startDate).Hours() / 24)
-				excluded[idx] = true
-			}
-			var engineerSamples []int
-			for i, count := range eng.counts {
-				if !excluded[i] {
-					engineerSamples = append(engineerSamples, count)
-				}
-			}
-			pool.PerEngineer[name] = engineerSamples
-		}
-	}
-
-	return pool, nil
+	return buildPool(records, exc, startDate, endDate, wholeTeam), nil
 }
 
 // warnUnmatchedIncludes logs a warning for any name in includeEngineers that

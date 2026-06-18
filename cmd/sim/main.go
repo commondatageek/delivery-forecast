@@ -11,7 +11,6 @@ import (
 	"os"
 	"runtime"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -21,30 +20,6 @@ import (
 
 	"github.com/mattn/go-isatty"
 )
-
-// percentileList is a flag.Value for a comma-separated list of ints.
-type percentileList []int
-
-func (p *percentileList) String() string {
-	parts := make([]string, len(*p))
-	for i, v := range *p {
-		parts[i] = strconv.Itoa(v)
-	}
-	return strings.Join(parts, ",")
-}
-
-func (p *percentileList) Set(s string) error {
-	*p = nil
-	for _, part := range strings.Split(s, ",") {
-		part = strings.TrimSpace(part)
-		v, err := strconv.Atoi(part)
-		if err != nil {
-			return fmt.Errorf("invalid percentile %q: %w", part, err)
-		}
-		*p = append(*p, v)
-	}
-	return nil
-}
 
 // --- Data loading ---
 
@@ -534,7 +509,7 @@ func cmdItems(args []string) error {
 	sampleStart := cmd.String("sample-start", defaultStart, "sample data start date (YYYY-MM-DD)")
 	sampleEnd := cmd.String("sample-end", defaultEnd, "sample data end date (YYYY-MM-DD)")
 	randomSeed := cmd.Int64("random-seed", 0, "seed for the random number generator (default: time-based, non-deterministic)")
-	var percentiles percentileList
+	var percentiles intList
 	cmd.Var(&percentiles, "percentile", "comma-separated percentiles to output (default: 5,25,50,75,95)")
 	var include stringList
 	cmd.Var(&include, "include", "comma-separated list of engineer names to include (default: all)")
@@ -589,7 +564,7 @@ func cmdItems(args []string) error {
 	}
 
 	if len(percentiles) == 0 {
-		percentiles = percentileList{5, 25, 50, 75, 95}
+		percentiles = intList{5, 25, 50, 75, 95}
 	}
 	for _, p := range percentiles {
 		fmt.Printf("  %dth percentile: %d items\n", p, Percentile(dist, float64(p)))
@@ -611,7 +586,7 @@ func cmdDays(args []string) error {
 	sampleStart := cmd.String("sample-start", defaultSampleStart, "sample data start date (YYYY-MM-DD)")
 	sampleEnd := cmd.String("sample-end", defaultSampleEnd, "sample data end date (YYYY-MM-DD)")
 	randomSeed := cmd.Int64("random-seed", 0, "seed for the random number generator (default: time-based, non-deterministic)")
-	var percentiles percentileList
+	var percentiles intList
 	cmd.Var(&percentiles, "percentile", "comma-separated percentiles to output (default: 50,75,85,95)")
 	var include stringList
 	cmd.Var(&include, "include", "comma-separated list of engineer names to include (default: all)")
@@ -666,7 +641,7 @@ func cmdDays(args []string) error {
 	}
 
 	if len(percentiles) == 0 {
-		percentiles = percentileList{50, 75, 85, 95}
+		percentiles = intList{50, 75, 85, 95}
 	}
 	for _, p := range percentiles {
 		fmt.Printf("  %dth percentile: %d days\n", p, Percentile(dist, float64(p)))

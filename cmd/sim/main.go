@@ -22,24 +22,6 @@ import (
 	"github.com/mattn/go-isatty"
 )
 
-// stringList is a flag.Value for a comma-separated list of strings.
-type stringList []string
-
-func (s *stringList) String() string {
-	return strings.Join(*s, ",")
-}
-
-func (s *stringList) Set(val string) error {
-	*s = nil
-	for _, part := range strings.Split(val, ",") {
-		part = strings.TrimSpace(part)
-		if part != "" {
-			*s = append(*s, part)
-		}
-	}
-	return nil
-}
-
 // percentileList is a flag.Value for a comma-separated list of ints.
 type percentileList []int
 

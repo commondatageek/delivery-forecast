@@ -113,6 +113,105 @@ func (p *SamplePool) GetCombinedSamples() []int {
 	return combined
 }
 
+// completion is a normalized completed-issue record: the engineer and the
+// instant they completed something. Both the NDJSON and SQLite loaders reduce
+// their source rows to a slice of these and hand them to buildPool.
+type completion struct {
+	Engineer    string
+	CompletedAt time.Time
+}
+
+// buildPool bins completions into per-engineer daily completion counts over the
+// half-open window [startDate, endDate), applies exclusions, and returns the
+// resulting SamplePool. It is pure (no file/DB/clock access), so it is the
+// single unit-testable home of the bucketing logic both loaders share.
+//
+// The pool deliberately preserves zero-completion days: each engineer's slice
+// has one slot per non-excluded day in the window, so a day with no completions
+// contributes a 0 sample. Dropping those would bias every forecast upward.
+//
+// The engineer set is derived solely from records: an engineer appears in the
+// pool only if they have at least one completion inside the window. Completions
+// outside the window are ignored entirely (neither counted nor do they create
+// an engineer). In whole-team mode all engineers are summed into a single
+// "__whole_team__" series.
+func buildPool(records []completion, exc Exclusions, startDate, endDate time.Time, wholeTeam bool) *SamplePool {
+	totalDays := daysBetween(startDate, endDate)
+
+	// Build the global excluded day-index set.
+	globalExcluded := make(map[int]bool)
+	for _, ds := range exc.Global {
+		t, err := time.ParseInLocation("2006-01-02", ds, time.UTC)
+		if err != nil {
+			continue
+		}
+		idx := int(t.Sub(startDate).Hours() / 24)
+		globalExcluded[idx] = true
+	}
+
+	type engData struct {
+		counts []int
+	}
+	engineers := make(map[string]*engData)
+	for _, r := range records {
+		t := r.CompletedAt.UTC().Truncate(24 * time.Hour)
+		idx := int(t.Sub(startDate).Hours() / 24)
+		if idx < 0 || idx >= totalDays {
+			continue // out-of-window: don't count, don't create the engineer
+		}
+		eng, ok := engineers[r.Engineer]
+		if !ok {
+			eng = &engData{counts: make([]int, totalDays)}
+			engineers[r.Engineer] = eng
+		}
+		eng.counts[idx]++
+	}
+
+	pool := &SamplePool{PerEngineer: make(map[string][]int)}
+
+	if wholeTeam {
+		// Sum all engineers' completions per day. Only global exclusions apply.
+		teamCounts := make([]int, totalDays)
+		for _, eng := range engineers {
+			for i, count := range eng.counts {
+				teamCounts[i] += count
+			}
+		}
+		var teamSamples []int
+		for i, count := range teamCounts {
+			if !globalExcluded[i] {
+				teamSamples = append(teamSamples, count)
+			}
+		}
+		pool.PerEngineer["__whole_team__"] = teamSamples
+	} else {
+		for name, eng := range engineers {
+			// Per-engineer excluded set = global + engineer-specific.
+			excluded := make(map[int]bool, len(globalExcluded))
+			for k := range globalExcluded {
+				excluded[k] = true
+			}
+			for _, ds := range exc.Engineers[name] {
+				t, err := time.ParseInLocation("2006-01-02", ds, time.UTC)
+				if err != nil {
+					continue
+				}
+				idx := int(t.Sub(startDate).Hours() / 24)
+				excluded[idx] = true
+			}
+			var engineerSamples []int
+			for i, count := range eng.counts {
+				if !excluded[i] {
+					engineerSamples = append(engineerSamples, count)
+				}
+			}
+			pool.PerEngineer[name] = engineerSamples
+		}
+	}
+
+	return pool
+}
+
 // --- Progress reporting ---
 
 // progressBar renders a simple text progress bar to stderr, updating

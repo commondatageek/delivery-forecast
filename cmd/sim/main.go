@@ -415,23 +415,9 @@ func loadPool(issuesFile, exclusionsFile string, includeEngineers []string, star
 		return nil, err
 	}
 
-	totalDays := daysBetween(startDate, endDate)
-
-	// Build global excluded date index set
-	globalExcluded := make(map[int]bool)
-	for _, ds := range exc.Global {
-		t, err := time.ParseInLocation("2006-01-02", ds, time.UTC)
-		if err != nil {
-			continue
-		}
-		// For each globally excluded date string, parse it as a date,
-		// compute its index relative to the sample start date, and mark
-		// that index as excluded in the globalExcluded map.
-		idx := int(t.Sub(startDate).Hours() / 24)
-		globalExcluded[idx] = true
-	}
-
-	// Collect unique engineers (respecting include filter)
+	// Collect unique engineers (respecting include filter), purely for the
+	// typo warning below — buildPool derives the actual pool's engineer set
+	// from in-window completions.
 	includeSet := make(map[string]bool, len(includeEngineers))
 	for _, name := range includeEngineers {
 		includeSet[name] = true
@@ -442,80 +428,19 @@ func loadPool(issuesFile, exclusionsFile string, includeEngineers []string, star
 	}
 	warnUnmatchedIncludes(includeEngineers, engineerSeen)
 
-	// Build per-day counts per engineer
-	type engData struct {
-		counts []int
-	}
-	engineers := make(map[string]*engData)
-	for name := range engineerSeen {
-		if len(includeSet) > 0 && !includeSet[name] {
-			continue
-		}
-		engineers[name] = &engData{counts: make([]int, totalDays)}
-	}
-
+	var records []completion
 	for _, issue := range issues {
-		eng, ok := engineers[issue.Engineer]
-		if !ok {
+		if len(includeSet) > 0 && !includeSet[issue.Engineer] {
 			continue
 		}
 		t, err := time.Parse(time.RFC3339, issue.CompletedAt)
 		if err != nil {
 			continue
 		}
-		t = t.UTC().Truncate(24 * time.Hour)
-		idx := int(t.Sub(startDate).Hours() / 24)
-		if idx >= 0 && idx < totalDays {
-			eng.counts[idx]++
-		}
+		records = append(records, completion{Engineer: issue.Engineer, CompletedAt: t})
 	}
 
-	pool := &SamplePool{PerEngineer: make(map[string][]int)}
-
-	if wholeTeam {
-		// Sum all engineers' completions per day into a single team-level sample.
-		// Only global exclusions apply — per-engineer exclusions are irrelevant when
-		// treating the team as a unit.
-		teamCounts := make([]int, totalDays)
-		for _, eng := range engineers {
-			for i, count := range eng.counts {
-				teamCounts[i] += count
-			}
-		}
-		var teamSamples []int
-		for i, count := range teamCounts {
-			if !globalExcluded[i] {
-				teamSamples = append(teamSamples, count)
-			}
-		}
-		pool.PerEngineer["__whole_team__"] = teamSamples
-	} else {
-		for name, eng := range engineers {
-			// Per-engineer excluded set = global + engineer-specific
-			excluded := make(map[int]bool, len(globalExcluded))
-			for k := range globalExcluded {
-				excluded[k] = true
-			}
-			for _, ds := range exc.Engineers[name] {
-				t, err := time.ParseInLocation("2006-01-02", ds, time.UTC)
-				if err != nil {
-					continue
-				}
-				idx := int(t.Sub(startDate).Hours() / 24)
-				excluded[idx] = true
-			}
-
-			var engineerSamples []int
-			for i, count := range eng.counts {
-				if !excluded[i] {
-					engineerSamples = append(engineerSamples, count)
-				}
-			}
-			pool.PerEngineer[name] = engineerSamples
-		}
-	}
-
-	return pool, nil
+	return buildPool(records, exc, startDate, endDate, wholeTeam), nil
 }
 
 // loadPoolFromDB builds a SamplePool by querying the SQLite store instead of

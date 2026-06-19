@@ -378,15 +378,32 @@ func modeLabel(mode samplingMode, team []string, engineers int) string {
 	}
 }
 
+// sum returns the total of a slice of ints.
+func sum(samples []int) int {
+	total := 0
+	for _, v := range samples {
+		total += v
+	}
+	return total
+}
+
 // validatePool ensures the chosen mode actually has samples to draw from before
 // any simulation runs, turning what would otherwise be an rng.Intn(0) panic deep
 // in a worker goroutine into a clear, actionable error. Named engineers must be
 // present AND have at least one non-excluded day; anonymous and whole-team modes
-// need a non-empty daily series. (Whole-team over a window with completions but
-// zero throughput still has slots — all zeros — and is left to report 0, not error.)
-func validatePool(pool *SamplePool, mode samplingMode, team []string) error {
+// need a non-empty daily series.
+//
+// requireProgress must be true for callers whose simulation loop runs until a
+// target item count is reached (SimulateDaysToComplete and its per-engineer
+// variant, used by cmdDays) rather than for a fixed number of days. For those,
+// a pool that sums to zero is a guaranteed infinite loop — "completed" never
+// advances — so it's rejected outright. Fixed-day callers (cmdItems,
+// cmdProbability) pass false: an all-zero pool there is a legitimate "0 items"
+// / "0% probability" answer, not an error.
+func validatePool(pool *SamplePool, mode samplingMode, team []string, requireProgress bool) error {
 	switch mode {
 	case modeNamedTeam:
+		teamTotal := 0
 		for _, name := range team {
 			samples, ok := pool.PerEngineer[name]
 			if !ok {
@@ -395,14 +412,26 @@ func validatePool(pool *SamplePool, mode samplingMode, team []string) error {
 			if len(samples) == 0 {
 				return fmt.Errorf("engineer %q has no sample days in the selected window (every day excluded?)", name)
 			}
+			teamTotal += sum(samples)
+		}
+		if requireProgress && teamTotal == 0 {
+			return fmt.Errorf("team [%s] completed 0 items in the selected window; days-to-complete is undefined (they would never finish)", strings.Join(team, ", "))
 		}
 	case modeFullTeam:
-		if len(pool.PerEngineer["__whole_team__"]) == 0 {
+		samples := pool.PerEngineer["__whole_team__"]
+		if len(samples) == 0 {
 			return fmt.Errorf("no sample days in the selected window (try a different -sample-start/-sample-end)")
 		}
+		if requireProgress && sum(samples) == 0 {
+			return fmt.Errorf("whole-team throughput was 0 in the selected window; days-to-complete is undefined (it would never finish)")
+		}
 	default: // modeAnonymous
-		if len(pool.GetCombinedSamples()) == 0 {
+		samples := pool.GetCombinedSamples()
+		if len(samples) == 0 {
 			return fmt.Errorf("no completed items in the selected window (try a different -sample-start/-sample-end)")
+		}
+		if requireProgress && sum(samples) == 0 {
+			return fmt.Errorf("0 items completed in the selected window; days-to-complete is undefined (it would never finish)")
 		}
 	}
 	return nil
@@ -643,7 +672,7 @@ func cmdItems(args []string) error {
 	if err != nil {
 		return err
 	}
-	if err := validatePool(pool, mode, team); err != nil {
+	if err := validatePool(pool, mode, team, false); err != nil {
 		return err
 	}
 	seed := resolveSeed(cmd, *randomSeed, now)
@@ -701,7 +730,7 @@ func cmdDays(args []string) error {
 	if err != nil {
 		return err
 	}
-	if err := validatePool(pool, mode, team); err != nil {
+	if err := validatePool(pool, mode, team, true); err != nil {
 		return err
 	}
 	seed := resolveSeed(cmd, *randomSeed, now)
@@ -758,7 +787,7 @@ func cmdProbability(args []string) error {
 	if err != nil {
 		return err
 	}
-	if err := validatePool(pool, mode, team); err != nil {
+	if err := validatePool(pool, mode, team, false); err != nil {
 		return err
 	}
 	seed := resolveSeed(cmd, *randomSeed, now)

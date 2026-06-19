@@ -318,30 +318,49 @@ func TestValidatePool(t *testing.T) {
 	named := &SamplePool{PerEngineer: map[string][]int{
 		"alice": {1, 0, 2},
 		"bob":   {3},
-		"empty": {}, // present but every day excluded -> no samples
+		"empty": {},        // present but every day excluded -> no samples
+		"zero":  {0, 0, 0}, // present, has slots, but never completed anything
 	}}
 	full := &SamplePool{PerEngineer: map[string][]int{"__whole_team__": {0, 1, 0}}}
+	zeroFull := &SamplePool{PerEngineer: map[string][]int{"__whole_team__": {0, 0, 0}}}
 	emptyFull := &SamplePool{PerEngineer: map[string][]int{"__whole_team__": {}}}
 	emptyAnon := &SamplePool{PerEngineer: map[string][]int{}}
+	zeroAnon := &SamplePool{PerEngineer: map[string][]int{"alice": {0, 0}, "bob": {0}}}
 
 	cases := []struct {
-		name    string
-		pool    *SamplePool
-		mode    samplingMode
-		team    []string
-		wantErr bool
+		name            string
+		pool            *SamplePool
+		mode            samplingMode
+		team            []string
+		requireProgress bool
+		wantErr         bool
 	}{
-		{"named ok", named, modeNamedTeam, []string{"alice", "bob"}, false},
-		{"named unknown engineer", named, modeNamedTeam, []string{"alice", "carol"}, true},
-		{"named present but no samples", named, modeNamedTeam, []string{"empty"}, true},
-		{"full team ok", full, modeFullTeam, nil, false},
-		{"full team empty series", emptyFull, modeFullTeam, nil, true},
-		{"anonymous ok", named, modeAnonymous, nil, false},
-		{"anonymous empty pool", emptyAnon, modeAnonymous, nil, true},
+		{"named ok", named, modeNamedTeam, []string{"alice", "bob"}, false, false},
+		{"named unknown engineer", named, modeNamedTeam, []string{"alice", "carol"}, false, true},
+		{"named present but no samples", named, modeNamedTeam, []string{"empty"}, false, true},
+		{"full team ok", full, modeFullTeam, nil, false, false},
+		{"full team empty series", emptyFull, modeFullTeam, nil, false, true},
+		{"anonymous ok", named, modeAnonymous, nil, false, false},
+		{"anonymous empty pool", emptyAnon, modeAnonymous, nil, false, true},
+
+		// requireProgress=false (cmdItems/cmdProbability): all-zero is a fine,
+		// legitimate "0 items" answer, not an error.
+		{"named all-zero, fixed days ok", named, modeNamedTeam, []string{"zero"}, false, false},
+		{"full team all-zero, fixed days ok", zeroFull, modeFullTeam, nil, false, false},
+		{"anonymous all-zero, fixed days ok", zeroAnon, modeAnonymous, nil, false, false},
+
+		// requireProgress=true (cmdDays): all-zero means SimulateDaysToComplete*
+		// would loop forever (completed never advances), so it must error.
+		{"named all-zero, requireProgress errors", named, modeNamedTeam, []string{"zero"}, true, true},
+		{"named mixed zero/nonzero, requireProgress ok", named, modeNamedTeam, []string{"alice", "zero"}, true, false},
+		{"full team all-zero, requireProgress errors", zeroFull, modeFullTeam, nil, true, true},
+		{"full team nonzero, requireProgress ok", full, modeFullTeam, nil, true, false},
+		{"anonymous all-zero, requireProgress errors", zeroAnon, modeAnonymous, nil, true, true},
+		{"anonymous nonzero, requireProgress ok", named, modeAnonymous, nil, true, false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			err := validatePool(c.pool, c.mode, c.team)
+			err := validatePool(c.pool, c.mode, c.team, c.requireProgress)
 			if c.wantErr && err == nil {
 				t.Error("validatePool = nil, want error")
 			}

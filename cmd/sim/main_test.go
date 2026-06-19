@@ -314,13 +314,41 @@ func TestModeLabel(t *testing.T) {
 	}
 }
 
-func TestValidateTeamInPool(t *testing.T) {
-	pool := &SamplePool{PerEngineer: map[string][]int{"alice": {1}, "bob": {2}}}
-	if err := validateTeamInPool(pool, []string{"alice", "bob"}); err != nil {
-		t.Errorf("validateTeamInPool(known names) = %v, want nil", err)
+func TestValidatePool(t *testing.T) {
+	named := &SamplePool{PerEngineer: map[string][]int{
+		"alice": {1, 0, 2},
+		"bob":   {3},
+		"empty": {}, // present but every day excluded -> no samples
+	}}
+	full := &SamplePool{PerEngineer: map[string][]int{"__whole_team__": {0, 1, 0}}}
+	emptyFull := &SamplePool{PerEngineer: map[string][]int{"__whole_team__": {}}}
+	emptyAnon := &SamplePool{PerEngineer: map[string][]int{}}
+
+	cases := []struct {
+		name    string
+		pool    *SamplePool
+		mode    samplingMode
+		team    []string
+		wantErr bool
+	}{
+		{"named ok", named, modeNamedTeam, []string{"alice", "bob"}, false},
+		{"named unknown engineer", named, modeNamedTeam, []string{"alice", "carol"}, true},
+		{"named present but no samples", named, modeNamedTeam, []string{"empty"}, true},
+		{"full team ok", full, modeFullTeam, nil, false},
+		{"full team empty series", emptyFull, modeFullTeam, nil, true},
+		{"anonymous ok", named, modeAnonymous, nil, false},
+		{"anonymous empty pool", emptyAnon, modeAnonymous, nil, true},
 	}
-	if err := validateTeamInPool(pool, []string{"alice", "carol"}); err == nil {
-		t.Error("validateTeamInPool(unknown name) = nil, want error")
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			err := validatePool(c.pool, c.mode, c.team)
+			if c.wantErr && err == nil {
+				t.Error("validatePool = nil, want error")
+			}
+			if !c.wantErr && err != nil {
+				t.Errorf("validatePool = %v, want nil", err)
+			}
+		})
 	}
 }
 

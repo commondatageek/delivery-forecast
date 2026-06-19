@@ -378,12 +378,31 @@ func modeLabel(mode samplingMode, team []string, engineers int) string {
 	}
 }
 
-// validateTeamInPool ensures every named engineer has samples in the pool.
-// Only meaningful in modeNamedTeam; the other modes don't name engineers.
-func validateTeamInPool(pool *SamplePool, team []string) error {
-	for _, name := range team {
-		if _, ok := pool.PerEngineer[name]; !ok {
-			return fmt.Errorf("engineer %q not found in data", name)
+// validatePool ensures the chosen mode actually has samples to draw from before
+// any simulation runs, turning what would otherwise be an rng.Intn(0) panic deep
+// in a worker goroutine into a clear, actionable error. Named engineers must be
+// present AND have at least one non-excluded day; anonymous and whole-team modes
+// need a non-empty daily series. (Whole-team over a window with completions but
+// zero throughput still has slots — all zeros — and is left to report 0, not error.)
+func validatePool(pool *SamplePool, mode samplingMode, team []string) error {
+	switch mode {
+	case modeNamedTeam:
+		for _, name := range team {
+			samples, ok := pool.PerEngineer[name]
+			if !ok {
+				return fmt.Errorf("engineer %q not found in data", name)
+			}
+			if len(samples) == 0 {
+				return fmt.Errorf("engineer %q has no sample days in the selected window (every day excluded?)", name)
+			}
+		}
+	case modeFullTeam:
+		if len(pool.PerEngineer["__whole_team__"]) == 0 {
+			return fmt.Errorf("no sample days in the selected window (try a different -sample-start/-sample-end)")
+		}
+	default: // modeAnonymous
+		if len(pool.GetCombinedSamples()) == 0 {
+			return fmt.Errorf("no completed items in the selected window (try a different -sample-start/-sample-end)")
 		}
 	}
 	return nil
@@ -624,10 +643,8 @@ func cmdItems(args []string) error {
 	if err != nil {
 		return err
 	}
-	if mode == modeNamedTeam {
-		if err := validateTeamInPool(pool, team); err != nil {
-			return err
-		}
+	if err := validatePool(pool, mode, team); err != nil {
+		return err
 	}
 	seed := resolveSeed(cmd, *randomSeed, now)
 
@@ -684,10 +701,8 @@ func cmdDays(args []string) error {
 	if err != nil {
 		return err
 	}
-	if mode == modeNamedTeam {
-		if err := validateTeamInPool(pool, team); err != nil {
-			return err
-		}
+	if err := validatePool(pool, mode, team); err != nil {
+		return err
 	}
 	seed := resolveSeed(cmd, *randomSeed, now)
 
@@ -743,10 +758,8 @@ func cmdProbability(args []string) error {
 	if err != nil {
 		return err
 	}
-	if mode == modeNamedTeam {
-		if err := validateTeamInPool(pool, team); err != nil {
-			return err
-		}
+	if err := validatePool(pool, mode, team); err != nil {
+		return err
 	}
 	seed := resolveSeed(cmd, *randomSeed, now)
 

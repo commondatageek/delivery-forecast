@@ -98,12 +98,12 @@ ON CONFLICT(identifier) DO UPDATE SET
 		_, err := stmt.ExecContext(ctx,
 			it.Identifier,
 			it.Title,
-			it.Assignee,
+			nullString(it.Assignee),
 			it.Team,
-			it.ProjectID,
-			it.ProjectName,
-			it.ProjectMilestoneID,
-			it.ProjectMilestoneName,
+			nullString(it.ProjectID),
+			nullString(it.ProjectName),
+			nullString(it.ProjectMilestoneID),
+			nullString(it.ProjectMilestoneName),
 			it.StateType,
 			it.StateName,
 			nullTime(it.CreatedAt),
@@ -146,7 +146,8 @@ func (s *Store) LatestUpdatedAt(ctx context.Context) (time.Time, error) {
 
 // CompletedBetween returns completed issues whose completed_at falls within
 // [start, end) — start inclusive, end exclusive. If assignees is non-empty,
-// only issues whose assignee is in that set are returned.
+// only issues whose assignee is in that set are returned. Unassigned issues
+// (NULL assignee) are always excluded — throughput is attributed per engineer.
 //
 // Returned issues have Identifier, Title, Assignee, Team, ProjectName,
 // StateType, StartedAt, CompletedAt, and UpdatedAt populated.
@@ -156,6 +157,7 @@ SELECT identifier, title, assignee, team, project_name, state_type,
        started_at, completed_at, updated_at
 FROM issues
 WHERE state_type = 'completed'
+  AND assignee IS NOT NULL
   AND completed_at >= ?
   AND completed_at < ?`
 
@@ -182,14 +184,17 @@ WHERE state_type = 'completed'
 	var issues []linear.Issue
 	for rows.Next() {
 		var it linear.Issue
+		var assignee, projectName sql.NullString
 		var startedAt, completedAt, updatedAt sql.NullTime
 		if err := rows.Scan(
-			&it.Identifier, &it.Title, &it.Assignee,
-			&it.Team, &it.ProjectName, &it.StateType,
+			&it.Identifier, &it.Title, &assignee,
+			&it.Team, &projectName, &it.StateType,
 			&startedAt, &completedAt, &updatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("CompletedBetween scan: %w", err)
 		}
+		it.Assignee = assignee.String
+		it.ProjectName = projectName.String
 		if startedAt.Valid {
 			it.StartedAt = startedAt.Time
 		}
@@ -223,13 +228,16 @@ ORDER BY started_at ASC`
 	var issues []linear.Issue
 	for rows.Next() {
 		var it linear.Issue
+		var assignee, projectName sql.NullString
 		var startedAt sql.NullTime
 		if err := rows.Scan(
-			&it.Identifier, &it.Title, &it.Assignee,
-			&it.Team, &it.ProjectName, &it.StateType, &it.StateName, &startedAt,
+			&it.Identifier, &it.Title, &assignee,
+			&it.Team, &projectName, &it.StateType, &it.StateName, &startedAt,
 		); err != nil {
 			return nil, fmt.Errorf("InProgress scan: %w", err)
 		}
+		it.Assignee = assignee.String
+		it.ProjectName = projectName.String
 		if startedAt.Valid {
 			it.StartedAt = startedAt.Time
 		}
@@ -244,4 +252,14 @@ func nullTime(t time.Time) sql.NullTime {
 		return sql.NullTime{}
 	}
 	return sql.NullTime{Time: t, Valid: true}
+}
+
+// nullString converts a string to sql.NullString, treating "" as NULL. Used
+// for the optional columns (assignee, project, milestone) so that absent data
+// is stored as NULL rather than an empty string.
+func nullString(s string) sql.NullString {
+	if s == "" {
+		return sql.NullString{}
+	}
+	return sql.NullString{String: s, Valid: true}
 }

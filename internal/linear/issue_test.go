@@ -5,21 +5,23 @@ import (
 	"time"
 )
 
-func TestToIssueSkipsNoAssignee(t *testing.T) {
+func TestToIssueNoAssigneeYieldsEmpty(t *testing.T) {
 	n := issueNode{Identifier: "ENG-1", Assignee: nil}
-	if _, ok := toIssue(n); ok {
-		t.Fatalf("toIssue with nil Assignee should be skipped")
+	got := toIssue(n)
+	if got.Assignee != "" {
+		t.Fatalf("toIssue with nil Assignee = %q, want empty", got.Assignee)
 	}
 }
 
-func TestToIssueSkipsInProgressWithoutStartedAt(t *testing.T) {
+func TestToIssueKeepsIssueWithoutStartedAt(t *testing.T) {
 	n := issueNode{
 		Identifier: "ENG-1",
 		Assignee:   &assignee{Name: "alice"},
-		// CompletedAt and StartedAt both zero.
+		// CompletedAt and StartedAt both zero (e.g. a backlog issue).
 	}
-	if _, ok := toIssue(n); ok {
-		t.Fatalf("toIssue for an in-progress issue with no startedAt should be skipped")
+	got := toIssue(n)
+	if got.Identifier != "ENG-1" {
+		t.Fatalf("toIssue dropped a backlog issue: %+v", got)
 	}
 }
 
@@ -49,10 +51,7 @@ func TestToIssueFullyPopulated(t *testing.T) {
 		State:            &stateRef{Type: "completed", Name: "Done"},
 	}
 
-	got, ok := toIssue(n)
-	if !ok {
-		t.Fatalf("toIssue should not skip a fully populated completed issue")
-	}
+	got := toIssue(n)
 
 	want := Issue{
 		Identifier:           "ENG-123",
@@ -86,10 +85,7 @@ func TestToIssueNilRelationsYieldEmptyStrings(t *testing.T) {
 		// Team, Project, ProjectMilestone, State all nil.
 	}
 
-	got, ok := toIssue(n)
-	if !ok {
-		t.Fatalf("toIssue should not skip a completed issue with nil relations")
-	}
+	got := toIssue(n)
 	if got.Team != "" || got.ProjectID != "" || got.ProjectName != "" ||
 		got.ProjectMilestoneID != "" || got.ProjectMilestoneName != "" ||
 		got.StateType != "" || got.StateName != "" {

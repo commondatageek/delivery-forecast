@@ -63,6 +63,36 @@ func TestUpsertAndCompletedBetween(t *testing.T) {
 	}
 }
 
+func TestCompletedBetweenExcludesUnassigned(t *testing.T) {
+	store := openTestStore(t)
+	ctx := context.Background()
+
+	assigned := linear.Issue{
+		Identifier:  "ENG-1",
+		Assignee:    "alice",
+		StateType:   "completed",
+		CompletedAt: mustParse(t, "2024-01-05T00:00:00Z"),
+	}
+	unassigned := linear.Issue{
+		Identifier:  "ENG-2",
+		StateType:   "completed",
+		CompletedAt: mustParse(t, "2024-01-06T00:00:00Z"),
+	}
+	if err := store.Upsert(ctx, assigned, unassigned); err != nil {
+		t.Fatalf("Upsert: %v", err)
+	}
+
+	start := mustParse(t, "2024-01-01T00:00:00Z")
+	end := mustParse(t, "2024-01-10T00:00:00Z")
+	got, err := store.CompletedBetween(ctx, start, end, nil)
+	if err != nil {
+		t.Fatalf("CompletedBetween: %v", err)
+	}
+	if len(got) != 1 || got[0].Identifier != "ENG-1" {
+		t.Fatalf("CompletedBetween = %+v, want only the assigned ENG-1", got)
+	}
+}
+
 func TestCompletedBetweenBoundary(t *testing.T) {
 	store := openTestStore(t)
 	ctx := context.Background()
@@ -238,5 +268,40 @@ func TestUpsertNullTimeRoundTrip(t *testing.T) {
 	}
 	if !got[0].CompletedAt.IsZero() {
 		t.Fatalf("CompletedAt = %v, want zero time", got[0].CompletedAt)
+	}
+}
+
+func TestUpsertStoresAbsentOptionalFieldsAsNull(t *testing.T) {
+	store := openTestStore(t)
+	ctx := context.Background()
+
+	// An unassigned issue with no project/milestone — every optional field empty.
+	if err := store.Upsert(ctx, linear.Issue{Identifier: "ENG-1", StateType: "started", StartedAt: mustParse(t, "2024-01-01T00:00:00Z")}); err != nil {
+		t.Fatalf("Upsert: %v", err)
+	}
+
+	const q = `SELECT
+		assignee IS NULL, project_id IS NULL, project_name IS NULL,
+		project_milestone_id IS NULL, project_milestone_name IS NULL
+	FROM issues WHERE identifier = 'ENG-1'`
+
+	var assigneeNull, projIDNull, projNameNull, msIDNull, msNameNull bool
+	if err := store.db.QueryRowContext(ctx, q).Scan(
+		&assigneeNull, &projIDNull, &projNameNull, &msIDNull, &msNameNull,
+	); err != nil {
+		t.Fatalf("query: %v", err)
+	}
+	if !(assigneeNull && projIDNull && projNameNull && msIDNull && msNameNull) {
+		t.Fatalf("optional fields stored as NULL = assignee:%v proj_id:%v proj_name:%v ms_id:%v ms_name:%v, want all true",
+			assigneeNull, projIDNull, projNameNull, msIDNull, msNameNull)
+	}
+
+	// Round-trips back to empty strings on the Go side.
+	got, err := store.InProgress(ctx)
+	if err != nil {
+		t.Fatalf("InProgress: %v", err)
+	}
+	if got[0].Assignee != "" || got[0].ProjectName != "" {
+		t.Fatalf("NULL did not round-trip to empty string: %+v", got[0])
 	}
 }

@@ -1,13 +1,16 @@
 -- +goose Up
 CREATE TABLE issues (
+    -- identifier/title/team/state_* are always present on a Linear issue.
+    -- assignee and the project/milestone columns are genuinely optional and
+    -- are stored as NULL when absent (see nullString in internal/sqlite).
     identifier              TEXT NOT NULL PRIMARY KEY,
     title                   TEXT NOT NULL DEFAULT '',
-    assignee                TEXT NOT NULL DEFAULT '',
+    assignee                TEXT,
     team                    TEXT NOT NULL DEFAULT '',
-    project_id              TEXT NOT NULL DEFAULT '',
-    project_name            TEXT NOT NULL DEFAULT '',
-    project_milestone_id    TEXT NOT NULL DEFAULT '',
-    project_milestone_name  TEXT NOT NULL DEFAULT '',
+    project_id              TEXT,
+    project_name            TEXT,
+    project_milestone_id    TEXT,
+    project_milestone_name  TEXT,
     state_type              TEXT NOT NULL DEFAULT '',
     state_name              TEXT NOT NULL DEFAULT '',
     created_at              DATETIME,

@@ -45,11 +45,7 @@ func (s *Client) Fetch(ctx context.Context, since time.Time) ([]Issue, error) {
 		}
 
 		for _, node := range resp.Data.Issues.Nodes {
-			iss, ok := toIssue(node)
-			if !ok {
-				continue
-			}
-			issues = append(issues, iss)
+			issues = append(issues, toIssue(node))
 		}
 
 		if !resp.Data.Issues.PageInfo.HasNextPage {
@@ -160,18 +156,14 @@ func (s *Client) do(ctx context.Context, body []byte) ([]byte, error) {
 	return raw, nil
 }
 
-// toIssue converts an issueNode to an Issue.
-// Returns (Issue{}, false) if the issue should be skipped (e.g. no assignee).
-func toIssue(n issueNode) (Issue, bool) {
-	if n.Assignee == nil {
-		return Issue{}, false
+// toIssue converts an issueNode to an Issue. Every issue is kept; absent
+// related objects (assignee, team, project, milestone, state) become empty
+// strings, which the store persists as NULL.
+func toIssue(n issueNode) Issue {
+	assigneeName := ""
+	if n.Assignee != nil {
+		assigneeName = n.Assignee.Name
 	}
-
-	// In-progress issues without a startedAt can't be used for aging.
-	if n.CompletedAt.IsZero() && n.StartedAt.IsZero() {
-		return Issue{}, false
-	}
-
 	teamName := ""
 	if n.Team != nil {
 		teamName = n.Team.Name
@@ -198,7 +190,7 @@ func toIssue(n issueNode) (Issue, bool) {
 	return Issue{
 		Identifier:           n.Identifier,
 		Title:                n.Title,
-		Assignee:             n.Assignee.Name,
+		Assignee:             assigneeName,
 		Team:                 teamName,
 		ProjectID:            projectID,
 		ProjectName:          projectName,
@@ -213,16 +205,13 @@ func toIssue(n issueNode) (Issue, bool) {
 		AutoArchivedAt:       n.AutoArchivedAt,
 		AddedToProjectAt:     n.AddedToProjectAt,
 		UpdatedAt:            n.UpdatedAt,
-	}, true
+	}
 }
 
 // buildQuery constructs the GraphQL query string.
 // If since is non-zero, adds an updatedAt filter so only changed items are returned.
 func buildQuery(teamKeys []string, since time.Time) string {
 	var filters []string
-
-	filters = append(filters, `      state: { type: { in: ["completed", "started"] } }`)
-	filters = append(filters, `      assignee: { null: false }`)
 
 	if len(teamKeys) > 0 {
 		quoted := make([]string, len(teamKeys))

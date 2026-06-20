@@ -17,17 +17,6 @@ import (
 	"forecasting/internal/sqlite"
 )
 
-type issue struct {
-	Engineer    string `json:"engineer"`
-	Team        string `json:"team"`
-	Identifier  string `json:"identifier"`
-	Title       string `json:"title"`
-	ProjectName string `json:"project_name"`
-	StartedAt   string `json:"started_at"`
-	CompletedAt string `json:"completed_at"`
-	Status      string `json:"status"`
-}
-
 type reportItem struct {
 	Identifier  string
 	Title       string
@@ -128,7 +117,7 @@ func loadFromDB(dbPath string, sampleStart, sampleEnd time.Time, minCycleTime ti
 	}
 	defer store.Close()
 
-	completed, err := store.CompletedBetween(context.Background(), "linear", sampleStart, sampleEnd, nil)
+	completed, err := store.CompletedBetween(context.Background(), sampleStart, sampleEnd, nil)
 	if err != nil {
 		return nil, nil, fmt.Errorf("query completed: %w", err)
 	}
@@ -146,7 +135,7 @@ func loadFromDB(dbPath string, sampleStart, sampleEnd time.Time, minCycleTime ti
 		}
 	}
 
-	active, err := store.InProgress(context.Background(), "linear")
+	active, err := store.InProgress(context.Background())
 	if err != nil {
 		return nil, nil, fmt.Errorf("query in-progress: %w", err)
 	}
@@ -169,15 +158,13 @@ func loadFromDB(dbPath string, sampleStart, sampleEnd time.Time, minCycleTime ti
 }
 
 func main() {
-	dbFile := flag.String("db", "items.db", "path to SQLite database (default source)")
-	issuesFile := flag.String("issues", "", "path to NDJSON issues file (overrides -db)")
+	dbFile := flag.String("db", "linear.db", "path to SQLite database")
 	sampleStartStr := flag.String("sample-start", "", "Start of completed-issue window (YYYY-MM-DD, default: today minus 3 months)")
 	sampleEndStr := flag.String("sample-end", "", "End of completed-issue window (YYYY-MM-DD, default: today)")
 	format := flag.String("format", "text", "Output format: text, json, html")
 	minCycleTimeStr := flag.String("min-cycle-time", "", "Exclude completed issues with cycle time below this duration from the percentile distribution (e.g. 5m, 1h, 1d)")
 	flag.Parse()
 
-	var err error
 	var minCycleTime time.Duration
 	if *minCycleTimeStr != "" {
 		d, err := parseFlexibleDuration(*minCycleTimeStr)
@@ -215,77 +202,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	var cycleTimes []float64
-	var inProgress []reportItem
-
-	if *issuesFile != "" {
-		// Legacy NDJSON path — used when -issues is explicitly provided.
-		f, err := os.Open(*issuesFile)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error: open %s: %v\n", *issuesFile, err)
-			os.Exit(1)
-		}
-		defer f.Close()
-
-		dec := json.NewDecoder(f)
-		for dec.More() {
-			var iss issue
-			if err := dec.Decode(&iss); err != nil {
-				fmt.Fprintf(os.Stderr, "error: decode issue: %v\n", err)
-				os.Exit(1)
-			}
-
-			switch iss.Status {
-			case "completed":
-				if iss.StartedAt == "" || iss.CompletedAt == "" {
-					continue
-				}
-				startedAt, err1 := time.Parse(time.RFC3339, iss.StartedAt)
-				completedAt, err2 := time.Parse(time.RFC3339, iss.CompletedAt)
-				if err1 != nil || err2 != nil {
-					continue
-				}
-				if completedAt.Before(sampleStart) || completedAt.After(sampleEnd) {
-					continue
-				}
-				cycleTime := completedAt.Sub(startedAt)
-				if cycleTime < minCycleTime {
-					continue
-				}
-				days := cycleTime.Hours() / 24
-				if days >= 0 {
-					cycleTimes = append(cycleTimes, days)
-				}
-
-			case "in_progress":
-				if iss.StartedAt == "" {
-					continue
-				}
-				startedAt, err := time.Parse(time.RFC3339, iss.StartedAt)
-				if err != nil {
-					continue
-				}
-				ageDays := today.Sub(startedAt).Hours() / 24
-				if ageDays < 0 {
-					ageDays = 0
-				}
-				inProgress = append(inProgress, reportItem{
-					Identifier:  iss.Identifier,
-					Title:       iss.Title,
-					Assignee:    iss.Engineer,
-					ProjectName: iss.ProjectName,
-					StartedAt:   startedAt,
-					AgeDays:     ageDays,
-				})
-			}
-		}
-	} else {
-		// SQLite path — default.
-		cycleTimes, inProgress, err = loadFromDB(*dbFile, sampleStart, sampleEnd, minCycleTime, today)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
-			os.Exit(1)
-		}
+	cycleTimes, inProgress, err := loadFromDB(*dbFile, sampleStart, sampleEnd, minCycleTime, today)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
 	}
 
 	sort.Float64s(cycleTimes)

@@ -6,47 +6,37 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"forecasting/internal/linear"
 	"forecasting/internal/sqlite"
-	internalsync "forecasting/internal/sync"
 )
 
 func main() {
-	source := flag.String("source", "linear", "data source to sync (currently: linear)")
 	var teams linear.KeyList
-	flag.Var(&teams, "teams", "comma-separated team keys, e.g. ENG,DESIGN (source=linear only); required unless -all-teams")
-	allTeams := flag.Bool("all-teams", false, "fetch issues for all accessible teams (source=linear only); mutually exclusive with -teams")
-	listTeamsFlag := flag.Bool("list-teams", false, "list accessible teams and their keys, then exit (source=linear only)")
-	syncAll := flag.Bool("sync-all", false, "ignore the stored watermark and do a full reload from the source")
-	db := flag.String("db", "items.db", "path to SQLite database file")
+	flag.Var(&teams, "teams", "comma-separated team keys, e.g. ENG,DESIGN; required unless -all-teams")
+	allTeams := flag.Bool("all-teams", false, "fetch issues for all accessible teams; mutually exclusive with -teams")
+	listTeamsFlag := flag.Bool("list-teams", false, "list accessible teams and their keys, then exit")
+	syncAll := flag.Bool("sync-all", false, "ignore the stored watermark and do a full reload from Linear")
+	db := flag.String("db", "linear.db", "path to SQLite database file")
 	flag.Parse()
 
-	if err := run(context.Background(), *source, teams, *allTeams, *listTeamsFlag, *syncAll, *db); err != nil {
+	if err := run(context.Background(), teams, *allTeams, *listTeamsFlag, *syncAll, *db); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func run(ctx context.Context, source string, teams linear.KeyList, allTeams, listTeams, syncAll bool, dbPath string) error {
-	switch source {
-	case "linear":
-		return syncLinear(ctx, teams, allTeams, listTeams, syncAll, dbPath)
-	default:
-		return fmt.Errorf("unknown source %q; supported: linear", source)
-	}
-}
-
-func syncLinear(ctx context.Context, teams linear.KeyList, allTeams, listTeams, syncAll bool, dbPath string) error {
+func run(ctx context.Context, teams linear.KeyList, allTeams, listTeams, syncAll bool, dbPath string) error {
 	apiKey := os.Getenv("LINEAR_API_KEY")
 	if apiKey == "" {
 		return fmt.Errorf("LINEAR_API_KEY environment variable is not set")
 	}
 
-	src := linear.New(apiKey, []string(teams))
+	client := linear.New(apiKey, []string(teams))
 
 	if listTeams {
-		return src.ListTeams(ctx, os.Stderr)
+		return client.ListTeams(ctx, os.Stderr)
 	}
 
 	if allTeams && len(teams) > 0 {
@@ -68,11 +58,24 @@ func syncLinear(ctx context.Context, teams linear.KeyList, allTeams, listTeams, 
 	}
 	defer store.Close()
 
-	n, err := internalsync.Sync(ctx, src, store, syncAll)
-	if err != nil {
-		return err
+	var since time.Time
+	if !syncAll {
+		since, err = store.LatestUpdatedAt(ctx)
+		if err != nil {
+			return fmt.Errorf("watermark: %w", err)
+		}
 	}
 
-	fmt.Fprintf(os.Stderr, "done. upserted %d items.\n", n)
+	issues, err := client.Fetch(ctx, since)
+	if err != nil {
+		return fmt.Errorf("fetch: %w", err)
+	}
+	if len(issues) > 0 {
+		if err := store.Upsert(ctx, issues...); err != nil {
+			return fmt.Errorf("upsert: %w", err)
+		}
+	}
+
+	fmt.Fprintf(os.Stderr, "done. upserted %d issues.\n", len(issues))
 	return nil
 }

@@ -269,7 +269,7 @@ func outputText(items []reportItem, cycleTimes []float64, p85 float64, sampleSta
 		pct := item.Percentile
 		fmt.Fprintf(w, "%s\t%s\t%.1f\t%d%s\t%s\t%s\t%s\n",
 			item.Identifier,
-			item.Title,
+			truncateTitle(item.Title),
 			item.AgeDays,
 			pct, ordinalSuffix(pct),
 			formatState(item.StateName, item.StateType),
@@ -278,6 +278,14 @@ func outputText(items []reportItem, cycleTimes []float64, p85 float64, sampleSta
 		)
 	}
 	w.Flush()
+}
+
+func truncateTitle(title string) string {
+	const maxLen = 50
+	if len(title) <= maxLen {
+		return title
+	}
+	return title[:maxLen] + "..."
 }
 
 type jsonItem struct {

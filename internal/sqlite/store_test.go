@@ -64,6 +64,100 @@ func TestUpsertAndCompletedBetween(t *testing.T) {
 	}
 }
 
+func TestNotCompletedCounts(t *testing.T) {
+	store := openTestStore(t)
+	ctx := context.Background()
+
+	issues := []linear.Issue{
+		// Apollo / Beta: two not-completed.
+		{Identifier: "ENG-1", TeamKey: "ENG", StateType: "started", ProjectName: "Apollo", ProjectMilestoneName: "Beta"},
+		{Identifier: "ENG-2", TeamKey: "ENG", StateType: "backlog", ProjectName: "Apollo", ProjectMilestoneName: "Beta"},
+		// Apollo with no milestone.
+		{Identifier: "ENG-3", TeamKey: "ENG", StateType: "unstarted", ProjectName: "Apollo"},
+		// No project, no milestone; different team.
+		{Identifier: "DES-1", TeamKey: "DES", StateType: "started"},
+		// Terminal states are excluded.
+		{Identifier: "ENG-5", TeamKey: "ENG", StateType: "completed", ProjectName: "Apollo", ProjectMilestoneName: "Beta"},
+		{Identifier: "ENG-6", TeamKey: "ENG", StateType: "canceled", ProjectName: "Apollo"},
+	}
+	if err := store.Upsert(ctx, issues...); err != nil {
+		t.Fatalf("Upsert: %v", err)
+	}
+
+	got, err := store.NotCompletedCounts(ctx, nil)
+	if err != nil {
+		t.Fatalf("NotCompletedCounts: %v", err)
+	}
+
+	want := []ProjectMilestoneCount{
+		{TeamKey: "DES", ProjectName: "", MilestoneName: "", Count: 1},
+		{TeamKey: "ENG", ProjectName: "Apollo", MilestoneName: "", Count: 1},
+		{TeamKey: "ENG", ProjectName: "Apollo", MilestoneName: "Beta", Count: 2},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("NotCompletedCounts = %+v, want %+v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("row %d = %+v, want %+v", i, got[i], want[i])
+		}
+	}
+
+	// With a team filter, only that team's issues are counted.
+	gotTeam, err := store.NotCompletedCounts(ctx, []string{"ENG"})
+	if err != nil {
+		t.Fatalf("NotCompletedCounts(ENG): %v", err)
+	}
+	wantTeam := []ProjectMilestoneCount{
+		{TeamKey: "ENG", ProjectName: "Apollo", MilestoneName: "", Count: 1},
+		{TeamKey: "ENG", ProjectName: "Apollo", MilestoneName: "Beta", Count: 2},
+	}
+	if len(gotTeam) != len(wantTeam) {
+		t.Fatalf("NotCompletedCounts(ENG) = %+v, want %+v", gotTeam, wantTeam)
+	}
+	for i := range wantTeam {
+		if gotTeam[i] != wantTeam[i] {
+			t.Errorf("ENG row %d = %+v, want %+v", i, gotTeam[i], wantTeam[i])
+		}
+	}
+}
+
+func TestProjectLastUpdated(t *testing.T) {
+	store := openTestStore(t)
+	ctx := context.Background()
+
+	older := mustParse(t, "2024-01-01T00:00:00Z")
+	newer := mustParse(t, "2024-03-15T12:30:00Z")
+
+	issues := []linear.Issue{
+		// Apollo's newest touch is a completed (terminal) issue.
+		{Identifier: "ENG-1", TeamKey: "ENG", StateType: "started", ProjectName: "Apollo", UpdatedAt: older},
+		{Identifier: "ENG-2", TeamKey: "ENG", StateType: "completed", ProjectName: "Apollo", UpdatedAt: newer},
+		// An issue with no project.
+		{Identifier: "ENG-3", TeamKey: "ENG", StateType: "started", UpdatedAt: older},
+	}
+	if err := store.Upsert(ctx, issues...); err != nil {
+		t.Fatalf("Upsert: %v", err)
+	}
+
+	got, err := store.ProjectLastUpdated(ctx, nil)
+	if err != nil {
+		t.Fatalf("ProjectLastUpdated: %v", err)
+	}
+
+	last := make(map[string]time.Time)
+	for _, a := range got {
+		last[a.ProjectName] = a.LastUpdated
+	}
+	// Terminal issues must count toward "last touched".
+	if !last["Apollo"].Equal(newer) {
+		t.Errorf("Apollo last updated = %v, want %v", last["Apollo"], newer)
+	}
+	if !last[""].Equal(older) {
+		t.Errorf("(no project) last updated = %v, want %v", last[""], older)
+	}
+}
+
 func TestCompletedBetweenExcludesUnassigned(t *testing.T) {
 	store := openTestStore(t)
 	ctx := context.Background()

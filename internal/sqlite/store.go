@@ -280,6 +280,159 @@ ORDER BY started_at ASC`
 	return issues, rows.Err()
 }
 
+// ProjectMilestoneCount is a count of issues grouped by team, project and
+// milestone. Empty ProjectName / MilestoneName mean the issue had no project /
+// no milestone.
+type ProjectMilestoneCount struct {
+	TeamKey       string
+	TeamName      string
+	ProjectName   string
+	MilestoneName string
+	Count         int
+}
+
+// NotCompletedCounts returns the number of issues that are not in a terminal
+// state, grouped by team, project and milestone. Terminal states ('completed'
+// and 'canceled') are excluded, so the counts reflect outstanding/remaining
+// work. Issues without a project or milestone come back with an empty
+// ProjectName / MilestoneName for the caller to label. If teamKeys is
+// non-empty, only issues belonging to those teams are counted.
+func (s *Store) NotCompletedCounts(ctx context.Context, teamKeys []string) ([]ProjectMilestoneCount, error) {
+	q := `
+SELECT team_key,
+       team_name,
+       COALESCE(project_name, '')           AS project_name,
+       COALESCE(project_milestone_name, '') AS milestone_name,
+       COUNT(*)                             AS cnt
+FROM issues
+WHERE state_type NOT IN ('completed', 'canceled')`
+
+	var args []any
+	if len(teamKeys) > 0 {
+		placeholders := make([]byte, 0, len(teamKeys)*2)
+		for i, k := range teamKeys {
+			if i > 0 {
+				placeholders = append(placeholders, ',')
+			}
+			placeholders = append(placeholders, '?')
+			args = append(args, k)
+		}
+		q += " AND team_key IN (" + string(placeholders) + ")"
+	}
+
+	q += `
+GROUP BY team_key, team_name, project_name, milestone_name
+ORDER BY project_name, milestone_name`
+
+	rows, err := s.db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, fmt.Errorf("NotCompletedCounts: %w", err)
+	}
+	defer rows.Close()
+
+	var counts []ProjectMilestoneCount
+	for rows.Next() {
+		var c ProjectMilestoneCount
+		if err := rows.Scan(&c.TeamKey, &c.TeamName, &c.ProjectName, &c.MilestoneName, &c.Count); err != nil {
+			return nil, fmt.Errorf("NotCompletedCounts scan: %w", err)
+		}
+		counts = append(counts, c)
+	}
+	return counts, rows.Err()
+}
+
+// ProjectActivity is the most recent updated_at across all of a project's
+// issues — including terminal (completed/canceled) ones — so it reflects the
+// last time the project was touched in any way. ProjectName is empty for issues
+// with no project.
+type ProjectActivity struct {
+	TeamKey     string
+	TeamName    string
+	ProjectName string
+	LastUpdated time.Time
+}
+
+// ProjectLastUpdated returns, per team and project, the most recent updated_at
+// across ALL issues (no state filter), so callers can tell when a project was
+// last touched even if the only recent change was to a completed issue. If
+// teamKeys is non-empty, only those teams are considered.
+func (s *Store) ProjectLastUpdated(ctx context.Context, teamKeys []string) ([]ProjectActivity, error) {
+	q := `
+SELECT team_key,
+       team_name,
+       COALESCE(project_name, '') AS project_name,
+       MAX(updated_at)            AS max_updated_at
+FROM issues`
+
+	var args []any
+	if len(teamKeys) > 0 {
+		placeholders := make([]byte, 0, len(teamKeys)*2)
+		for i, k := range teamKeys {
+			if i > 0 {
+				placeholders = append(placeholders, ',')
+			}
+			placeholders = append(placeholders, '?')
+			args = append(args, k)
+		}
+		q += " WHERE team_key IN (" + string(placeholders) + ")"
+	}
+
+	q += `
+GROUP BY team_key, team_name, project_name`
+
+	rows, err := s.db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, fmt.Errorf("ProjectLastUpdated: %w", err)
+	}
+	defer rows.Close()
+
+	var acts []ProjectActivity
+	for rows.Next() {
+		var a ProjectActivity
+		// MAX(updated_at) is an aggregate expression, so the driver loses the
+		// column's DATETIME affinity and returns the raw stored string rather
+		// than a time.Time; parse it ourselves.
+		var maxUpdated sql.NullString
+		if err := rows.Scan(&a.TeamKey, &a.TeamName, &a.ProjectName, &maxUpdated); err != nil {
+			return nil, fmt.Errorf("ProjectLastUpdated scan: %w", err)
+		}
+		if maxUpdated.Valid {
+			t, err := parseSQLiteTime(maxUpdated.String)
+			if err != nil {
+				return nil, fmt.Errorf("ProjectLastUpdated parse %q: %w", maxUpdated.String, err)
+			}
+			a.LastUpdated = t
+		}
+		acts = append(acts, a)
+	}
+	return acts, rows.Err()
+}
+
+// sqliteTimeLayouts are the timestamp formats modernc.org/sqlite may have
+// written DATETIME values in. The first matches how the driver binds a
+// time.Time; the rest are fallbacks.
+var sqliteTimeLayouts = []string{
+	"2006-01-02 15:04:05.999999999 -0700 MST", // time.Time.String(), how the driver binds time values
+	"2006-01-02 15:04:05.999999999-07:00",
+	"2006-01-02T15:04:05.999999999-07:00",
+	time.RFC3339Nano,
+	time.RFC3339,
+	"2006-01-02 15:04:05.999999999",
+	"2006-01-02 15:04:05",
+	"2006-01-02",
+}
+
+// parseSQLiteTime parses a DATETIME string read back from SQLite, trying the
+// layouts the driver may have stored.
+func parseSQLiteTime(s string) (time.Time, error) {
+	for _, layout := range sqliteTimeLayouts {
+		if t, err := time.Parse(layout, s); err == nil {
+			return t, nil
+		}
+	}
+	return time.Time{}, fmt.Errorf("unrecognized time format")
+}
+
 // nullTime converts a time.Time to sql.NullTime, treating zero as NULL.
 func nullTime(t time.Time) sql.NullTime {
 	if t.IsZero() {

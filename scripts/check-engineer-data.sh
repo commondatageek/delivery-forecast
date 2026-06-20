@@ -14,14 +14,14 @@
 #     -start 2026-01-05 -end 2026-04-01
 #
 # Flags:
-#   -db          path to the sqlite database (default: items.db)
+#   -db          path to the sqlite database (default: linear.db)
 #   -engineers   comma-separated list of assignee names to check (required)
 #   -start       sample window start, YYYY-MM-DD, inclusive (default: 90 days before -end)
 #   -end         sample window end, YYYY-MM-DD, exclusive (default: today)
 
 set -euo pipefail
 
-db="items.db"
+db="linear.db"
 engineers=""
 start=""
 end=""
@@ -83,7 +83,7 @@ echo "=== Engineers not found in data at all (check for typos) ==="
 any_missing=0
 for eng in "${engineer_list[@]}"; do
   escaped="${eng//\'/\'\'}"
-  count=$(sqlite3 "$db" "SELECT COUNT(*) FROM items WHERE assignee = '$escaped';")
+  count=$(sqlite3 "$db" "SELECT COUNT(*) FROM issues WHERE assignee = '$escaped';")
   if [ "$count" -eq 0 ]; then
     echo "  MISSING: $eng"
     any_missing=1
@@ -100,8 +100,8 @@ SELECT assignee,
        COUNT(*) AS items_in_window,
        COUNT(DISTINCT substr(completed_at,1,10)) AS distinct_days,
        $total_days - COUNT(DISTINCT substr(completed_at,1,10)) AS zero_days_in_pool
-FROM items
-WHERE status = 'completed'
+FROM issues
+WHERE state_type = 'completed'
   AND assignee IN ($in_list)
   AND completed_at >= '$start'
   AND completed_at <  '$end'
@@ -116,8 +116,8 @@ SELECT assignee,
        COUNT(*) AS total_completed_ever,
        MIN(completed_at) AS earliest,
        MAX(completed_at) AS latest
-FROM items
-WHERE status = 'completed'
+FROM issues
+WHERE state_type = 'completed'
   AND assignee IN ($in_list)
 GROUP BY assignee
 ORDER BY assignee;

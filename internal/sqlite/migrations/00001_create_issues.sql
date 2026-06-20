@@ -1,12 +1,13 @@
 -- +goose Up
 CREATE TABLE issues (
-    -- identifier/title/team/state_* are always present on a Linear issue.
+    -- identifier/title/team_key/team_name/state_* are always present on a Linear issue.
     -- assignee and the project/milestone columns are genuinely optional and
     -- are stored as NULL when absent (see nullString in internal/sqlite).
     identifier              TEXT NOT NULL PRIMARY KEY,
     title                   TEXT NOT NULL DEFAULT '',
     assignee                TEXT,
-    team                    TEXT NOT NULL DEFAULT '',
+    team_key                TEXT NOT NULL DEFAULT '',
+    team_name               TEXT NOT NULL DEFAULT '',
     project_id              TEXT,
     project_name            TEXT,
     project_milestone_id    TEXT,
@@ -22,8 +23,8 @@ CREATE TABLE issues (
     updated_at              DATETIME
 );
 
-CREATE INDEX idx_issues_updated_at   ON issues (updated_at);
-CREATE INDEX idx_issues_completed_at ON issues (completed_at);
+CREATE INDEX idx_issues_team_key_updated_at ON issues (team_key, updated_at);
+CREATE INDEX idx_issues_completed_at        ON issues (completed_at);
 
 -- +goose Down
 DROP TABLE issues;

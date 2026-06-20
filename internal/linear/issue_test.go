@@ -45,7 +45,7 @@ func TestToIssueFullyPopulated(t *testing.T) {
 		AutoArchivedAt:   autoArchivedAt,
 		AddedToProjectAt: addedToProjectAt,
 		Assignee:         &assignee{Name: "alice"},
-		Team:             &teamRef{Name: "ENG"},
+		Team:             &teamRef{Key: "ENG", Name: "Engineering"},
 		Project:          &projectRef{ID: "proj-1", Name: "Q3"},
 		ProjectMilestone: &milestoneRef{ID: "ms-1", Name: "Milestone 1"},
 		State:            &stateRef{Type: "completed", Name: "Done"},
@@ -57,7 +57,8 @@ func TestToIssueFullyPopulated(t *testing.T) {
 		Identifier:           "ENG-123",
 		Title:                "Fix bug",
 		Assignee:             "alice",
-		Team:                 "ENG",
+		TeamKey:              "ENG",
+		TeamName:             "Engineering",
 		ProjectID:            "proj-1",
 		ProjectName:          "Q3",
 		ProjectMilestoneID:   "ms-1",
@@ -86,7 +87,7 @@ func TestToIssueNilRelationsYieldEmptyStrings(t *testing.T) {
 	}
 
 	got := toIssue(n)
-	if got.Team != "" || got.ProjectID != "" || got.ProjectName != "" ||
+	if got.TeamKey != "" || got.TeamName != "" || got.ProjectID != "" || got.ProjectName != "" ||
 		got.ProjectMilestoneID != "" || got.ProjectMilestoneName != "" ||
 		got.StateType != "" || got.StateName != "" {
 		t.Fatalf("toIssue() with nil relations = %+v, want all relation fields empty", got)

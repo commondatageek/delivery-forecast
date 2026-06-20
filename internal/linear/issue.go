@@ -7,7 +7,8 @@ type Issue struct {
 	Identifier           string // e.g. "ENG-123"
 	Title                string
 	Assignee             string
-	Team                 string
+	TeamKey              string
+	TeamName             string
 	ProjectID            string
 	ProjectName          string
 	ProjectMilestoneID   string

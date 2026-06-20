@@ -167,8 +167,10 @@ func toIssue(n issueNode) Issue {
 	if n.Assignee != nil {
 		assigneeName = n.Assignee.Name
 	}
+	teamKey := ""
 	teamName := ""
 	if n.Team != nil {
+		teamKey = n.Team.Key
 		teamName = n.Team.Name
 	}
 	projectName := ""
@@ -194,7 +196,8 @@ func toIssue(n issueNode) Issue {
 		Identifier:           n.Identifier,
 		Title:                n.Title,
 		Assignee:             assigneeName,
-		Team:                 teamName,
+		TeamKey:              teamKey,
+		TeamName:             teamName,
 		ProjectID:            projectID,
 		ProjectName:          projectName,
 		ProjectMilestoneID:   milestoneID,
@@ -253,6 +256,7 @@ query FetchIssues($after: String) {
         name
       }
       team {
+        key
         name
       }
       project {
@@ -311,6 +315,7 @@ type assignee struct {
 }
 
 type teamRef struct {
+	Key  string `json:"key"`
 	Name string `json:"name"`
 }
 

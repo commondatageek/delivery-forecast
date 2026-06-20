@@ -19,20 +19,30 @@ func main() {
 	listTeamsFlag := flag.Bool("list-teams", false, "list accessible teams and their keys, then exit")
 	syncAll := flag.Bool("sync-all", false, "ignore the stored watermark and do a full reload from Linear")
 	db := flag.String("db", "linear.db", "path to SQLite database file")
+
 	flag.Parse()
 
-	if err := run(context.Background(), teams, *allTeams, *listTeamsFlag, *syncAll, *db); err != nil {
+	apiKey, err := getAPIKey()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
+	}
+
+	if err := run(context.Background(), apiKey, teams, *allTeams, *listTeamsFlag, *syncAll, *db); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func run(ctx context.Context, teams linear.KeyList, allTeams, listTeams, syncAll bool, dbPath string) error {
+func getAPIKey() (string, error) {
 	apiKey := os.Getenv("LINEAR_API_KEY")
 	if apiKey == "" {
-		return fmt.Errorf("LINEAR_API_KEY environment variable is not set")
+		return "", fmt.Errorf("LINEAR_API_KEY environment variable is not set")
 	}
+	return apiKey, nil
+}
 
+func run(ctx context.Context, apiKey string, teams linear.KeyList, allTeams, listTeams, syncAll bool, dbPath string) error {
 	client := linear.New(apiKey, []string(teams))
 
 	if listTeams {

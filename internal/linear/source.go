@@ -198,6 +198,10 @@ func toItem(n issueNode) (item.Item, bool) {
 		milestoneID = n.ProjectMilestone.ID
 		milestoneName = n.ProjectMilestone.Name
 	}
+	statusType := ""
+	if n.State != nil {
+		statusType = n.State.Type
+	}
 
 	return item.Item{
 		Source:           "linear",
@@ -210,6 +214,7 @@ func toItem(n issueNode) (item.Item, bool) {
 		MilestoneID:      milestoneID,
 		MilestoneName:    milestoneName,
 		Status:           status,
+		StatusType:       statusType,
 		CreatedAt:        n.CreatedAt,
 		StartedAt:        n.StartedAt,
 		CompletedAt:      n.CompletedAt,
@@ -275,6 +280,9 @@ query FetchIssues($after: String) {
         id
         name
       }
+      state {
+        type
+      }
     }
     pageInfo {
       hasNextPage
@@ -311,6 +319,7 @@ type issueNode struct {
 	Team             *teamRef      `json:"team"`
 	Project          *projectRef   `json:"project"`
 	ProjectMilestone *milestoneRef `json:"projectMilestone"`
+	State            *stateRef     `json:"state"`
 }
 
 type assignee struct {
@@ -329,6 +338,10 @@ type projectRef struct {
 type milestoneRef struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
+}
+
+type stateRef struct {
+	Type string `json:"type"`
 }
 
 type issuesConnection struct {

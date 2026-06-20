@@ -17,6 +17,7 @@ type Item struct {
 	MilestoneID      string
 	MilestoneName    string
 	Status           string // plain string for now: "completed", "started", ...
+	StatusType       string // raw workflow state type from the source, e.g. Linear's state.type
 	CreatedAt        time.Time
 	StartedAt        time.Time
 	CompletedAt      time.Time

@@ -59,11 +59,11 @@ func (s *Store) Upsert(ctx context.Context, items ...item.Item) error {
 	const q = `
 INSERT INTO items
     (source, identifier, title, assignee, team, project_name, project_id,
-     milestone_id, milestone_name, status,
+     milestone_id, milestone_name, status, status_type,
      created_at, started_at, completed_at, archived_at, auto_archived_at,
      added_to_project_at, updated_at)
 VALUES
-    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(source, identifier) DO UPDATE SET
     title               = excluded.title,
     assignee            = excluded.assignee,
@@ -73,6 +73,7 @@ ON CONFLICT(source, identifier) DO UPDATE SET
     milestone_id        = excluded.milestone_id,
     milestone_name      = excluded.milestone_name,
     status              = excluded.status,
+    status_type         = excluded.status_type,
     created_at          = excluded.created_at,
     started_at          = excluded.started_at,
     completed_at        = excluded.completed_at,
@@ -105,6 +106,7 @@ ON CONFLICT(source, identifier) DO UPDATE SET
 			it.MilestoneID,
 			it.MilestoneName,
 			it.Status,
+			it.StatusType,
 			nullTime(it.CreatedAt),
 			nullTime(it.StartedAt),
 			nullTime(it.CompletedAt),
@@ -148,10 +150,10 @@ func (s *Store) LatestUpdatedAt(ctx context.Context, source string) (time.Time, 
 // only items whose assignee is in that set are returned.
 //
 // Returned items have Source, Identifier, Title, Assignee, Team, Project,
-// Status, StartedAt, CompletedAt, and UpdatedAt populated.
+// Status, StatusType, StartedAt, CompletedAt, and UpdatedAt populated.
 func (s *Store) CompletedBetween(ctx context.Context, source string, start, end time.Time, assignees []string) ([]item.Item, error) {
 	q := `
-SELECT source, identifier, title, assignee, team, project_name, status,
+SELECT source, identifier, title, assignee, team, project_name, status, status_type,
        started_at, completed_at, updated_at
 FROM items
 WHERE source = ?
@@ -185,7 +187,7 @@ WHERE source = ?
 		var startedAt, completedAt, updatedAt sql.NullTime
 		if err := rows.Scan(
 			&it.Source, &it.Identifier, &it.Title, &it.Assignee,
-			&it.Team, &it.ProjectName, &it.Status,
+			&it.Team, &it.ProjectName, &it.Status, &it.StatusType,
 			&startedAt, &completedAt, &updatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("CompletedBetween scan: %w", err)
@@ -208,7 +210,7 @@ WHERE source = ?
 // non-NULL started_at. Results are ordered by started_at ascending.
 func (s *Store) InProgress(ctx context.Context, source string) ([]item.Item, error) {
 	const q = `
-SELECT source, identifier, title, assignee, team, project_name, status, started_at
+SELECT source, identifier, title, assignee, team, project_name, status, status_type, started_at
 FROM items
 WHERE source = ?
   AND status = 'in_progress'
@@ -227,7 +229,7 @@ ORDER BY started_at ASC`
 		var startedAt sql.NullTime
 		if err := rows.Scan(
 			&it.Source, &it.Identifier, &it.Title, &it.Assignee,
-			&it.Team, &it.ProjectName, &it.Status, &startedAt,
+			&it.Team, &it.ProjectName, &it.Status, &it.StatusType, &startedAt,
 		); err != nil {
 			return nil, fmt.Errorf("InProgress scan: %w", err)
 		}

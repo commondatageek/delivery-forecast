@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -15,25 +16,31 @@ import (
 
 const endpoint = "https://api.linear.app/graphql"
 
+func GetAPIKey() (string, error) {
+	apiKey := os.Getenv("LINEAR_API_KEY")
+	if apiKey == "" {
+		return "", fmt.Errorf("LINEAR_API_KEY environment variable is not set")
+	}
+	return apiKey, nil
+}
+
 // Client fetches issues from Linear and converts them to Issue.
 type Client struct {
-	apiKey   string
-	teamKeys []string // empty = all teams
-	client   *http.Client
+	apiKey string
+	client *http.Client
 }
 
 // New creates a Linear Client. teamKeys may be empty to fetch all accessible teams.
-func New(apiKey string, teamKeys []string) *Client {
+func New(apiKey string) *Client {
 	return &Client{
-		apiKey:   apiKey,
-		teamKeys: teamKeys,
-		client:   &http.Client{Timeout: 30 * time.Second},
+		apiKey: apiKey,
+		client: &http.Client{Timeout: 30 * time.Second},
 	}
 }
 
 // Fetch retrieves issues updated since the given time. since == zero means full fetch.
-func (c *Client) Fetch(ctx context.Context, since time.Time) ([]Issue, error) {
-	query := buildQuery(c.teamKeys, since)
+func (c *Client) Fetch(ctx context.Context, since time.Time, teamKeys []string) ([]Issue, error) {
+	query := buildQuery(teamKeys, since)
 
 	var issues []Issue
 	var cursor string
@@ -59,7 +66,7 @@ func (c *Client) Fetch(ctx context.Context, since time.Time) ([]Issue, error) {
 
 // ListTeams writes accessible teams to the provided writer (for CLI use),
 // sorted in ascending alphabetical order by team key.
-func (c *Client) ListTeams(ctx context.Context, w io.Writer) error {
+func (c *Client) ListTeams(ctx context.Context) ([]teamNode, error) {
 	var teams []teamNode
 	var cursor string
 
@@ -71,20 +78,20 @@ func (c *Client) ListTeams(ctx context.Context, w io.Writer) error {
 
 		body, err := json.Marshal(gqlRequest{Query: teamsQuery, Variables: vars})
 		if err != nil {
-			return fmt.Errorf("marshal request: %w", err)
+			return nil, fmt.Errorf("marshal request: %w", err)
 		}
 
 		raw, err := c.do(ctx, body)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		var resp teamsResponse
 		if err := json.Unmarshal(raw, &resp); err != nil {
-			return fmt.Errorf("unmarshal teams: %w", err)
+			return nil, fmt.Errorf("unmarshal teams: %w", err)
 		}
 		if len(resp.Errors) > 0 {
-			return fmt.Errorf("graphql error: %s", resp.Errors[0].Message)
+			return nil, fmt.Errorf("graphql error: %s", resp.Errors[0].Message)
 		}
 
 		teams = append(teams, resp.Data.Teams.Nodes...)
@@ -97,11 +104,7 @@ func (c *Client) ListTeams(ctx context.Context, w io.Writer) error {
 
 	sort.Slice(teams, func(i, j int) bool { return teams[i].Key < teams[j].Key })
 
-	fmt.Fprintf(w, "accessible teams (%d):\n", len(teams))
-	for _, t := range teams {
-		fmt.Fprintf(w, "  %-12s %s\n", t.Key, t.Name)
-	}
-	return nil
+	return teams, nil
 }
 
 // --- internal helpers ---

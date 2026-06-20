@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -20,14 +19,6 @@ import (
 
 	"github.com/mattn/go-isatty"
 )
-
-// --- Data loading ---
-
-type RawIssue struct {
-	Engineer    string `json:"engineer"`
-	Title       string `json:"title"`
-	CompletedAt string `json:"completed_at"` // RFC 3339 date string
-}
 
 // --- Exclusions ---
 
@@ -71,8 +62,8 @@ func (p *SamplePool) GetCombinedSamples() []int {
 }
 
 // completion is a normalized completed-issue record: the engineer and the
-// instant they completed something. Both the NDJSON and SQLite loaders reduce
-// their source rows to a slice of these and hand them to buildPool.
+// instant they completed something. loadPool reduces DB rows to a slice of
+// these and hands them to buildPool.
 type completion struct {
 	Engineer    string
 	CompletedAt time.Time
@@ -503,70 +494,21 @@ func daysBetween(start, end time.Time) int {
 	return days
 }
 
-func loadPool(issuesFile, exclusionsFile string, includeEngineers []string, startDate, endDate time.Time, wholeTeam bool) (*SamplePool, error) {
-	data, err := os.ReadFile(issuesFile)
-	if err != nil {
-		return nil, fmt.Errorf("reading issues file: %w", err)
-	}
-	var issues []RawIssue
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	for decoder.More() {
-		var issue RawIssue
-		if err := decoder.Decode(&issue); err != nil {
-			return nil, fmt.Errorf("decoding issue: %w", err)
-		}
-		issues = append(issues, issue)
-	}
-
-	exc, err := loadExclusions(exclusionsFile)
-	if err != nil {
-		return nil, err
-	}
-
-	// Collect unique engineers (respecting include filter), purely for the
-	// typo warning below — buildPool derives the actual pool's engineer set
-	// from in-window completions.
-	includeSet := make(map[string]bool, len(includeEngineers))
-	for _, name := range includeEngineers {
-		includeSet[name] = true
-	}
-	engineerSeen := make(map[string]bool)
-	for _, issue := range issues {
-		engineerSeen[issue.Engineer] = true
-	}
-	warnUnmatchedIncludes(includeEngineers, engineerSeen)
-
-	var records []completion
-	for _, issue := range issues {
-		if len(includeSet) > 0 && !includeSet[issue.Engineer] {
-			continue
-		}
-		t, err := time.Parse(time.RFC3339, issue.CompletedAt)
-		if err != nil {
-			continue
-		}
-		records = append(records, completion{Engineer: issue.Engineer, CompletedAt: t})
-	}
-
-	return buildPool(records, exc, startDate, endDate, wholeTeam), nil
-}
-
-// loadPoolFromDB builds a SamplePool by querying the SQLite store instead of
-// reading NDJSON. It is the preferred path when -db is provided.
-func loadPoolFromDB(dbPath, exclusionsFile string, includeEngineers []string, startDate, endDate time.Time, wholeTeam bool) (*SamplePool, error) {
+// loadPool builds a SamplePool by querying the SQLite store.
+func loadPool(dbPath, exclusionsFile string, includeEngineers []string, startDate, endDate time.Time, wholeTeam bool) (*SamplePool, error) {
 	store, err := sqlite.Open(dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("open db: %w", err)
 	}
 	defer store.Close()
 
-	items, err := store.CompletedBetween(context.Background(), "linear", startDate, endDate, includeEngineers)
+	issues, err := store.CompletedBetween(context.Background(), startDate, endDate, includeEngineers)
 	if err != nil {
 		return nil, fmt.Errorf("querying db: %w", err)
 	}
 
-	engineerSeen := make(map[string]bool, len(items))
-	for _, it := range items {
+	engineerSeen := make(map[string]bool, len(issues))
+	for _, it := range issues {
 		engineerSeen[it.Assignee] = true
 	}
 	warnUnmatchedIncludes(includeEngineers, engineerSeen)
@@ -576,8 +518,8 @@ func loadPoolFromDB(dbPath, exclusionsFile string, includeEngineers []string, st
 		return nil, err
 	}
 
-	records := make([]completion, len(items))
-	for i, it := range items {
+	records := make([]completion, len(issues))
+	for i, it := range issues {
 		records[i] = completion{Engineer: it.Assignee, CompletedAt: it.CompletedAt}
 	}
 
@@ -605,16 +547,6 @@ func isFlagSet(fs *flag.FlagSet, name string) bool {
 	return found
 }
 
-// resolvePool picks the DB-backed loader when -db was explicitly set or when
-// -issues was not explicitly set (so -db is the new default). Falls back to
-// the NDJSON loader only when -issues is explicitly provided.
-func resolvePool(cmd *flag.FlagSet, dbPath, issuesFile, exclusionsFile string, include []string, startDate, endDate time.Time, wholeTeam bool) (*SamplePool, error) {
-	if isFlagSet(cmd, "issues") {
-		return loadPool(issuesFile, exclusionsFile, include, startDate, endDate, wholeTeam)
-	}
-	return loadPoolFromDB(dbPath, exclusionsFile, include, startDate, endDate, wholeTeam)
-}
-
 // defaultDateRange returns a default date range of the last 6 months, formatted as YYYY-MM-DD.
 func defaultDateRange() (start, end string) {
 	now := time.Now().UTC()
@@ -634,8 +566,7 @@ func resolveSeed(cmd *flag.FlagSet, randomSeed int64, now time.Time) int64 {
 func cmdItems(args []string) error {
 	defaultStart, defaultEnd := defaultDateRange()
 	cmd := flag.NewFlagSet("items", flag.ExitOnError)
-	dbFile := cmd.String("db", "items.db", "path to SQLite database (default source)")
-	issuesFile := cmd.String("issues", "issues.json", "path to NDJSON issues file (overrides -db)")
+	dbFile := cmd.String("db", "linear.db", "path to SQLite database")
 	exclusionsFile := cmd.String("exclusions", "exclusions.json", "path to exclusions JSON file")
 	engineers := cmd.Int("engineers", 3, "number of (equivalent) engineers")
 	days := cmd.Int("days", 30, "number of days")
@@ -668,7 +599,7 @@ func cmdItems(args []string) error {
 		return fmt.Errorf("invalid -sample-end date: %w", err)
 	}
 
-	pool, err := resolvePool(cmd, *dbFile, *issuesFile, *exclusionsFile, include, startDate, endDate, *wholeTeam)
+	pool, err := loadPool(*dbFile, *exclusionsFile, include, startDate, endDate, *wholeTeam)
 	if err != nil {
 		return err
 	}
@@ -692,8 +623,7 @@ func cmdItems(args []string) error {
 func cmdDays(args []string) error {
 	defaultSampleStart, defaultSampleEnd := defaultDateRange()
 	cmd := flag.NewFlagSet("days", flag.ExitOnError)
-	dbFile := cmd.String("db", "items.db", "path to SQLite database (default source)")
-	issuesFile := cmd.String("issues", "issues.json", "path to NDJSON issues file (overrides -db)")
+	dbFile := cmd.String("db", "linear.db", "path to SQLite database")
 	exclusionsFile := cmd.String("exclusions", "exclusions.json", "path to exclusions JSON file")
 	engineers := cmd.Int("engineers", 3, "number of (equivalent) engineers")
 	items := cmd.Int("items", 50, "number of items to complete")
@@ -726,7 +656,7 @@ func cmdDays(args []string) error {
 		return fmt.Errorf("invalid -sample-end date: %w", err)
 	}
 
-	pool, err := resolvePool(cmd, *dbFile, *issuesFile, *exclusionsFile, include, startDate, endDate, *wholeTeam)
+	pool, err := loadPool(*dbFile, *exclusionsFile, include, startDate, endDate, *wholeTeam)
 	if err != nil {
 		return err
 	}
@@ -750,8 +680,7 @@ func cmdDays(args []string) error {
 func cmdProbability(args []string) error {
 	defaultStart, defaultEnd := defaultDateRange()
 	cmd := flag.NewFlagSet("probability", flag.ExitOnError)
-	dbFile := cmd.String("db", "items.db", "path to SQLite database (default source)")
-	issuesFile := cmd.String("issues", "issues.json", "path to NDJSON issues file (overrides -db)")
+	dbFile := cmd.String("db", "linear.db", "path to SQLite database")
 	exclusionsFile := cmd.String("exclusions", "exclusions.json", "path to exclusions JSON file")
 	engineers := cmd.Int("engineers", 3, "number of (equivalent) engineers")
 	days := cmd.Int("days", 30, "number of days")
@@ -783,7 +712,7 @@ func cmdProbability(args []string) error {
 		return fmt.Errorf("invalid -sample-end date: %w", err)
 	}
 
-	pool, err := resolvePool(cmd, *dbFile, *issuesFile, *exclusionsFile, include, startDate, endDate, *wholeTeam)
+	pool, err := loadPool(*dbFile, *exclusionsFile, include, startDate, endDate, *wholeTeam)
 	if err != nil {
 		return err
 	}

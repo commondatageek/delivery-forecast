@@ -121,7 +121,7 @@ func loadProjects(dbPath string, teamKeys []string, since time.Time) (projects [
 
 	// "Last touched" is measured across ALL issues (including terminal ones),
 	// so a project counts as recently active even if the only recent change was
-	// to a completed/canceled issue. The counts above, by contrast, deliberately
+	// to a completed/canceled/duplicate issue. The counts above, by contrast, deliberately
 	// include only non-terminal issues.
 	activity, err := store.ProjectLastUpdated(ctx, teamKeys)
 	if err != nil {

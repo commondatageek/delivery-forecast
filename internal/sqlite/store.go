@@ -292,11 +292,11 @@ type ProjectMilestoneCount struct {
 }
 
 // NotCompletedCounts returns the number of issues that are not in a terminal
-// state, grouped by team, project and milestone. Terminal states ('completed'
-// and 'canceled') are excluded, so the counts reflect outstanding/remaining
-// work. Issues without a project or milestone come back with an empty
-// ProjectName / MilestoneName for the caller to label. If teamKeys is
-// non-empty, only issues belonging to those teams are counted.
+// state, grouped by team, project and milestone. Terminal states ('completed',
+// 'canceled' and 'duplicate') are excluded, so the counts reflect
+// outstanding/remaining work. Issues without a project or milestone come back
+// with an empty ProjectName / MilestoneName for the caller to label. If
+// teamKeys is non-empty, only issues belonging to those teams are counted.
 func (s *Store) NotCompletedCounts(ctx context.Context, teamKeys []string) ([]ProjectMilestoneCount, error) {
 	q := `
 SELECT team_key,
@@ -305,7 +305,7 @@ SELECT team_key,
        COALESCE(project_milestone_name, '') AS milestone_name,
        COUNT(*)                             AS cnt
 FROM issues
-WHERE state_type NOT IN ('completed', 'canceled')`
+WHERE state_type NOT IN ('completed', 'canceled', 'duplicate')`
 
 	var args []any
 	if len(teamKeys) > 0 {
@@ -342,9 +342,9 @@ ORDER BY project_name, milestone_name`
 }
 
 // ProjectActivity is the most recent updated_at across all of a project's
-// issues — including terminal (completed/canceled) ones — so it reflects the
-// last time the project was touched in any way. ProjectName is empty for issues
-// with no project.
+// issues — including terminal (completed/canceled/duplicate) ones — so it
+// reflects the last time the project was touched in any way. ProjectName is
+// empty for issues with no project.
 type ProjectActivity struct {
 	TeamKey     string
 	TeamName    string

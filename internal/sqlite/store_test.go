@@ -79,6 +79,7 @@ func TestNotCompletedCounts(t *testing.T) {
 		// Terminal states are excluded.
 		{Identifier: "ENG-5", TeamKey: "ENG", StateType: "completed", ProjectName: "Apollo", ProjectMilestoneName: "Beta"},
 		{Identifier: "ENG-6", TeamKey: "ENG", StateType: "canceled", ProjectName: "Apollo"},
+		{Identifier: "ENG-7", TeamKey: "ENG", StateType: "duplicate", ProjectName: "Apollo"},
 	}
 	if err := store.Upsert(ctx, issues...); err != nil {
 		t.Fatalf("Upsert: %v", err)

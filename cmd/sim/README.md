@@ -1,7 +1,8 @@
 # sim
 
-Monte Carlo throughput simulator. Reads historical issue completion data from a
-JSON file and runs simulations to answer three types of questions.
+Monte Carlo throughput simulator. Reads historical issue completion data from
+the SQLite store (`linear.db`, populated by `sync`) and runs simulations to
+answer three types of questions.
 
 ## Build
 
@@ -9,14 +10,10 @@ JSON file and runs simulations to answer three types of questions.
 go build -o sim .
 ```
 
-## Input format
+## Input
 
-`issues.json` is a newline-delimited stream of JSON objects:
-
-```json
-{"engineer": "alice", "title": "Fix login bug", "completed_at": "2025-08-01T14:00:00Z"}
-{"engineer": "bob", "title": "Add dark mode", "completed_at": "2025-08-02T09:30:00Z"}
-```
+Reads completed issues from the `issues` table of a SQLite database (default
+`linear.db`), built by the `sync` command. Point at a different file with `-db`.
 
 ## Subcommands
 
@@ -24,7 +21,7 @@ go build -o sim .
 
 ```sh
 ./sim items \
-  -issues issues.json \
+  -db linear.db \
   -engineers 4 \
   -days 30 \
   -simulations 10000 \
@@ -36,7 +33,7 @@ go build -o sim .
 
 | Flag | Default | Description |
 |---|---|---|
-| `-issues` | `issues.json` | Path to issues JSON file |
+| `-db` | `linear.db` | Path to the SQLite database |
 | `-engineers` | `3` | Number of engineers |
 | `-days` | `30` | Number of days to simulate |
 | `-simulations` | `10000` | Number of Monte Carlo simulations |
@@ -49,7 +46,7 @@ go build -o sim .
 
 ```sh
 ./sim days \
-  -issues issues.json \
+  -db linear.db \
   -engineers 4 \
   -items 80 \
   -simulations 10000 \
@@ -61,7 +58,7 @@ go build -o sim .
 
 | Flag | Default | Description |
 |---|---|---|
-| `-issues` | `issues.json` | Path to issues JSON file |
+| `-db` | `linear.db` | Path to the SQLite database |
 | `-engineers` | `3` | Number of engineers |
 | `-items` | `50` | Number of items to complete |
 | `-simulations` | `10000` | Number of Monte Carlo simulations |
@@ -74,7 +71,7 @@ go build -o sim .
 
 ```sh
 ./sim probability \
-  -issues issues.json \
+  -db linear.db \
   -engineers 4 \
   -days 30 \
   -items 80 \
@@ -86,7 +83,7 @@ go build -o sim .
 
 | Flag | Default | Description |
 |---|---|---|
-| `-issues` | `issues.json` | Path to issues JSON file |
+| `-db` | `linear.db` | Path to the SQLite database |
 | `-engineers` | `3` | Number of engineers |
 | `-days` | `30` | Number of days to simulate |
 | `-items` | `50` | Number of items to complete |

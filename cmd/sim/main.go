@@ -496,17 +496,26 @@ func daysBetween(start, end time.Time) int {
 	return days
 }
 
+// poolData bundles the built pool with the raw inputs that produced it, so a
+// run manifest can record exactly what fed the simulation.
+type poolData struct {
+	Pool       *SamplePool
+	Issues     []linear.Issue // the CompletedBetween candidate set
+	Exclusions Exclusions     // exclusions actually loaded/applied
+	Skipped    int            // issues dropped by validCompletions
+}
+
 // loadPool builds a SamplePool by querying the SQLite store.
-func loadPool(dbPath, exclusionsFile string, includeEngineers []string, startDate, endDate time.Time, wholeTeam bool) (*SamplePool, error) {
+func loadPool(dbPath, exclusionsFile string, includeEngineers []string, startDate, endDate time.Time, wholeTeam bool) (poolData, error) {
 	store, err := sqlite.Open(dbPath)
 	if err != nil {
-		return nil, fmt.Errorf("open db: %w", err)
+		return poolData{}, fmt.Errorf("open db: %w", err)
 	}
 	defer store.Close()
 
 	issues, err := store.CompletedBetween(context.Background(), startDate, endDate, includeEngineers)
 	if err != nil {
-		return nil, fmt.Errorf("querying db: %w", err)
+		return poolData{}, fmt.Errorf("querying db: %w", err)
 	}
 
 	engineerSeen := make(map[string]bool, len(issues))
@@ -517,7 +526,7 @@ func loadPool(dbPath, exclusionsFile string, includeEngineers []string, startDat
 
 	exc, err := loadExclusions(exclusionsFile)
 	if err != nil {
-		return nil, err
+		return poolData{}, err
 	}
 
 	records, skipped := validCompletions(issues)
@@ -525,7 +534,12 @@ func loadPool(dbPath, exclusionsFile string, includeEngineers []string, startDat
 		fmt.Fprintf(os.Stderr, "WARNING: skipped %d completed issue(s) with no assignee or completion date\n", skipped)
 	}
 
-	return buildPool(records, exc, startDate, endDate, wholeTeam), nil
+	return poolData{
+		Pool:       buildPool(records, exc, startDate, endDate, wholeTeam),
+		Issues:     issues,
+		Exclusions: exc,
+		Skipped:    skipped,
+	}, nil
 }
 
 // validCompletions reduces store rows to completion records, dropping any with
@@ -605,6 +619,7 @@ func cmdItems(args []string) error {
 	cmd.Var(&include, "include", "comma-separated list of engineer names to include (default: all)")
 	var team stringList
 	cmd.Var(&team, "team", "comma-separated list of specific engineer names to model individually")
+	manifestFile := cmd.String("manifest", "", `write a run-provenance JSON manifest to this path ("-" for stdout)`)
 	cmd.Parse(args)
 
 	mode, err := resolveMode(isFlagSet(cmd, "engineers"), *wholeTeam, team)
@@ -622,21 +637,34 @@ func cmdItems(args []string) error {
 		return fmt.Errorf("invalid -sample-end date: %w", err)
 	}
 
-	pool, err := loadPool(*dbFile, *exclusionsFile, include, startDate, endDate, *wholeTeam)
+	loaded, err := loadPool(*dbFile, *exclusionsFile, include, startDate, endDate, *wholeTeam)
 	if err != nil {
 		return err
 	}
+	pool := loaded.Pool
 	if err := validatePool(pool, mode, team, false); err != nil {
 		return err
 	}
 	seed := resolveSeed(cmd, *randomSeed, now)
 
-	dist := simulateItemsInDays(pool, mode, team, *engineers, *days, *simulations, *goroutines, seed)
-	fmt.Printf("%s, %d days -> how many items?\n", modeLabel(mode, team, *engineers), *days)
-
 	if len(percentiles) == 0 {
 		percentiles = intList{5, 25, 50, 75, 95}
 	}
+
+	if err := writeManifest(*manifestFile, manifestInputs{
+		Subcommand: "items", Cmd: cmd, Mode: mode, Team: team, Include: include,
+		Engineers: *engineers, WholeTeam: *wholeTeam, Seed: seed,
+		SampleStart: startDate, SampleEnd: endDate,
+		DBPath: *dbFile, ExclusionsPath: *exclusionsFile,
+		Exclusions: loaded.Exclusions, Pool: pool, Issues: loaded.Issues, Skipped: loaded.Skipped,
+		Extra: map[string]any{"effective_percentiles": []int(percentiles)},
+	}); err != nil {
+		return err
+	}
+
+	dist := simulateItemsInDays(pool, mode, team, *engineers, *days, *simulations, *goroutines, seed)
+	fmt.Printf("%s, %d days -> how many items?\n", modeLabel(mode, team, *engineers), *days)
+
 	for _, p := range percentiles {
 		fmt.Printf("  %dth percentile: %d items\n", p, Percentile(dist, float64(p)))
 	}
@@ -748,6 +776,7 @@ func cmdDays(args []string) error {
 	cmd.Var(&include, "include", "comma-separated list of engineer names to include (default: all)")
 	var team stringList
 	cmd.Var(&team, "team", "comma-separated list of specific engineer names to model individually")
+	manifestFile := cmd.String("manifest", "", `write a run-provenance JSON manifest to this path ("-" for stdout)`)
 	cmd.Parse(args)
 
 	mode, err := resolveMode(isFlagSet(cmd, "engineers"), *wholeTeam, team)
@@ -771,10 +800,11 @@ func cmdDays(args []string) error {
 		}
 	}
 
-	pool, err := loadPool(*dbFile, *exclusionsFile, include, startDate, endDate, *wholeTeam)
+	loaded, err := loadPool(*dbFile, *exclusionsFile, include, startDate, endDate, *wholeTeam)
 	if err != nil {
 		return err
 	}
+	pool := loaded.Pool
 	if err := validatePool(pool, mode, team, true); err != nil {
 		return err
 	}
@@ -782,6 +812,17 @@ func cmdDays(args []string) error {
 
 	if len(percentiles) == 0 {
 		percentiles = intList{50, 75, 85, 95}
+	}
+
+	if err := writeManifest(*manifestFile, manifestInputs{
+		Subcommand: "days", Cmd: cmd, Mode: mode, Team: team, Include: include,
+		Engineers: *engineers, WholeTeam: *wholeTeam, Seed: seed,
+		SampleStart: startDate, SampleEnd: endDate,
+		DBPath: *dbFile, ExclusionsPath: *exclusionsFile,
+		Exclusions: loaded.Exclusions, Pool: pool, Issues: loaded.Issues, Skipped: loaded.Skipped,
+		Extra: map[string]any{"effective_percentiles": []int(percentiles)},
+	}); err != nil {
+		return err
 	}
 
 	if len(items) > 1 {
@@ -823,6 +864,7 @@ func cmdProbability(args []string) error {
 	cmd.Var(&include, "include", "comma-separated list of engineer names to include (default: all)")
 	var team stringList
 	cmd.Var(&team, "team", "comma-separated list of specific engineer names to model individually")
+	manifestFile := cmd.String("manifest", "", `write a run-provenance JSON manifest to this path ("-" for stdout)`)
 	cmd.Parse(args)
 
 	mode, err := resolveMode(isFlagSet(cmd, "engineers"), *wholeTeam, team)
@@ -840,14 +882,25 @@ func cmdProbability(args []string) error {
 		return fmt.Errorf("invalid -sample-end date: %w", err)
 	}
 
-	pool, err := loadPool(*dbFile, *exclusionsFile, include, startDate, endDate, *wholeTeam)
+	loaded, err := loadPool(*dbFile, *exclusionsFile, include, startDate, endDate, *wholeTeam)
 	if err != nil {
 		return err
 	}
+	pool := loaded.Pool
 	if err := validatePool(pool, mode, team, false); err != nil {
 		return err
 	}
 	seed := resolveSeed(cmd, *randomSeed, now)
+
+	if err := writeManifest(*manifestFile, manifestInputs{
+		Subcommand: "probability", Cmd: cmd, Mode: mode, Team: team, Include: include,
+		Engineers: *engineers, WholeTeam: *wholeTeam, Seed: seed,
+		SampleStart: startDate, SampleEnd: endDate,
+		DBPath: *dbFile, ExclusionsPath: *exclusionsFile,
+		Exclusions: loaded.Exclusions, Pool: pool, Issues: loaded.Issues, Skipped: loaded.Skipped,
+	}); err != nil {
+		return err
+	}
 
 	dist := simulateItemsInDays(pool, mode, team, *engineers, *days, *simulations, *goroutines, seed)
 	modeDescription := modeLabel(mode, team, *engineers)

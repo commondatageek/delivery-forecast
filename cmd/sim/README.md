@@ -41,6 +41,7 @@ Reads completed issues from the `issues` table of a SQLite database (default
 | `-sample-end` | today | End of historical sample window (YYYY-MM-DD) |
 | `-percentile` | `5,10,...,95` | Comma-separated percentiles to output |
 | `-include` | all | Comma-separated engineer names to include |
+| `-manifest` | (disabled) | Write a run-provenance JSON manifest to this path (`-` for stdout) |
 
 ### `days` — how many days for N engineers to complete I items?
 
@@ -67,6 +68,7 @@ Reads completed issues from the `issues` table of a SQLite database (default
 | `-percentile` | `5,10,...,95` | Comma-separated percentiles to output |
 | `-include` | all | Comma-separated engineer names to include |
 | `-start-date` | today | Report start date for the grouped trajectory report (YYYY-MM-DD) |
+| `-manifest` | (disabled) | Write a run-provenance JSON manifest to this path (`-` for stdout) |
 
 #### Grouped trajectory report
 
@@ -121,3 +123,16 @@ value (the default) keeps the original one-line-per-percentile output.
 | `-sample-start` | 6 months ago | Start of historical sample window (YYYY-MM-DD) |
 | `-sample-end` | today | End of historical sample window (YYYY-MM-DD) |
 | `-include` | all | Comma-separated engineer names to include |
+| `-manifest` | (disabled) | Write a run-provenance JSON manifest to this path (`-` for stdout) |
+
+## Run manifest
+
+All three subcommands accept `-manifest <path>` (`-manifest -` for stdout) to
+write a JSON document capturing every input that fed the run: the binary's
+git SHA/dirty state, every flag (and whether it was explicitly set), the
+resolved sampling mode/seed/sample window, a sha256 fingerprint of the DB
+file, the applied exclusions, the built sample pool's per-engineer totals,
+and a full dump of the completed issues the pool was built from. It's opt-in
+and off by default. Use it to diagnose why two runs disagree — diff two
+manifests and the difference (a different DB snapshot, a different seed, a
+narrower sample window, an engineer with no completions) shows up directly.

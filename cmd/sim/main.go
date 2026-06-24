@@ -750,7 +750,7 @@ func printTrajectoryReport(pool *SamplePool, mode samplingMode, team []string, e
 	fmt.Fprintln(w, strings.Join(header, "\t"))
 
 	for g := range groups {
-		row := []string{fmt.Sprintf("Group %d", g+1), fmt.Sprintf("%d", cum[g])}
+		row := []string{fmt.Sprintf("Group %d", g+1), fmt.Sprintf("%d", groups[g])}
 		for pi := range percentiles {
 			cell := cells[g][pi]
 			date := targetStartDate.AddDate(0, 0, cell.CumulativeDays)

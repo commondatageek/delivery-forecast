@@ -854,13 +854,16 @@ func cmdDays(args []string) error {
 	}
 
 	dist := simulateDaysToComplete(pool, mode, team, *engineers, items[0], *simulations, *goroutines, seed)
-	fmt.Printf("%s, %d items -> how many days?\n", modeLabel(mode, team, *engineers), items[0])
+	fmt.Printf("%s, %d items -> how many days?\n\n", modeLabel(mode, team, *engineers), items[0])
 
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(w, "Percentile\tDays\tDate")
 	for _, p := range percentiles {
 		days := Percentile(dist, float64(p))
 		date := targetStartDate.AddDate(0, 0, days)
-		fmt.Printf("  %dth percentile: %d days (%s)\n", p, days, date.Format("2006-01-02 (Mon)"))
+		fmt.Fprintf(w, "p%d\t%d\t%s\n", p, days, date.Format("2006-01-02 Mon"))
 	}
+	w.Flush()
 	return nil
 }
 

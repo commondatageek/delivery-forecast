@@ -2,6 +2,11 @@
 - CFD
   - How to handle the fact that some tickets were never properly "started"? Or were maybe "started" several days after their actual start date?
 
+## Historical Things
+- CFD
+- A chart showing how the probability of success of hitting a certain target date has changed over time.
+- A chart showing how p85 for Cycle Time has changed over time.
+
 ## Simulation Report
 
 ## Performance

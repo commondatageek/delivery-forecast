@@ -8,9 +8,7 @@ import (
 	"html/template"
 	"math"
 	"os"
-	"regexp"
 	"sort"
-	"strconv"
 	"text/tabwriter"
 	"time"
 
@@ -29,44 +27,6 @@ type reportItem struct {
 	StartedAt   time.Time
 	AgeDays     float64
 	Percentile  int
-}
-
-var durationTermRe = regexp.MustCompile(`^([0-9]*\.?[0-9]+)([a-zµ]+)`)
-
-// parseFlexibleDuration parses a duration string, extending time.ParseDuration
-// with a "d" (day) unit so expressions like "1d" or "1d12h" are accepted.
-func parseFlexibleDuration(s string) (time.Duration, error) {
-	if d, err := time.ParseDuration(s); err == nil {
-		return d, nil
-	}
-	if s == "" {
-		return 0, fmt.Errorf("invalid duration %q", s)
-	}
-	var total time.Duration
-	rest := s
-	for rest != "" {
-		m := durationTermRe.FindStringSubmatch(rest)
-		if m == nil {
-			return 0, fmt.Errorf("invalid duration %q", s)
-		}
-		n, err := strconv.ParseFloat(m[1], 64)
-		if err != nil {
-			return 0, fmt.Errorf("invalid duration %q", s)
-		}
-		var unitDur time.Duration
-		if m[2] == "d" {
-			unitDur = 24 * time.Hour
-		} else {
-			d, err := time.ParseDuration("1" + m[2])
-			if err != nil {
-				return 0, fmt.Errorf("invalid duration %q: unknown unit %q", s, m[2])
-			}
-			unitDur = d
-		}
-		total += time.Duration(n * float64(unitDur))
-		rest = rest[len(m[0]):]
-	}
-	return total, nil
 }
 
 func ordinalSuffix(n int) string {
@@ -190,7 +150,7 @@ func main() {
 
 	var minCycleTime time.Duration
 	if *minCycleTimeStr != "" {
-		d, err := parseFlexibleDuration(*minCycleTimeStr)
+		d, err := util.ParseFlexibleDuration(*minCycleTimeStr)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: invalid -min-cycle-time %q: %v\n", *minCycleTimeStr, err)
 			os.Exit(1)

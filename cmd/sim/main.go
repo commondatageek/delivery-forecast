@@ -297,15 +297,6 @@ func SimulateDaysToComplete(samples []int, numEngineers, items, numSimulations, 
 	})
 }
 
-// Percentile returns the value at the given percentile (0-100) from a sorted slice.
-func Percentile(sorted []int, p float64) int {
-	if len(sorted) == 0 {
-		return 0
-	}
-	idx := int(p/100.0*float64(len(sorted)-1) + 0.5)
-	return sorted[idx]
-}
-
 // probabilityAtLeast returns the percentage (0-100) of simulation results in dist
 // that met or exceeded n. Returns 0 for an empty distribution.
 func probabilityAtLeast(dist []int, n int) float64 {
@@ -683,7 +674,7 @@ func cmdItems(args []string) error {
 	fmt.Printf("%s, %d days -> how many items?\n", modeLabel(mode, team, *engineers), *days)
 
 	for _, p := range percentiles {
-		fmt.Printf("  %dth percentile: %d items\n", p, Percentile(dist, float64(p)))
+		fmt.Printf("  %dth percentile: %d items\n", p, util.PercentileValue(dist, float64(p)))
 	}
 	return nil
 }
@@ -712,7 +703,7 @@ func computeTrajectoryTable(dists [][]int, percentiles []int) (cells [][]traject
 	for g, dist := range dists {
 		cells[g] = make([]trajectoryCell, len(percentiles))
 		for pi, p := range percentiles {
-			cum := Percentile(dist, float64(p))
+			cum := util.PercentileValue(dist, float64(p))
 			cells[g][pi] = trajectoryCell{
 				MarginalDays:   cum - prevCum[pi],
 				CumulativeDays: cum,
@@ -865,7 +856,7 @@ func cmdDays(args []string) error {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "Percentile\tDays\tDate")
 	for _, p := range percentiles {
-		days := Percentile(dist, float64(p))
+		days := util.PercentileValue(dist, float64(p))
 		date := targetStartDate.AddDate(0, 0, days)
 		fmt.Fprintf(w, "p%d\t%d\t%s\n", p, days, date.Format("2006-01-02 Mon"))
 	}

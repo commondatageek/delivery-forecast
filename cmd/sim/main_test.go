@@ -208,29 +208,6 @@ func TestDaysBetween(t *testing.T) {
 	}
 }
 
-func TestPercentile(t *testing.T) {
-	sorted := make([]int, 100) // 0..99
-	for i := range sorted {
-		sorted[i] = i
-	}
-	cases := []struct {
-		p    float64
-		want int
-	}{
-		{0, 0},
-		{50, 50},
-		{100, 99},
-	}
-	for _, c := range cases {
-		if got := Percentile(sorted, c.p); got != c.want {
-			t.Errorf("Percentile(p=%v) = %d, want %d", c.p, got, c.want)
-		}
-	}
-	if got := Percentile(nil, 50); got != 0 {
-		t.Errorf("Percentile(empty) = %d, want 0", got)
-	}
-}
-
 // assertAll fails unless every element of got equals want. Used with constant
 // sample pools, where each simulation trial is fully determined and must be identical.
 func assertAll(t *testing.T, got []int, want int) {

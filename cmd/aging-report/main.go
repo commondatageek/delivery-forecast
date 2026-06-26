@@ -29,18 +29,6 @@ type reportItem struct {
 	Percentile  int
 }
 
-// p85value returns the 85th-percentile value from a sorted slice.
-func p85value(sorted []float64) float64 {
-	if len(sorted) == 0 {
-		return 0
-	}
-	idx := int(math.Round(0.85 * float64(len(sorted)-1)))
-	if idx >= len(sorted) {
-		idx = len(sorted) - 1
-	}
-	return sorted[idx]
-}
-
 func formatStartDate(t time.Time) string {
 	return t.Local().Format("Mon 1/2")
 }
@@ -177,7 +165,7 @@ func main() {
 		return inProgress[i].AgeDays > inProgress[j].AgeDays
 	})
 
-	p85 := p85value(cycleTimes)
+	p85 := util.PercentileValue(cycleTimes, 85)
 
 	if len(cycleTimes) == 0 {
 		fmt.Fprintln(os.Stderr, "warning: no completed issues found in the sample window; percentiles will be 0")

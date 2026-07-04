@@ -90,7 +90,12 @@ func cmdBacktest(args []string) error {
 	var team stringList
 	cmd.Var(&team, "team", "comma-separated list of specific engineer names to model individually")
 	format := cmd.String("format", "text", `output format: "text" or "csv"`)
+	configFile := cmd.String("config", "", "path to a YAML config file supplying flag values (CLI flags override)")
 	cmd.Parse(args)
+
+	if err := applyConfig(cmd, *configFile); err != nil {
+		return err
+	}
 
 	if *dbFile == "" {
 		return fmt.Errorf("-db is required")

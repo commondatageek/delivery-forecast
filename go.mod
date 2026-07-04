@@ -5,6 +5,7 @@ go 1.26
 require (
 	github.com/mattn/go-isatty v0.0.21
 	github.com/pressly/goose/v3 v3.27.1
+	gopkg.in/yaml.v3 v3.0.1
 	modernc.org/sqlite v1.52.0
 )
 

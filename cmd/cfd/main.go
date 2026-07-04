@@ -629,7 +629,13 @@ func main() {
 	outPath := flag.String("out", "", "Write output to this file instead of stdout")
 	var teams linear.KeyList
 	flag.Var(&teams, "teams", "Comma-separated team keys to filter by (e.g. ENG,DATA); default: all teams")
+	configFile := flag.String("config", "", "path to a YAML config file supplying flag values (CLI flags override)")
 	flag.Parse()
+
+	if err := util.ApplyConfig(flag.CommandLine, *configFile); err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
+	}
 
 	if *dbFile == "" {
 		fmt.Fprintln(os.Stderr, "error: -db is required")

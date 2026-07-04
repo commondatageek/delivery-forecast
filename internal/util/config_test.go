@@ -1,9 +1,10 @@
-package main
+package util
 
 import (
 	"flag"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -31,15 +32,26 @@ func TestStringify(t *testing.T) {
 	}
 }
 
-// newTestFlagSet builds a small FlagSet mirroring real sim flags for testing.
+// commaList is a minimal flag.Value for testing list-join behavior.
+type commaList []string
+
+func (l *commaList) Set(s string) error {
+	for _, tok := range strings.Split(s, ",") {
+		*l = append(*l, tok)
+	}
+	return nil
+}
+
+func (l *commaList) String() string { return strings.Join(*l, ",") }
+
 func newTestFlagSet() *flag.FlagSet {
 	fs := flag.NewFlagSet("test", flag.ContinueOnError)
 	fs.String("db", "", "")
 	fs.Int("engineers", 3, "")
 	fs.Bool("whole-team", false, "")
-	var pcts intList
+	var pcts commaList
 	fs.Var(&pcts, "percentile", "")
-	var team stringList
+	var team commaList
 	fs.Var(&team, "team", "")
 	return fs
 }
@@ -53,12 +65,22 @@ func writeYAML(t *testing.T, content string) string {
 	return f
 }
 
+func isFlagSet(fs *flag.FlagSet, name string) bool {
+	set := false
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == name {
+			set = true
+		}
+	})
+	return set
+}
+
 func TestApplyConfig(t *testing.T) {
 	t.Run("populates_unset_flags", func(t *testing.T) {
 		fs := newTestFlagSet()
 		fs.Parse([]string{})
 		path := writeYAML(t, "engineers: 7\nwhole-team: false\n")
-		if err := applyConfig(fs, path); err != nil {
+		if err := ApplyConfig(fs, path); err != nil {
 			t.Fatal(err)
 		}
 		got := fs.Lookup("engineers").Value.String()
@@ -71,7 +93,7 @@ func TestApplyConfig(t *testing.T) {
 		fs := newTestFlagSet()
 		fs.Parse([]string{"-engineers", "2"})
 		path := writeYAML(t, "engineers: 9\n")
-		if err := applyConfig(fs, path); err != nil {
+		if err := ApplyConfig(fs, path); err != nil {
 			t.Fatal(err)
 		}
 		got := fs.Lookup("engineers").Value.String()
@@ -80,15 +102,15 @@ func TestApplyConfig(t *testing.T) {
 		}
 	})
 
-	t.Run("config_set_flag_reports_as_set_via_isFlagSet", func(t *testing.T) {
+	t.Run("config_set_flag_reports_as_set", func(t *testing.T) {
 		fs := newTestFlagSet()
 		fs.Parse([]string{})
 		path := writeYAML(t, "engineers: 5\n")
-		if err := applyConfig(fs, path); err != nil {
+		if err := ApplyConfig(fs, path); err != nil {
 			t.Fatal(err)
 		}
 		if !isFlagSet(fs, "engineers") {
-			t.Error("isFlagSet(engineers) should be true after applyConfig")
+			t.Error("isFlagSet(engineers) should be true after ApplyConfig")
 		}
 	})
 
@@ -96,7 +118,7 @@ func TestApplyConfig(t *testing.T) {
 		fs := newTestFlagSet()
 		fs.Parse([]string{})
 		path := writeYAML(t, "enginers: 4\n") // typo
-		if err := applyConfig(fs, path); err == nil {
+		if err := ApplyConfig(fs, path); err == nil {
 			t.Error("expected error for unknown key, got nil")
 		}
 	})
@@ -104,7 +126,7 @@ func TestApplyConfig(t *testing.T) {
 	t.Run("missing_file_errors", func(t *testing.T) {
 		fs := newTestFlagSet()
 		fs.Parse([]string{})
-		if err := applyConfig(fs, "/no/such/file.yaml"); err == nil {
+		if err := ApplyConfig(fs, "/no/such/file.yaml"); err == nil {
 			t.Error("expected error for missing file, got nil")
 		}
 	})
@@ -112,16 +134,16 @@ func TestApplyConfig(t *testing.T) {
 	t.Run("empty_path_noop", func(t *testing.T) {
 		fs := newTestFlagSet()
 		fs.Parse([]string{})
-		if err := applyConfig(fs, ""); err != nil {
+		if err := ApplyConfig(fs, ""); err != nil {
 			t.Errorf("expected no error for empty path, got %v", err)
 		}
 	})
 
-	t.Run("yaml_list_parses_into_intList", func(t *testing.T) {
+	t.Run("yaml_list_parses_into_commaList", func(t *testing.T) {
 		fs := newTestFlagSet()
 		fs.Parse([]string{})
 		path := writeYAML(t, "percentile: [5, 25, 50]\n")
-		if err := applyConfig(fs, path); err != nil {
+		if err := ApplyConfig(fs, path); err != nil {
 			t.Fatal(err)
 		}
 		got := fs.Lookup("percentile").Value.String()
@@ -130,11 +152,11 @@ func TestApplyConfig(t *testing.T) {
 		}
 	})
 
-	t.Run("comma_string_parses_into_intList", func(t *testing.T) {
+	t.Run("comma_string_parses_into_commaList", func(t *testing.T) {
 		fs := newTestFlagSet()
 		fs.Parse([]string{})
 		path := writeYAML(t, "percentile: \"5,25,50\"\n")
-		if err := applyConfig(fs, path); err != nil {
+		if err := ApplyConfig(fs, path); err != nil {
 			t.Fatal(err)
 		}
 		got := fs.Lookup("percentile").Value.String()
@@ -148,10 +170,9 @@ func TestApplyConfig(t *testing.T) {
 		fs.String("config", "", "")
 		fs.Parse([]string{})
 		path := writeYAML(t, "config: some-other.yaml\nengineers: 6\n")
-		if err := applyConfig(fs, path); err != nil {
+		if err := ApplyConfig(fs, path); err != nil {
 			t.Fatal(err)
 		}
-		// config key should be ignored; engineers should be applied
 		got := fs.Lookup("engineers").Value.String()
 		if got != "6" {
 			t.Errorf("engineers = %q, want %q", got, "6")

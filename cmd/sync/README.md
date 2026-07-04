@@ -30,6 +30,7 @@ package ordering).
 | `-teams` | none | Comma-separated team keys, e.g. `ENG,DESIGN`. Limits/extends the candidate team set; new keys get a full sync |
 | `-all-teams` | `false` | Expand the candidate set to every accessible Linear team. Mutually exclusive with `-teams` |
 | `-full-reload` | `false` | Ignore each team's stored watermark and full-sync every candidate team |
+| `-config` | none | Path to a YAML file supplying flag values; CLI flags override config values, which override built-in defaults |
 
 With no `-teams`/`-all-teams`, sync incrementally syncs every team already
 present in the database. A brand-new/empty database has no existing teams to

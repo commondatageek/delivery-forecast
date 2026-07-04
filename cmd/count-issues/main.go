@@ -14,6 +14,7 @@ import (
 
 	"forecasting/internal/linear"
 	"forecasting/internal/sqlite"
+	"forecasting/internal/util"
 )
 
 const (
@@ -62,7 +63,13 @@ func main() {
 	updatedSince := flag.String("updated-since", defaultSince, "Only include projects with an issue updated on/after this date (YYYY-MM-DD)")
 	var teams linear.KeyList
 	flag.Var(&teams, "teams", "Comma-separated team keys to filter by (e.g. ENG,DESIGN); default: all teams")
+	configFile := flag.String("config", "", "path to a YAML config file supplying flag values (CLI flags override)")
 	flag.Parse()
+
+	if err := util.ApplyConfig(flag.CommandLine, *configFile); err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
+	}
 
 	since, err := time.Parse(dateLayout, *updatedSince)
 	if err != nil {

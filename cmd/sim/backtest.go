@@ -76,8 +76,8 @@ func cmdBacktest(args []string) error {
 	exclusionsFile := cmd.String("exclusions", "exclusions.json", "path to exclusions JSON file")
 	project := cmd.String("project", "", "project name to backtest (required)")
 	milestone := cmd.String("milestone", "", "milestone name within the project (optional)")
-	startDateStr := cmd.String("start-date", "", "first day to backtest, inclusive (YYYY-MM-DD); default: earliest started_at in the issue set")
-	targetDateStr := cmd.String("target-date", "", "completion deadline to forecast against (YYYY-MM-DD, required)")
+	replayStartStr := cmd.String("replay-start-date", "", "first day to replay from, inclusive (YYYY-MM-DD); default: earliest started_at across the issue set")
+	targetEndStr := cmd.String("target-end-date", "", "completion deadline to forecast against (YYYY-MM-DD, required)")
 	engineers := cmd.Int("engineers", 3, "number of (equivalent) engineers")
 	wholeTeam := cmd.Bool("whole-team", false, "use whole-team daily throughput from historical data (ignores -engineers)")
 	simulations := cmd.Int("simulations", 10_000, "number of Monte Carlo simulations to run per backtested day")
@@ -90,7 +90,12 @@ func cmdBacktest(args []string) error {
 	var team stringList
 	cmd.Var(&team, "team", "comma-separated list of specific engineer names to model individually")
 	format := cmd.String("format", "text", `output format: "text" or "csv"`)
+	configFile := cmd.String("config", "", "path to a YAML config file supplying flag values (CLI flags override)")
 	cmd.Parse(args)
+
+	if err := applyConfig(cmd, *configFile); err != nil {
+		return err
+	}
 
 	if *dbFile == "" {
 		return fmt.Errorf("-db is required")
@@ -98,16 +103,16 @@ func cmdBacktest(args []string) error {
 	if *project == "" {
 		return fmt.Errorf("-project is required")
 	}
-	if *targetDateStr == "" {
-		return fmt.Errorf("-target-date is required")
+	if *targetEndStr == "" {
+		return fmt.Errorf("-target-end-date is required")
 	}
 	if *format != "text" && *format != "csv" {
 		return fmt.Errorf(`-format must be "text" or "csv"`)
 	}
 
-	targetDate, err := util.ParseDate(*targetDateStr)
+	targetDate, err := util.ParseDate(*targetEndStr)
 	if err != nil {
-		return fmt.Errorf("invalid -target-date: %w", err)
+		return fmt.Errorf("invalid -target-end-date: %w", err)
 	}
 
 	now := time.Now().UTC()
@@ -156,22 +161,22 @@ func cmdBacktest(args []string) error {
 	// Resolve start date: explicit flag wins; otherwise infer from the earliest
 	// started_at across the issue set.
 	var startDate time.Time
-	if *startDateStr != "" {
-		startDate, err = util.ParseDate(*startDateStr)
+	if *replayStartStr != "" {
+		startDate, err = util.ParseDate(*replayStartStr)
 		if err != nil {
-			return fmt.Errorf("invalid -start-date: %w", err)
+			return fmt.Errorf("invalid -replay-start-date: %w", err)
 		}
 	} else {
 		startDate = earliestStartedAt(issues)
 		if startDate.IsZero() {
-			return fmt.Errorf("no started_at found in issue set; provide -start-date explicitly")
+			return fmt.Errorf("no started_at found in issue set; provide -replay-start-date explicitly")
 		}
 		// Truncate to calendar day.
 		startDate = startDate.UTC().Truncate(24 * time.Hour)
 	}
 
 	if !targetDate.After(startDate) {
-		return fmt.Errorf("-target-date must be after -start-date (inferred: %s)", startDate.Format("2006-01-02"))
+		return fmt.Errorf("-target-end-date must be after -replay-start-date (inferred: %s)", startDate.Format("2006-01-02"))
 	}
 
 	// Daily backtest loop.

@@ -42,6 +42,7 @@ Reads completed issues from the `issues` table of a SQLite database (default
 | `-percentile` | `5,10,...,95` | Comma-separated percentiles to output |
 | `-include` | all | Comma-separated engineer names to include |
 | `-manifest` | (disabled) | Write a run-provenance JSON manifest to this path (`-` for stdout) |
+| `-config` | (none) | Path to a YAML config file supplying flag values (CLI flags override) |
 
 ### `days` — how many days for N engineers to complete I items?
 
@@ -67,8 +68,9 @@ Reads completed issues from the `issues` table of a SQLite database (default
 | `-sample-end` | today | End of historical sample window (YYYY-MM-DD) |
 | `-percentile` | `5,10,...,95` | Comma-separated percentiles to output |
 | `-include` | all | Comma-separated engineer names to include |
-| `-start-date` | today | Report start date for the grouped trajectory report (YYYY-MM-DD) |
+| `-target-start-date` | today | Report start date for the grouped trajectory report (YYYY-MM-DD) |
 | `-manifest` | (disabled) | Write a run-provenance JSON manifest to this path (`-` for stdout) |
+| `-config` | (none) | Path to a YAML config file supplying flag values (CLI flags override) |
 
 #### Grouped trajectory report
 
@@ -80,7 +82,7 @@ Pass `-items` a comma-separated list to forecast a *sequence* of work groups
   -db linear.db \
   -engineers 2 \
   -items 13,12,9,5,2 \
-  -start-date 2026-06-17 \
+  -target-start-date 2026-06-17 \
   -percentile 5,25,50,85,95
 ```
 
@@ -95,7 +97,7 @@ Total    41     14       2026-07-01  ...  21        2026-07-08
 ```
 
 Each group's `Days` is the marginal days to finish that group after all
-earlier groups; its `Date` is `-start-date` plus the cumulative days through
+earlier groups; its `Date` is `-target-start-date` plus the cumulative days through
 that group. The `Total` row's `Days`/`Date` are for the full list. A single
 value (the default) keeps the original one-line-per-percentile output.
 
@@ -124,6 +126,32 @@ value (the default) keeps the original one-line-per-percentile output.
 | `-sample-end` | today | End of historical sample window (YYYY-MM-DD) |
 | `-include` | all | Comma-separated engineer names to include |
 | `-manifest` | (disabled) | Write a run-provenance JSON manifest to this path (`-` for stdout) |
+| `-config` | (none) | Path to a YAML config file supplying flag values (CLI flags override) |
+
+## Config files
+
+All three subcommands (and `backtest`) accept `-config <file.yaml>` to supply
+flag values from a YAML file instead of typing them on the command line.
+YAML keys are flag names. Precedence: **CLI flag > config file > built-in default**.
+
+```yaml
+db: linear.db
+engineers: 4
+days: 30
+percentile: [5, 50, 95]
+sample-start: 2025-01-01
+```
+
+```sh
+# Use config, override days on the CLI:
+./sim items -config run.yaml -days 60
+
+# A bogus key (typo) fails with a clear error:
+./sim items -config run.yaml   # errors if run.yaml has "enginers: 4"
+```
+
+List values can be written as YAML sequences (`[5, 50, 95]`) or as a
+comma-separated string (`"5,50,95"`) — both parse identically.
 
 ## Run manifest
 

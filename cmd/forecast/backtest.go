@@ -30,9 +30,9 @@ func issuesToBacktestItems(issues []linear.Issue) []simulate.BacktestItem {
 	return items
 }
 
-func cmdBacktest(args []string) error {
+func cmdSimBacktest(args []string) error {
 	defaultStart, defaultEnd := defaultDateRange()
-	cmd := flag.NewFlagSet("backtest", flag.ExitOnError)
+	cmd := flag.NewFlagSet("sim backtest", flag.ExitOnError)
 	dbFile := cmd.String("db", "", "path to SQLite database")
 	exclusionsFile := cmd.String("exclusions", "exclusions.json", "path to exclusions JSON file")
 	project := cmd.String("project", "", "project name to backtest (required)")

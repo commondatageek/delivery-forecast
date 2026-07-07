@@ -52,7 +52,7 @@ func TestDBFingerprint_MissingFile(t *testing.T) {
 }
 
 func TestNewManifest_Assembly(t *testing.T) {
-	cmd := flag.NewFlagSet("items", flag.ContinueOnError)
+	cmd := flag.NewFlagSet("sim items", flag.ContinueOnError)
 	dbFile := cmd.String("db", "", "")
 	days := cmd.Int("days", 30, "")
 	if err := cmd.Parse([]string{"-db", "test.db"}); err != nil {
@@ -69,7 +69,7 @@ func TestNewManifest_Assembly(t *testing.T) {
 	}
 
 	m := newManifest(manifestInputs{
-		Subcommand:  "items",
+		Subcommand:  "sim items",
 		Cmd:         cmd,
 		Mode:        simulate.ModeAnonymous,
 		Engineers:   3,
@@ -86,8 +86,8 @@ func TestNewManifest_Assembly(t *testing.T) {
 	if m.SchemaVersion != 1 {
 		t.Fatalf("SchemaVersion = %d, want 1", m.SchemaVersion)
 	}
-	if m.Invocation.Subcommand != "items" {
-		t.Fatalf("Subcommand = %q, want %q", m.Invocation.Subcommand, "items")
+	if m.Invocation.Subcommand != "sim items" {
+		t.Fatalf("Subcommand = %q, want %q", m.Invocation.Subcommand, "sim items")
 	}
 
 	var dbFlag, daysFlag *FlagRecord

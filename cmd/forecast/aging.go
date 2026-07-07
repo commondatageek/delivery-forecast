@@ -1,0 +1,114 @@
+package main
+
+import (
+	"context"
+	"flag"
+	"fmt"
+	"os"
+	"sort"
+	"time"
+
+	"forecasting/internal/aging"
+	"forecasting/internal/linear"
+	"forecasting/internal/sqlite"
+	"forecasting/internal/util"
+)
+
+func cmdAging(args []string) error {
+	cmd := flag.NewFlagSet("aging", flag.ExitOnError)
+	dbFile := cmd.String("db", "", "path to SQLite database")
+	sampleStartStr := cmd.String("sample-start", "", "start of completed-issue window (YYYY-MM-DD, default: today minus 3 months)")
+	sampleEndStr := cmd.String("sample-end", "", "end of completed-issue window (YYYY-MM-DD, default: today)")
+	format := cmd.String("format", "text", "output format: text, json, html")
+	minCycleTimeStr := cmd.String("min-cycle-time", "", "exclude completed issues with cycle time below this duration (e.g. 5m, 1h, 1d)")
+	var teams linear.KeyList
+	cmd.Var(&teams, "teams", "comma-separated team keys to filter by (e.g. DATA,PLT); default: all teams")
+	configFile := cmd.String("config", "", "path to a YAML config file supplying flag values (CLI flags override)")
+	cmd.Parse(args)
+
+	if err := util.ApplyConfig(cmd, *configFile); err != nil {
+		return err
+	}
+
+	if *dbFile == "" {
+		return fmt.Errorf("-db is required")
+	}
+
+	var minCycleTime time.Duration
+	if *minCycleTimeStr != "" {
+		d, err := util.ParseFlexibleDuration(*minCycleTimeStr)
+		if err != nil {
+			return fmt.Errorf("invalid -min-cycle-time %q: %w", *minCycleTimeStr, err)
+		}
+		minCycleTime = d
+	}
+
+	today := time.Now().UTC().Truncate(24 * time.Hour)
+
+	sampleEnd := today
+	if *sampleEndStr != "" {
+		t, err := util.ParseDate(*sampleEndStr)
+		if err != nil {
+			return fmt.Errorf("invalid -sample-end %q: %w", *sampleEndStr, err)
+		}
+		sampleEnd = t
+	}
+
+	sampleStart := today.AddDate(0, -3, 0)
+	if *sampleStartStr != "" {
+		t, err := util.ParseDate(*sampleStartStr)
+		if err != nil {
+			return fmt.Errorf("invalid -sample-start %q: %w", *sampleStartStr, err)
+		}
+		sampleStart = t
+	}
+
+	if !sampleStart.Before(sampleEnd) {
+		return fmt.Errorf("-sample-start must be before -sample-end")
+	}
+
+	store, err := sqlite.Open(*dbFile)
+	if err != nil {
+		return fmt.Errorf("open db: %w", err)
+	}
+	defer store.Close()
+
+	ctx := context.Background()
+
+	completed, err := store.CompletedBetween(ctx, sampleStart, sampleEnd, nil, teams)
+	if err != nil {
+		return fmt.Errorf("query completed: %w", err)
+	}
+
+	active, err := store.InProgress(ctx, teams)
+	if err != nil {
+		return fmt.Errorf("query in-progress: %w", err)
+	}
+
+	cycleTimes := aging.CycleTimes(completed, minCycleTime)
+	sort.Float64s(cycleTimes)
+
+	inProgress := aging.InProgressItems(active, today)
+	aging.RankItems(inProgress, cycleTimes)
+
+	sort.Slice(inProgress, func(i, j int) bool {
+		return inProgress[i].AgeDays > inProgress[j].AgeDays
+	})
+
+	p85 := util.PercentileValue(cycleTimes, 85)
+
+	if len(cycleTimes) == 0 {
+		fmt.Fprintln(os.Stderr, "warning: no completed issues found in the sample window; percentiles will be 0")
+	}
+
+	switch *format {
+	case "text":
+		return aging.RenderText(os.Stdout, inProgress, cycleTimes, p85, sampleStart, sampleEnd)
+	case "json":
+		return aging.RenderJSON(os.Stdout, inProgress)
+	case "html":
+		return aging.RenderHTML(os.Stdout, inProgress, p85, sampleStart, sampleEnd, len(cycleTimes))
+	default:
+		return fmt.Errorf("unknown -format %q (use text, json, or html)", *format)
+	}
+}

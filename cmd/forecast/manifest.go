@@ -71,8 +71,8 @@ type Resolved struct {
 }
 
 type DataSection struct {
-	DB                DataFile           `json:"db"`
-	ExclusionsPath    string             `json:"exclusions_path"`
+	DB                DataFile            `json:"db"`
+	ExclusionsPath    string              `json:"exclusions_path"`
 	ExclusionsApplied simulate.Exclusions `json:"exclusions_applied"`
 }
 
@@ -199,7 +199,7 @@ func sumSlice(samples []int) int {
 	return total
 }
 
-// manifestInputs is the single shared parameter bag the three subcommands
+// manifestInputs is the single shared parameter bag the sim subcommands
 // fill in to produce a Manifest.
 type manifestInputs struct {
 	Subcommand     string

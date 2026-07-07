@@ -1,196 +1,21 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"os"
 	"runtime"
 	"strings"
-	"sync"
 	"text/tabwriter"
 	"time"
 
-	"forecasting/internal/linear"
 	"forecasting/internal/simulate"
-	"forecasting/internal/sqlite"
 	"forecasting/internal/util"
-
-	"github.com/mattn/go-isatty"
 )
 
-// --- Progress reporting ---
-
-// progressBar renders a simple text progress bar to stderr, updating
-// at most ~200 times over the run so it doesn't slow down tight loops.
-// It's a no-op when stderr isn't a terminal (e.g. piped output, CI logs).
-type progressBar struct {
-	enabled bool
-	total   int
-	step    int
-	mu      sync.Mutex
-}
-
-func newProgressBar(total int) *progressBar {
-	return &progressBar{
-		enabled: isatty.IsTerminal(os.Stderr.Fd()) && total > 0,
-		total:   total,
-		step:    max(1, total/200),
-	}
-}
-
-func (b *progressBar) update(done, _ int) {
-	if !b.enabled || (done != b.total && done%b.step != 0) {
-		return
-	}
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	const width = 30
-	filled := width * done / b.total
-	fmt.Fprintf(os.Stderr, "\r[%s%s] %d/%d", strings.Repeat("=", filled), strings.Repeat(" ", width-filled), done, b.total)
-	if done == b.total {
-		fmt.Fprint(os.Stderr, "\r\033[K")
-	}
-}
-
-// --- Pool loading ---
-
-// poolData bundles the built pool with the raw inputs that produced it, so a
-// run manifest can record exactly what fed the simulation.
-type poolData struct {
-	Pool       *simulate.SamplePool
-	Issues     []linear.Issue
-	Exclusions simulate.Exclusions
-	Skipped    int
-}
-
-// issuesToCompletions converts linear.Issue records to simulate.Completion.
-// No filtering is performed; call simulate.FilterInvalid on the result.
-func issuesToCompletions(issues []linear.Issue) []simulate.Completion {
-	records := make([]simulate.Completion, len(issues))
-	for i, it := range issues {
-		records[i] = simulate.Completion{Engineer: it.Assignee, CompletedAt: it.CompletedAt}
-	}
-	return records
-}
-
-// warnUnmatchedIncludes logs a warning for any name in includeEngineers that
-// doesn't appear in seen, which usually indicates a typo in -include.
-func warnUnmatchedIncludes(includeEngineers []string, seen map[string]bool) {
-	for _, name := range includeEngineers {
-		if !seen[name] {
-			fmt.Fprintf(os.Stderr, "WARNING: -include engineer %q not found in data\n", name)
-		}
-	}
-}
-
-// loadPool builds a SamplePool by querying the SQLite store.
-func loadPool(dbPath, exclusionsFile string, includeEngineers []string, startDate, endDate time.Time, wholeTeam bool) (poolData, error) {
-	store, err := sqlite.Open(dbPath)
-	if err != nil {
-		return poolData{}, fmt.Errorf("open db: %w", err)
-	}
-	defer store.Close()
-
-	issues, err := store.CompletedBetween(context.Background(), startDate, endDate, includeEngineers, nil)
-	if err != nil {
-		return poolData{}, fmt.Errorf("querying db: %w", err)
-	}
-
-	engineerSeen := make(map[string]bool, len(issues))
-	for _, it := range issues {
-		engineerSeen[it.Assignee] = true
-	}
-	warnUnmatchedIncludes(includeEngineers, engineerSeen)
-
-	exc, err := simulate.LoadExclusions(exclusionsFile)
-	if err != nil {
-		return poolData{}, err
-	}
-
-	records, skipped := simulate.FilterInvalid(issuesToCompletions(issues))
-	if skipped > 0 {
-		fmt.Fprintf(os.Stderr, "WARNING: skipped %d completed issue(s) with no assignee or completion date\n", skipped)
-	}
-
-	return poolData{
-		Pool:       simulate.BuildPool(records, exc, startDate, endDate, wholeTeam),
-		Issues:     issues,
-		Exclusions: exc,
-		Skipped:    skipped,
-	}, nil
-}
-
-// --- Helpers ---
-
-// isFlagSet reports whether a flag was explicitly provided on the command line.
-func isFlagSet(fs *flag.FlagSet, name string) bool {
-	found := false
-	fs.Visit(func(f *flag.Flag) {
-		if f.Name == name {
-			found = true
-		}
-	})
-	return found
-}
-
-// defaultDateRange returns a default date range of the last 6 months, formatted as YYYY-MM-DD.
-func defaultDateRange() (start, end string) {
-	now := time.Now().UTC()
-	return now.AddDate(0, -6, 0).Format("2006-01-02"), now.Format("2006-01-02")
-}
-
-// resolveRelativeDate parses s as a calendar date, accepting YYYY-MM-DD or
-// the relative keywords today and tomorrow.
-func resolveRelativeDate(s string, now time.Time) (time.Time, error) {
-	y, m, d := now.Local().Date()
-	today := time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
-	switch strings.ToLower(s) {
-	case "today":
-		return today, nil
-	case "tomorrow":
-		return today.AddDate(0, 0, 1), nil
-	default:
-		return util.ParseDate(s)
-	}
-}
-
-// resolveEndDate returns the end of the sample window. If -sample-end was
-// explicitly passed, it's parsed as a calendar date (midnight, exclusive of
-// that whole day). Otherwise it defaults to the current moment, so that
-// today's already-completed work is included up to right now rather than
-// being dropped entirely by a midnight-of-today cutoff.
-func resolveEndDate(cmd *flag.FlagSet, sampleEnd string, now time.Time) (time.Time, error) {
-	if !isFlagSet(cmd, "sample-end") {
-		return now, nil
-	}
-	return util.ParseDate(sampleEnd)
-}
-
-// resolveSeed returns randomSeed if -random-seed was explicitly set, otherwise
-// a time-based seed so runs are non-deterministic by default.
-func resolveSeed(cmd *flag.FlagSet, randomSeed int64, now time.Time) int64 {
-	if isFlagSet(cmd, "random-seed") {
-		return randomSeed
-	}
-	return now.UnixNano()
-}
-
-// --- Main ---
-
-func usage() {
-	fmt.Fprintf(os.Stderr, "Usage: sim <command> [flags]\n\n")
-	fmt.Fprintf(os.Stderr, "Commands:\n")
-	fmt.Fprintf(os.Stderr, "  items        How many items can N engineers complete in D days?\n")
-	fmt.Fprintf(os.Stderr, "  days         How many days for N engineers to complete I items?\n")
-	fmt.Fprintf(os.Stderr, "  probability  What is the probability of completing I items in D days?\n")
-	fmt.Fprintf(os.Stderr, "  backtest     Replay probability forecasts day-by-day for a project/milestone.\n\n")
-	fmt.Fprintf(os.Stderr, "Run 'sim <command> -help' for command-specific flags.\n")
-}
-
-func cmdItems(args []string) error {
+func cmdSimItems(args []string) error {
 	defaultStart, defaultEnd := defaultDateRange()
-	cmd := flag.NewFlagSet("items", flag.ExitOnError)
+	cmd := flag.NewFlagSet("sim items", flag.ExitOnError)
 	dbFile := cmd.String("db", "", "path to SQLite database")
 	exclusionsFile := cmd.String("exclusions", "exclusions.json", "path to exclusions JSON file")
 	engineers := cmd.Int("engineers", 3, "number of (equivalent) engineers")
@@ -249,7 +74,7 @@ func cmdItems(args []string) error {
 	}
 
 	if err := writeManifest(*manifestFile, manifestInputs{
-		Subcommand: "items", Cmd: cmd, Mode: mode, Team: team, Include: include,
+		Subcommand: "sim items", Cmd: cmd, Mode: mode, Team: team, Include: include,
 		Engineers: *engineers, WholeTeam: *wholeTeam, Seed: seed,
 		SampleStart: startDate, SampleEnd: endDate,
 		DBPath: *dbFile, ExclusionsPath: *exclusionsFile,
@@ -337,9 +162,9 @@ func printTrajectoryReport(pool *simulate.SamplePool, mode simulate.Mode, team [
 	w.Flush()
 }
 
-func cmdDays(args []string) error {
+func cmdSimDays(args []string) error {
 	defaultSampleStart, defaultSampleEnd := defaultDateRange()
-	cmd := flag.NewFlagSet("days", flag.ExitOnError)
+	cmd := flag.NewFlagSet("sim days", flag.ExitOnError)
 	dbFile := cmd.String("db", "", "path to SQLite database")
 	exclusionsFile := cmd.String("exclusions", "exclusions.json", "path to exclusions JSON file")
 	engineers := cmd.Int("engineers", 3, "number of (equivalent) engineers")
@@ -411,7 +236,7 @@ func cmdDays(args []string) error {
 	}
 
 	if err := writeManifest(*manifestFile, manifestInputs{
-		Subcommand: "days", Cmd: cmd, Mode: mode, Team: team, Include: include,
+		Subcommand: "sim days", Cmd: cmd, Mode: mode, Team: team, Include: include,
 		Engineers: *engineers, WholeTeam: *wholeTeam, Seed: seed,
 		SampleStart: startDate, SampleEnd: endDate,
 		DBPath: *dbFile, ExclusionsPath: *exclusionsFile,
@@ -450,9 +275,9 @@ func cmdDays(args []string) error {
 	return nil
 }
 
-func cmdProbability(args []string) error {
+func cmdSimProbability(args []string) error {
 	defaultStart, defaultEnd := defaultDateRange()
-	cmd := flag.NewFlagSet("probability", flag.ExitOnError)
+	cmd := flag.NewFlagSet("sim probability", flag.ExitOnError)
 	dbFile := cmd.String("db", "", "path to SQLite database")
 	exclusionsFile := cmd.String("exclusions", "exclusions.json", "path to exclusions JSON file")
 	engineers := cmd.Int("engineers", 3, "number of (equivalent) engineers")
@@ -540,7 +365,7 @@ func cmdProbability(args []string) error {
 		manifestExtra["effective_days"] = effectiveDays
 	}
 	if err := writeManifest(*manifestFile, manifestInputs{
-		Subcommand: "probability", Cmd: cmd, Mode: mode, Team: team, Include: include,
+		Subcommand: "sim probability", Cmd: cmd, Mode: mode, Team: team, Include: include,
 		Engineers: *engineers, WholeTeam: *wholeTeam, Seed: seed,
 		SampleStart: startDate, SampleEnd: endDate,
 		DBPath: *dbFile, ExclusionsPath: *exclusionsFile,
@@ -584,32 +409,4 @@ func cmdProbability(args []string) error {
 		}
 	}
 	return nil
-}
-
-func main() {
-	if len(os.Args) < 2 {
-		usage()
-		os.Exit(1)
-	}
-
-	var err error
-	switch os.Args[1] {
-	case "items":
-		err = cmdItems(os.Args[2:])
-	case "days":
-		err = cmdDays(os.Args[2:])
-	case "probability":
-		err = cmdProbability(os.Args[2:])
-	case "backtest":
-		err = cmdBacktest(os.Args[2:])
-	default:
-		fmt.Fprintf(os.Stderr, "unknown command: %q\n\n", os.Args[1])
-		usage()
-		os.Exit(1)
-	}
-
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		os.Exit(1)
-	}
 }

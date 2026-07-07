@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Cumulative Flow Diagram</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 2rem auto; max-width: 1200px; color: #1a1a1a; background: #f5f5f5; padding: 0 1rem; }
+  h1 { font-size: 1.35rem; font-weight: 600; margin: 0 0 0.25rem; }
+  .meta { color: #555; font-size: 0.875rem; margin-bottom: 1.5rem; }
+  #chart { background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.10); margin-bottom: 1.5rem; }
+  .health { background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.10); padding: 1.25rem 1.5rem; margin-bottom: 1.5rem; }
+  .health h2 { font-size: 1rem; font-weight: 600; margin: 0 0 1rem; }
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.75rem 1.5rem; }
+  .stat { }
+  .stat-label { font-size: 0.75rem; color: #666; text-transform: uppercase; letter-spacing: 0.05em; }
+  .stat-value { font-size: 1.1rem; font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 0.1rem; }
+  .stat-sub { font-size: 0.8rem; color: #555; margin-top: 0.1rem; }
+  .band-table { border-collapse: collapse; width: 100%; margin-top: 1rem; font-size: 0.875rem; }
+  .band-table th { text-align: left; padding: 0.35rem 0.75rem; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #555; border-bottom: 1px solid #ddd; }
+  .band-table td { padding: 0.35rem 0.75rem; border-bottom: 1px solid #f0f0f0; }
+  .band-table tr:last-child td { border-bottom: none; }
+  .verdict-stable { color: #15803d; }
+  .verdict-widening { color: #b91c1c; }
+  .verdict-narrowing { color: #c2410c; }
+  .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: middle; }
+  .explainer { background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.10); padding: 1.25rem 1.5rem; font-size: 0.875rem; line-height: 1.6; color: #444; }
+  .explainer h2 { font-size: 1rem; font-weight: 600; margin: 0 0 0.5rem; color: #1a1a1a; }
+</style>
+</head>
+<body>
+<h1>Cumulative Flow Diagram</h1>
+<p class="meta">{{.WindowStart}} → {{.WindowEnd}} &nbsp;·&nbsp; {{.TotalIssues}} issues{{if .SkippedIssues}} &nbsp;·&nbsp; {{.SkippedIssues}} skipped (no created_at){{end}}</p>
+
+<div id="chart"></div>
+
+<div class="health">
+  <h2>Flow Health</h2>
+  <div class="stats-grid">
+    <div class="stat">
+      <div class="stat-label">Throughput</div>
+      <div class="stat-value">{{printf "%.2f" .ThroughputPerDay}} items/day</div>
+      <div class="stat-sub">slope of Done line</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Total departure rate</div>
+      <div class="stat-value">{{printf "%.2f" .DeparturePerDay}} items/day</div>
+      <div class="stat-sub">completed + canceled</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Avg cycle time</div>
+      <div class="stat-value">{{printf "%.1f" .AvgCycleTimeDays}} days</div>
+      <div class="stat-sub">created→completed (in window)</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Little's Law cycle time</div>
+      <div class="stat-value">{{printf "%.1f" .LittlesLawCTDays}} days</div>
+      <div class="stat-sub">avg WIP in-progress ÷ throughput</div>
+    </div>
+  </div>
+
+  <table class="band-table" style="margin-top:1.25rem">
+    <thead>
+      <tr><th>Band</th><th>Avg WIP</th><th>Stability</th><th>Verdict</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="swatch" style="background:#636EFA"></span>Backlog</td>
+        <td>{{printf "%.1f" .AvgWIPBacklog}}</td>
+        <td>{{printf "%+.3f" .StabilityBacklog}} items/day</td>
+        <td class="{{.VerdictClassBacklog}}">{{.VerdictBacklog}}</td>
+      </tr>
+      <tr>
+        <td><span class="swatch" style="background:#00CC96"></span>In Progress</td>
+        <td>{{printf "%.1f" .AvgWIPInProgress}}</td>
+        <td>{{printf "%+.3f" .StabilityInProgress}} items/day</td>
+        <td class="{{.VerdictClassInProgress}}">{{.VerdictInProgress}}</td>
+      </tr>
+      <tr>
+        <td><span class="swatch" style="background:#EF553B"></span>Canceled</td>
+        <td>{{printf "%.1f" .AvgWIPCanceled}}</td>
+        <td>{{printf "%+.3f" .StabilityCanceled}} items/day</td>
+        <td class="{{.VerdictClassCanceled}}">{{.VerdictCanceled}}</td>
+      </tr>
+      <tr>
+        <td><span class="swatch" style="background:#AB63FA"></span>Done</td>
+        <td>{{printf "%.1f" .AvgWIPDone}}</td>
+        <td>&mdash;</td>
+        <td>&mdash;</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="explainer">
+  <h2>How to read this diagram</h2>
+  <p>Each colored band represents items currently in that stage. The band's <strong>vertical height</strong> at any point equals the WIP in that stage. The <strong>horizontal distance</strong> between the top edge of a band and its bottom edge approximates the average time items spend there (Little's Law: WIP = throughput × cycle time).</p>
+  <p><strong>Ideal shape</strong>: straight, parallel lines with constant-width bands. Straight means a steady rate; parallel means inflow equals outflow at every boundary so no queue is accumulating. A <em>widening</em> band signals a bottleneck; a <em>narrowing</em> band means that stage is draining. A flattening top line means fewer new issues are being created.</p>
+</div>
+
+<script>
+var dates = {{.DatesJSON}};
+var traces = [
+  {
+    name: 'Done',
+    x: dates, y: {{.DoneJSON}},
+    stackgroup: 'one',
+    fillcolor: 'rgba(171,99,250,0.7)',
+    line: {color: '#AB63FA', width: 1},
+    mode: 'lines',
+    hovertemplate: '%{y} done<extra>Done</extra>'
+  },
+  {
+    name: 'Canceled',
+    x: dates, y: {{.CanceledJSON}},
+    stackgroup: 'one',
+    fillcolor: 'rgba(239,85,59,0.7)',
+    line: {color: '#EF553B', width: 1},
+    mode: 'lines',
+    hovertemplate: '%{y} canceled<extra>Canceled</extra>'
+  },
+  {
+    name: 'In Progress',
+    x: dates, y: {{.InProgressJSON}},
+    stackgroup: 'one',
+    fillcolor: 'rgba(0,204,150,0.7)',
+    line: {color: '#00CC96', width: 1},
+    mode: 'lines',
+    hovertemplate: '%{y} in progress<extra>In Progress</extra>'
+  },
+  {
+    name: 'Backlog',
+    x: dates, y: {{.BacklogJSON}},
+    stackgroup: 'one',
+    fillcolor: 'rgba(99,110,250,0.7)',
+    line: {color: '#636EFA', width: 1},
+    mode: 'lines',
+    hovertemplate: '%{y} in backlog<extra>Backlog</extra>'
+  }
+];
+
+var layout = {
+  hovermode: 'x unified',
+  xaxis: {type: 'date', title: ''},
+  yaxis: {title: 'Cumulative issues'},
+  legend: {traceorder: 'reversed'},
+  margin: {t: 20, r: 20, b: 40, l: 60},
+  height: 480,
+  paper_bgcolor: '#fff',
+  plot_bgcolor: '#fff'
+};
+
+Plotly.newPlot('chart', traces, layout, {responsive: true, displayModeBar: false});
+</script>
+</body>
+</html>

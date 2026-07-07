@@ -11,10 +11,6 @@ tasks:
       - go build -C cmd/sim -o ../../bin/sim .
       - go build -C cmd/sync -o ../../bin/sync .
 
-  fetch:
-    desc: Fetch completed issues from Linear and persist to linear.db (requires LINEAR_API_KEY)
-    cmd: ./bin/sync linear.db
-
   test:
     desc: Run all Go tests
     cmd: go test ./...

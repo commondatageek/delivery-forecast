@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
 # Sanity-check completed-issue data for a set of engineers before trusting a
-# `sim` run. For each engineer, reports how many completed items fall in the
-# sample window, how many distinct days have at least one completion, and
-# how many days in the window would be a 0 in the sample pool. Also reports
-# each engineer's lifetime first/last completed_at so you can tell "thin in
-# this window" apart from "no real data at all" or "name doesn't match".
+# `forecast sim` run. For each engineer, reports how many completed items fall
+# in the sample window, how many distinct days have at least one completion,
+# and how many days in the window would be a 0 in the sample pool. Also
+# reports each engineer's lifetime first/last completed_at so you can tell
+# "thin in this window" apart from "no real data at all" or "name doesn't
+# match".
 #
-# Mirrors `sim`'s date semantics: -start is inclusive, -end is exclusive
-# (i.e. pass the day *after* the last day you want, same as -sample-end).
+# Mirrors `forecast sim`'s date semantics: -start is inclusive, -end is
+# exclusive (i.e. pass the day *after* the last day you want, same as
+# -sample-end).
 #
 # Usage:
 #   scripts/check-engineer-data.sh -db all.db -engineers "alice,Bob Jones" \

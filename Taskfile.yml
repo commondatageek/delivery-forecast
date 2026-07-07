@@ -13,7 +13,7 @@ tasks:
 
   fetch:
     desc: Fetch completed issues from Linear and persist to linear.db (requires LINEAR_API_KEY)
-    cmd: ./bin/sync -db linear.db
+    cmd: ./bin/sync linear.db
 
   test:
     desc: Run all Go tests

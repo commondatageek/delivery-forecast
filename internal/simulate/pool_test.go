@@ -185,6 +185,20 @@ func TestBuildPool_WholeTeamSumsAndIgnoresPerEngineerExclusions(t *testing.T) {
 	}
 }
 
+func TestGetCombinedSamples_DeterministicOrder(t *testing.T) {
+	pool := &SamplePool{PerEngineer: map[string][]int{
+		"carol": {5, 6},
+		"alice": {1, 2},
+		"bob":   {3, 4},
+	}}
+	want := []int{1, 2, 3, 4, 5, 6} // alice, bob, carol: sorted by engineer name
+	for i := range 10 {
+		if got := pool.GetCombinedSamples(); !reflect.DeepEqual(got, want) {
+			t.Fatalf("run %d: GetCombinedSamples = %v, want %v", i, got, want)
+		}
+	}
+}
+
 func TestDaysBetween(t *testing.T) {
 	cases := []struct {
 		name       string

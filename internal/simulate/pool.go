@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"sort"
 	"time"
 )
 
@@ -72,11 +73,19 @@ func (p *SamplePool) DrawFromEngineer(engineer string, rng *rand.Rand) int {
 	return samples[rng.Intn(len(samples))]
 }
 
-// GetCombinedSamples returns all engineers' samples concatenated into a flat slice.
+// GetCombinedSamples returns all engineers' samples concatenated into a flat
+// slice, ordered by engineer name so the result (and thus anything sampled
+// from it under a pinned seed) is deterministic across runs.
 func (p *SamplePool) GetCombinedSamples() []int {
+	names := make([]string, 0, len(p.PerEngineer))
+	for name := range p.PerEngineer {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
 	var combined []int
-	for _, samples := range p.PerEngineer {
-		combined = append(combined, samples...)
+	for _, name := range names {
+		combined = append(combined, p.PerEngineer[name]...)
 	}
 	return combined
 }

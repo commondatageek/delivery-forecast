@@ -74,7 +74,7 @@ func ValidatePool(pool *SamplePool, mode Mode, team []string, requireProgress bo
 			if len(samples) == 0 {
 				return fmt.Errorf("engineer %q has no sample days in the selected window (every day excluded?)", name)
 			}
-			teamTotal += sum(samples)
+			teamTotal += Sum(samples)
 		}
 		if requireProgress && teamTotal == 0 {
 			return fmt.Errorf("team [%s] completed 0 items in the selected window; days-to-complete is undefined (they would never finish)", strings.Join(team, ", "))
@@ -84,7 +84,7 @@ func ValidatePool(pool *SamplePool, mode Mode, team []string, requireProgress bo
 		if len(samples) == 0 {
 			return fmt.Errorf("no sample days in the selected window (try a different -sample-start/-sample-end)")
 		}
-		if requireProgress && sum(samples) == 0 {
+		if requireProgress && Sum(samples) == 0 {
 			return fmt.Errorf("whole-team throughput was 0 in the selected window; days-to-complete is undefined (it would never finish)")
 		}
 	default: // ModeAnonymous
@@ -92,7 +92,7 @@ func ValidatePool(pool *SamplePool, mode Mode, team []string, requireProgress bo
 		if len(samples) == 0 {
 			return fmt.Errorf("no completed items in the selected window (try a different -sample-start/-sample-end)")
 		}
-		if requireProgress && sum(samples) == 0 {
+		if requireProgress && Sum(samples) == 0 {
 			return fmt.Errorf("0 items completed in the selected window; days-to-complete is undefined (it would never finish)")
 		}
 	}

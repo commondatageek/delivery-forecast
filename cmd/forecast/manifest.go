@@ -191,14 +191,6 @@ func issueTime(t time.Time) string {
 	return t.UTC().Format(time.RFC3339)
 }
 
-func sumSlice(samples []int) int {
-	total := 0
-	for _, v := range samples {
-		total += v
-	}
-	return total
-}
-
 // manifestInputs is the single shared parameter bag the sim subcommands
 // fill in to produce a Manifest.
 type manifestInputs struct {
@@ -242,7 +234,7 @@ func newManifest(in manifestInputs) *Manifest {
 	perDays := make(map[string]int, len(in.Pool.PerEngineer))
 	totalComp, totalDays := 0, 0
 	for name, samples := range in.Pool.PerEngineer {
-		s := sumSlice(samples)
+		s := simulate.Sum(samples)
 		perComp[name] = s
 		perDays[name] = len(samples)
 		totalComp += s

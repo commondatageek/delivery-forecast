@@ -7,7 +7,8 @@ import (
 	"sync/atomic"
 )
 
-func sum(samples []int) int {
+// Sum returns the total of samples.
+func Sum(samples []int) int {
 	total := 0
 	for _, v := range samples {
 		total += v
@@ -56,7 +57,7 @@ func RunSimulations(numSimulations, numWorkers int, seed int64, trial func(rng *
 
 // SimulateItemsInDays returns the distribution of total items completed in
 // `days` days by `numDailyDraws` equivalent engineers sampling from samples.
-func SimulateItemsInDays(samples []int, numDailyDraws, days, numSimulations, numWorkers int, seed int64) []int {
+func SimulateItemsInDays(samples []int, numDailyDraws, days, numSimulations, numWorkers int, seed int64, progress func(done, total int)) []int {
 	return RunSimulations(numSimulations, numWorkers, seed, func(rng *rand.Rand) int {
 		total := 0
 		for e := 0; e < numDailyDraws; e++ {
@@ -65,12 +66,12 @@ func SimulateItemsInDays(samples []int, numDailyDraws, days, numSimulations, num
 			}
 		}
 		return total
-	}, nil)
+	}, progress)
 }
 
 // SimulateItemsInDaysPerEngineer returns the distribution of total items
 // completed in `days` days where each engineer samples their own history.
-func SimulateItemsInDaysPerEngineer(pool *SamplePool, teamMembers []string, days, numSimulations, numWorkers int, seed int64) []int {
+func SimulateItemsInDaysPerEngineer(pool *SamplePool, teamMembers []string, days, numSimulations, numWorkers int, seed int64, progress func(done, total int)) []int {
 	return RunSimulations(numSimulations, numWorkers, seed, func(rng *rand.Rand) int {
 		total := 0
 		for _, engineer := range teamMembers {
@@ -79,12 +80,12 @@ func SimulateItemsInDaysPerEngineer(pool *SamplePool, teamMembers []string, days
 			}
 		}
 		return total
-	}, nil)
+	}, progress)
 }
 
 // SimulateDaysToComplete returns the distribution of days needed for
 // `numEngineers` equivalent engineers to complete `items` items sampling from samples.
-func SimulateDaysToComplete(samples []int, numEngineers, items, numSimulations, numWorkers int, seed int64) []int {
+func SimulateDaysToComplete(samples []int, numEngineers, items, numSimulations, numWorkers int, seed int64, progress func(done, total int)) []int {
 	return RunSimulations(numSimulations, numWorkers, seed, func(rng *rand.Rand) int {
 		completed := 0
 		days := 0
@@ -95,12 +96,12 @@ func SimulateDaysToComplete(samples []int, numEngineers, items, numSimulations, 
 			}
 		}
 		return days
-	}, nil)
+	}, progress)
 }
 
 // SimulateDaysToCompletePerEngineer returns the distribution of days needed
 // where each engineer samples their own history.
-func SimulateDaysToCompletePerEngineer(pool *SamplePool, teamMembers []string, items, numSimulations, numWorkers int, seed int64) []int {
+func SimulateDaysToCompletePerEngineer(pool *SamplePool, teamMembers []string, items, numSimulations, numWorkers int, seed int64, progress func(done, total int)) []int {
 	return RunSimulations(numSimulations, numWorkers, seed, func(rng *rand.Rand) int {
 		completed := 0
 		days := 0
@@ -111,7 +112,7 @@ func SimulateDaysToCompletePerEngineer(pool *SamplePool, teamMembers []string, i
 			}
 		}
 		return days
-	}, nil)
+	}, progress)
 }
 
 // ProbabilityAtLeast returns the percentage (0-100) of results in dist that

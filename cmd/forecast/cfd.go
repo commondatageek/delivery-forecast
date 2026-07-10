@@ -67,6 +67,9 @@ func cmdCFD(args []string) error {
 	if err != nil {
 		return fmt.Errorf("query issues: %w", err)
 	}
+	if len(raw) == 0 {
+		fmt.Fprintln(os.Stderr, "warning: no issues found in the database for the given team filter")
+	}
 
 	var normalized []cfd.NormalizedIssue
 	skipped := 0

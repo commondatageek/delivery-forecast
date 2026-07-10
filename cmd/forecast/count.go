@@ -73,6 +73,9 @@ func loadCountProjects(dbPath string, opts counts.Options) ([]counts.Project, in
 	if err != nil {
 		return nil, 0, false, err
 	}
+	if len(countRows) == 0 {
+		fmt.Fprintln(os.Stderr, "warning: no outstanding (non-terminal) issues found for the given filters")
+	}
 
 	activity, err := store.ProjectLastUpdated(ctx, opts.Teams)
 	if err != nil {

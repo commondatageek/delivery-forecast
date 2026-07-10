@@ -67,7 +67,7 @@ func cmdAging(args []string) error {
 
 	opts := aging.Options{Teams: *teams, SampleStart: sampleStart, SampleEnd: sampleEnd, MinCycleTime: minCycleTime}
 
-	store, err := sqlite.Open(*dbFile)
+	store, err := sqlite.OpenExisting(*dbFile)
 	if err != nil {
 		return fmt.Errorf("open db: %w", err)
 	}

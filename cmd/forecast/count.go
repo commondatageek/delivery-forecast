@@ -55,7 +55,7 @@ func cmdCount(args []string) error {
 // returns the folded project list. It also reports whether the database holds
 // more than one team.
 func loadCountProjects(dbPath string, opts counts.Options) ([]counts.Project, int, bool, error) {
-	store, err := sqlite.Open(dbPath)
+	store, err := sqlite.OpenExisting(dbPath)
 	if err != nil {
 		return nil, 0, false, fmt.Errorf("open db: %w", err)
 	}

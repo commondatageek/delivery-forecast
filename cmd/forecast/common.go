@@ -82,7 +82,7 @@ func warnUnmatchedIncludes(includeEngineers []string, seen map[string]bool) {
 
 // loadPool builds a SamplePool by querying the SQLite store.
 func loadPool(dbPath, exclusionsFile string, includeEngineers []string, startDate, endDate time.Time, wholeTeam bool) (poolData, error) {
-	store, err := sqlite.Open(dbPath)
+	store, err := sqlite.OpenExisting(dbPath)
 	if err != nil {
 		return poolData{}, fmt.Errorf("open db: %w", err)
 	}

@@ -57,7 +57,7 @@ func cmdCFD(args []string) error {
 
 	opts := cfd.Options{Teams: *teams, Start: windowStart, End: windowEnd}
 
-	store, err := sqlite.Open(*dbFile)
+	store, err := sqlite.OpenExisting(*dbFile)
 	if err != nil {
 		return fmt.Errorf("open db: %w", err)
 	}

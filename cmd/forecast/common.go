@@ -203,8 +203,8 @@ func addConfigFlag(fs *flag.FlagSet) *string {
 // an example) because its wording differs meaningfully between commands that
 // filter to a team set (aging/cfd/count) and linear sync, where -teams
 // extends the candidate set rather than filtering.
-func addTeamsFlag(fs *flag.FlagSet, usage string) *linear.KeyList {
-	var teams linear.KeyList
+func addTeamsFlag(fs *flag.FlagSet, usage string) *linear.TeamKeyList {
+	var teams linear.TeamKeyList
 	fs.Var(&teams, "teams", usage)
 	return &teams
 }

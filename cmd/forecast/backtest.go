@@ -82,7 +82,7 @@ func cmdSimBacktest(args []string) error {
 	}
 
 	// Build the fixed sample pool once; reused for every backtested day.
-	pd, err := loadPool(*dbFile, *sf.ExclusionsFile, sf.Include, sampleStartDate, sampleEndDate, *sf.WholeTeam)
+	pd, err := loadPool(*dbFile, *sf.ExclusionsFile, sf.TypicalEngineers, sampleStartDate, sampleEndDate, *sf.WholeTeam)
 	if err != nil {
 		return err
 	}

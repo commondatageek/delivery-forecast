@@ -14,6 +14,35 @@ linear.Client  --Fetch-->  linear.Issue  --Upsert-->  sqlite.Store (linear.db, "
                             (Monte Carlo forecasts)                   (cycle-time / WIP-age / CFD reports)
 ```
 
+## Install
+
+```bash
+# Linux / macOS
+curl -fsSL https://raw.githubusercontent.com/commondatageek/delivery-forecast/main/install.sh | sh
+```
+
+```powershell
+# Windows (PowerShell)
+irm https://raw.githubusercontent.com/commondatageek/delivery-forecast/main/install.ps1 | iex
+```
+
+Both scripts download the release asset matching your OS/arch, verify its
+SHA256 checksum, and install `forecast` to `~/.forecast/bin`
+(`%USERPROFILE%\.forecast\bin` on Windows), adding it to your `PATH` unless
+opted out.
+
+| Env var | Default | Description |
+|---|---|---|
+| `FORECAST_INSTALL_DIR` | `~/.forecast/bin` | where to install the binary |
+| `FORECAST_VERSION` | latest release | pin a specific release tag, e.g. `v1.2.3` |
+| `FORECAST_NO_MODIFY_PATH` | unset | set to skip editing your shell profile / User `PATH` |
+
+Prefer to install manually? Grab the archive for your platform from the
+[releases page](https://github.com/commondatageek/delivery-forecast/releases)
+and extract the `forecast` binary onto your `PATH` yourself.
+
+Once installed, `forecast update` (below) handles future upgrades in place.
+
 ## Build & test
 
 Uses [Task](https://taskfile.dev):

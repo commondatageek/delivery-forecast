@@ -11,8 +11,8 @@ func TestResolveMode(t *testing.T) {
 		want         Mode
 		wantErr      bool
 	}{
-		{"default is anonymous", false, false, nil, ModeAnonymous, false},
-		{"engineers set stays anonymous", true, false, nil, ModeAnonymous, false},
+		{"nothing set is an error", false, false, nil, 0, true},
+		{"engineers set is anonymous", true, false, nil, ModeAnonymous, false},
 		{"whole-team", false, true, nil, ModeFullTeam, false},
 		{"named team", false, false, []string{"alice"}, ModeNamedTeam, false},
 		{"team wins when only team set", false, false, []string{"alice", "bob"}, ModeNamedTeam, false},

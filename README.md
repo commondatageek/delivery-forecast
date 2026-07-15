@@ -201,6 +201,35 @@ forecast count -db linear.db -milestones
 | `-teams` | all teams | comma-separated team keys to filter by (e.g. ENG,DESIGN) |
 | `-config` | | path to a YAML config file supplying flag values (CLI flags override) |
 
+## `forecast version` — print version and build info
+
+```bash
+forecast version
+```
+
+Prints the build-time version (set via `-ldflags "-X main.version=..."` for
+released binaries, `(dev)` for local builds) plus VCS-stamped build info:
+git SHA, git time, dirty flag, Go version, module.
+
+## `forecast update` — self-update
+
+Checks the latest GitHub release, compares it against the running binary's
+version, and — after confirmation — downloads, checksum-verifies, and
+installs the release asset matching this OS/arch, replacing the running
+executable in place.
+
+```bash
+forecast update -check   # report current vs. latest, install nothing
+forecast update -yes     # download, verify, and install without prompting
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `-check` | `false` | report current vs. latest version and exit without installing anything |
+| `-yes` | `false` | skip the interactive confirmation prompt |
+| `-force` | `false` | proceed even if already on the latest version, or the current version is unknown (a dev build) |
+| `-timeout` | `60s` | overall HTTP timeout |
+
 ## Config files (`-config`)
 
 Every subcommand accepts `-config <file.yaml>` to supply flag values from a

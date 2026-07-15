@@ -28,6 +28,7 @@ var topCommands = []command{
 	{Name: "cfd", Summary: "Cumulative flow diagram.", Run: cmdCFD},
 	{Name: "count", Summary: "Count of non-terminal issues, grouped by project.", Run: cmdCount},
 	{Name: "version", Summary: "Print version and build info.", Run: cmdVersion},
+	{Name: "update", Summary: "Download and install the latest release.", Run: cmdUpdate},
 }
 
 func usage() {

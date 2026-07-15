@@ -1,12 +1,37 @@
 package util
 
 import (
+	"bufio"
 	"flag"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
+
+// captureStderr redirects os.Stderr for the duration of fn and returns
+// everything written to it.
+func captureStderr(t *testing.T, fn func()) string {
+	t.Helper()
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("os.Pipe: %v", err)
+	}
+	orig := os.Stderr
+	os.Stderr = w
+	defer func() { os.Stderr = orig }()
+
+	fn()
+
+	w.Close()
+	var sb strings.Builder
+	scanner := bufio.NewScanner(r)
+	for scanner.Scan() {
+		sb.WriteString(scanner.Text())
+		sb.WriteString("\n")
+	}
+	return sb.String()
+}
 
 func TestStringify(t *testing.T) {
 	cases := []struct {
@@ -173,6 +198,22 @@ func TestApplyConfig(t *testing.T) {
 		fs.Parse([]string{})
 		if err := ApplyConfig(fs, ""); err != nil {
 			t.Errorf("expected no error for empty path, got %v", err)
+		}
+	})
+
+	t.Run("logs_applied_keys_at_info", func(t *testing.T) {
+		fs := newTestFlagSet()
+		fs.Parse([]string{"-engineers", "2"})
+		out := captureStderr(t, func() {
+			if err := applyConfig(fs, map[string]any{"engineers": 9, "whole-team": true}); err != nil {
+				t.Fatal(err)
+			}
+		})
+		if !strings.Contains(out, "whole-team = true") {
+			t.Errorf("expected log of applied config key, got %q", out)
+		}
+		if strings.Contains(out, "engineers") {
+			t.Errorf("expected no log for CLI-overridden key, got %q", out)
 		}
 	})
 

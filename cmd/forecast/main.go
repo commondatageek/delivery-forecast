@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
+
+	"forecasting/internal/logx"
 )
 
 type command struct {
@@ -68,19 +70,19 @@ func main() {
 		for _, c := range topCommands {
 			if c.Name == os.Args[1] {
 				if err := c.Run(os.Args[2:]); err != nil {
-					fmt.Fprintf(os.Stderr, "error: %v\n", err)
+					logx.Errorf("%v", err)
 					os.Exit(1)
 				}
 				return
 			}
 		}
-		fmt.Fprintf(os.Stderr, "unknown command: %q\n\n", os.Args[1])
+		logx.Errorf("unknown command: %q", os.Args[1])
 		usage()
 		os.Exit(1)
 	}
 
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		logx.Errorf("%v", err)
 		os.Exit(1)
 	}
 }
@@ -98,7 +100,7 @@ func runGroup(group string, cmds []command, args []string) error {
 			return c.Run(args[1:])
 		}
 	}
-	fmt.Fprintf(os.Stderr, "unknown subcommand %q\n\nRun 'forecast %s' for available subcommands.\n", args[0], group)
+	logx.Errorf("unknown subcommand %q; run 'forecast %s' for available subcommands", args[0], group)
 	os.Exit(1)
 	return nil
 }

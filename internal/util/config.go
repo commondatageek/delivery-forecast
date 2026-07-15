@@ -8,6 +8,8 @@ import (
 	"sort"
 	"strings"
 
+	"forecasting/internal/logx"
+
 	"gopkg.in/yaml.v3"
 )
 
@@ -65,7 +67,9 @@ func applyConfig(fs *flag.FlagSet, raw map[string]any) error {
 		}
 		if err := fs.Set(k, stringify(raw[k])); err != nil {
 			errs = append(errs, fmt.Errorf("config key %q: %w", k, err))
+			continue
 		}
+		logx.Infof("config: %s = %s", k, fs.Lookup(k).Value.String())
 	}
 	return errors.Join(errs...)
 }

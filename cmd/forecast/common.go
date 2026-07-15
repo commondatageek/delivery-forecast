@@ -134,10 +134,11 @@ func isFlagSet(fs *flag.FlagSet, name string) bool {
 	return found
 }
 
-// defaultDateRange returns a default date range of the last 6 months, formatted as YYYY-MM-DD.
+// defaultDateRange returns a default date range of the last 3 months, formatted
+// as YYYY-MM-DD — matching the lookback used by count/aging/cfd.
 func defaultDateRange() (start, end string) {
 	now := time.Now()
-	return now.AddDate(0, -6, 0).Format("2006-01-02"), now.Format("2006-01-02")
+	return now.AddDate(0, -3, 0).Format("2006-01-02"), now.Format("2006-01-02")
 }
 
 // resolveRelativeDate parses s as a calendar date, accepting YYYY-MM-DD or
@@ -269,7 +270,7 @@ func addSimFlags(fs *flag.FlagSet) *simFlags {
 	defaultStart, defaultEnd := defaultDateRange()
 	sf := &simFlags{}
 	sf.ExclusionsFile = fs.String("exclusions", "exclusions.json", "path to exclusions JSON file")
-	sf.Engineers = fs.Int("engineers", 3, "number of (equivalent) engineers")
+	sf.Engineers = fs.Int("engineers", 0, "number of (equivalent) engineers; one of -engineers, -team, or -whole-team is required")
 	sf.WholeTeam = fs.Bool("whole-team", false, "use whole-team daily throughput from historical data (ignores -engineers)")
 	sf.Simulations = fs.Int("simulations", 10_000, "number of Monte Carlo simulations to run")
 	sf.Goroutines = fs.Int("goroutines", runtime.NumCPU(), "number of parallel worker goroutines")

@@ -63,7 +63,9 @@ Four subcommands, all sampling from the same historical daily-completion
 data (`-sample-start`/`-sample-end`) in one of three mutually-exclusive
 modes:
 
-- `-engineers N` (default) — pool all engineers' history together and draw for N anonymous equivalent engineers.
+One of the three is required — there is no implicit default mode:
+
+- `-engineers N` — pool all engineers' history together and draw for N anonymous equivalent engineers.
 - `-team alice,bob` — each named engineer draws from their own history.
 - `-whole-team` — sum all engineers' daily counts into one series (ignores individual variance).
 
@@ -77,12 +79,12 @@ forecast sim items -db linear.db -team alice,bob -days 30
 |---|---|---|
 | `-db` | *(required)* | path to SQLite database |
 | `-exclusions` | `exclusions.json` | path to exclusions JSON file |
-| `-engineers` | `3` | number of (equivalent) engineers |
+| `-engineers` | *(required unless `-team`/`-whole-team`)* | number of (equivalent) engineers |
 | `-days` | `30` | number of days |
 | `-whole-team` | `false` | use whole-team daily throughput from historical data (ignores `-engineers`) |
 | `-simulations` | `10000` | number of Monte Carlo simulations to run |
 | `-goroutines` | NumCPU | number of parallel worker goroutines |
-| `-sample-start` | 6 months ago | sample data start date (YYYY-MM-DD) |
+| `-sample-start` | 3 months ago | sample data start date (YYYY-MM-DD) |
 | `-sample-end` | now | sample data end date (YYYY-MM-DD) |
 | `-random-seed` | time-based | seed for the random number generator |
 | `-percentile` | `5,25,50,75,95` | comma-separated percentiles to output |
@@ -101,7 +103,7 @@ Same flags as `sim items`, plus:
 
 | Flag | Default | Description |
 |---|---|---|
-| `-items` | `50` | number of items to complete; comma-separated for a grouped trajectory report (e.g. `13,12,9`) |
+| `-items` | *(required)* | number of items to complete; comma-separated for a grouped trajectory report (e.g. `13,12,9`) |
 | `-target-start-date` | `today` | forecast start date used to compute calendar dates (YYYY-MM-DD, or: today, tomorrow) |
 | `-percentile` | `50,75,85,95` | comma-separated percentiles to output |
 
@@ -129,7 +131,7 @@ actual history, one row per day from the replay start date to a completion
 deadline.
 
 ```bash
-forecast sim backtest -db linear.db -project "Q3 Migration" -target-end-date 2025-09-30
+forecast sim backtest -db linear.db -whole-team -project "Q3 Migration" -target-end-date 2025-09-30
 ```
 
 Same base sampling flags as `sim items`, plus:

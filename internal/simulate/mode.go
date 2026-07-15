@@ -14,10 +14,13 @@ const (
 	ModeNamedTeam             // individually-modeled named engineers
 )
 
-// ResolveMode enforces that -engineers, -whole-team, and -team are mutually
-// exclusive and reports the selected mode. engineersSet must report whether
+// ResolveMode enforces that exactly one of -engineers, -whole-team, and -team
+// is given and reports the selected mode. engineersSet must report whether
 // -engineers was explicitly passed (its default value is otherwise
-// indistinguishable from an unset flag).
+// indistinguishable from an unset flag). There is no implicit default mode:
+// an anonymous-engineers run silently assuming some fixed team size would
+// produce a plausible-looking but potentially wrong forecast, so the caller
+// must state one of the three explicitly.
 func ResolveMode(engineersSet, wholeTeam bool, team []string) (Mode, error) {
 	if wholeTeam && engineersSet {
 		return 0, fmt.Errorf("-whole-team and -engineers are mutually exclusive")
@@ -33,8 +36,10 @@ func ResolveMode(engineersSet, wholeTeam bool, team []string) (Mode, error) {
 		return ModeNamedTeam, nil
 	case wholeTeam:
 		return ModeFullTeam, nil
-	default:
+	case engineersSet:
 		return ModeAnonymous, nil
+	default:
+		return 0, fmt.Errorf("one of -engineers, -team, or -whole-team must be specified")
 	}
 }
 

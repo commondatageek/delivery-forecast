@@ -153,8 +153,8 @@ func cmdSimDays(args []string) error {
 	cmd := flag.NewFlagSet("sim days", flag.ExitOnError)
 	dbFile := addDBFlag(cmd)
 	sf := addSimFlags(cmd)
-	items := intList{50}
-	cmd.Var(&items, "items", "number of items to complete; comma-separated for a grouped trajectory report (e.g. 13,12,9)")
+	var items intList
+	cmd.Var(&items, "items", "number of items to complete (required); comma-separated for a grouped trajectory report (e.g. 13,12,9)")
 	targetStartStr := cmd.String("target-start-date", "today", "forecast start date used to compute calendar dates (YYYY-MM-DD, or: today, tomorrow)")
 	var percentiles intList
 	cmd.Var(&percentiles, "percentile", "comma-separated percentiles to output (default: 50,75,85,95)")
@@ -185,6 +185,9 @@ func cmdSimDays(args []string) error {
 		return fmt.Errorf("invalid -sample-end date: %w", err)
 	}
 
+	if len(items) == 0 {
+		return fmt.Errorf("-items is required")
+	}
 	for _, n := range items {
 		if n <= 0 {
 			return fmt.Errorf("-items: group sizes must be positive, got %d", n)

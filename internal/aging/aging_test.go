@@ -64,6 +64,35 @@ func TestInProgressItemsAgeDays(t *testing.T) {
 	}
 }
 
+func TestCompletedItemsFiltering(t *testing.T) {
+	issues := []linear.Issue{
+		{Identifier: "ENG-1", StartedAt: mustTime("2024-01-01"), CompletedAt: mustTime("2024-01-11")}, // 10 days
+		{Identifier: "ENG-2", StartedAt: mustTime("2024-01-01"), CompletedAt: mustTime("2024-01-02")}, // 1 day
+		{Identifier: "ENG-3", CompletedAt: mustTime("2024-01-10")},                                    // no StartedAt → skip
+		{Identifier: "ENG-4", StartedAt: mustTime("2024-01-01")},                                      // no CompletedAt → skip
+	}
+
+	items := CompletedItems(issues, 0)
+	if len(items) != 2 {
+		t.Fatalf("got %d items, want 2", len(items))
+	}
+	if items[0].Identifier != "ENG-1" || items[0].AgeDays != 10.0 {
+		t.Errorf("ENG-1: got %+v", items[0])
+	}
+	if items[1].Identifier != "ENG-2" || items[1].AgeDays != 1.0 {
+		t.Errorf("ENG-2: got %+v", items[1])
+	}
+
+	// Min 3 days: 1-day issue filtered out.
+	items = CompletedItems(issues, 3*24*time.Hour)
+	if len(items) != 1 {
+		t.Fatalf("min 3d: got %d items, want 1", len(items))
+	}
+	if items[0].Identifier != "ENG-1" {
+		t.Errorf("min 3d: got %+v, want ENG-1", items[0])
+	}
+}
+
 func TestRankItems(t *testing.T) {
 	cycleTimes := []float64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
 	sort.Float64s(cycleTimes)

@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"io"
 	"math"
+	"strings"
 	"text/tabwriter"
 	"time"
 
@@ -92,6 +93,39 @@ func InProgressItems(issues []linear.Issue, today time.Time) []Item {
 	return out
 }
 
+// CompletedItems converts completed issues into Items with AgeDays set to
+// their cycle time (started_at → completed_at) in days, applying the same
+// filter as CycleTimes (missing timestamps, or cycle time below
+// minCycleTime, are skipped). The result is the exact set of issues backing
+// the percentile distribution, each annotated once ranked via RankItems.
+func CompletedItems(issues []linear.Issue, minCycleTime time.Duration) []Item {
+	var out []Item
+	for _, it := range issues {
+		if it.StartedAt.IsZero() || it.CompletedAt.IsZero() {
+			continue
+		}
+		ct := it.CompletedAt.Sub(it.StartedAt)
+		if ct < minCycleTime {
+			continue
+		}
+		days := ct.Hours() / 24
+		if days < 0 {
+			continue
+		}
+		out = append(out, Item{
+			Identifier:  it.Identifier,
+			Title:       it.Title,
+			Assignee:    it.Assignee,
+			ProjectName: it.ProjectName,
+			StateType:   it.StateType,
+			StateName:   it.StateName,
+			StartedAt:   it.StartedAt,
+			AgeDays:     days,
+		})
+	}
+	return out
+}
+
 // RankItems sets the Percentile field on each item based on its AgeDays
 // relative to the sorted cycle-time distribution.
 func RankItems(items []Item, sortedCycleTimes []float64) {
@@ -134,8 +168,41 @@ func ageClass(pct int) string {
 	}
 }
 
-// RenderText writes a tabular aging report to w.
-func RenderText(w io.Writer, items []Item, cycleTimes []float64, p85 float64, sampleStart, sampleEnd time.Time) error {
+const textHeader = "IDENTIFIER\tTITLE\tDAYS\tPERCENTILE\tSTATE\tSTART DATE\tASSIGNEE"
+
+// textDivider is tab-terminated with the same cell count as textHeader so it
+// stays within the same tabwriter column block as the rows around it —
+// otherwise the two sections' columns would be sized independently and no
+// longer line up.
+var textDivider = strings.Join([]string{
+	strings.Repeat("-", len("IDENTIFIER")),
+	strings.Repeat("-", len("TITLE")),
+	strings.Repeat("-", len("DAYS")),
+	strings.Repeat("-", len("PERCENTILE")),
+	strings.Repeat("-", len("STATE")),
+	strings.Repeat("-", len("START DATE")),
+	strings.Repeat("-", len("ASSIGNEE")),
+}, "\t")
+
+func writeItemRow(tw *tabwriter.Writer, item Item) {
+	pct := item.Percentile
+	fmt.Fprintf(tw, "%s\t%s\t%.1f\t%d%s\t%s\t%s\t%s\n",
+		item.Identifier,
+		truncateTitle(item.Title),
+		item.AgeDays,
+		pct, util.OrdinalSuffix(pct),
+		formatState(item.StateName, item.StateType),
+		formatStartDate(item.StartedAt),
+		item.Assignee,
+	)
+}
+
+// RenderText writes a tabular aging report to w: in-progress issues ranked by
+// age/percentile. When showCompleted is true, a second section follows —
+// separated by a divider — listing the completed issues that make up the
+// percentile distribution itself. Both tables share a single tabwriter
+// column block so their columns stay horizontally aligned.
+func RenderText(w io.Writer, items []Item, completed []Item, showCompleted bool, cycleTimes []float64, p85 float64, sampleStart, sampleEnd time.Time) error {
 	fmt.Fprintf(w, "Cycle time distribution: %d completed issues (%s to %s)  ·  P85: %.1f days\n\n",
 		len(cycleTimes),
 		sampleStart.Format("2006-01-02"),
@@ -143,18 +210,16 @@ func RenderText(w io.Writer, items []Item, cycleTimes []float64, p85 float64, sa
 		p85,
 	)
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "IDENTIFIER\tTITLE\tDAYS\tPERCENTILE\tSTATE\tSTART DATE\tASSIGNEE")
+	fmt.Fprintln(tw, textHeader)
 	for _, item := range items {
-		pct := item.Percentile
-		fmt.Fprintf(tw, "%s\t%s\t%.1f\t%d%s\t%s\t%s\t%s\n",
-			item.Identifier,
-			truncateTitle(item.Title),
-			item.AgeDays,
-			pct, util.OrdinalSuffix(pct),
-			formatState(item.StateName, item.StateType),
-			formatStartDate(item.StartedAt),
-			item.Assignee,
-		)
+		writeItemRow(tw, item)
+	}
+	if showCompleted {
+		fmt.Fprintln(tw, textDivider)
+		fmt.Fprintln(tw, textHeader)
+		for _, item := range completed {
+			writeItemRow(tw, item)
+		}
 	}
 	return tw.Flush()
 }
@@ -201,11 +266,13 @@ const htmlTmpl = `<!DOCTYPE html>
   *, *::before, *::after { box-sizing: border-box; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 2rem auto; max-width: 1100px; color: #1a1a1a; background: #f5f5f5; }
   h1 { font-size: 1.35rem; font-weight: 600; margin: 0 0 0.4rem; }
+  h2 { font-size: 1.05rem; font-weight: 600; margin: 0 0 0.6rem; }
   .meta { color: #555; font-size: 0.875rem; margin-bottom: 1.75rem; }
   .meta strong { color: #1a1a1a; }
-  table { border-collapse: collapse; width: 100%; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.10); }
-  th { background: #f0f0f0; text-align: left; padding: 0.6rem 1rem; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: #555; border-bottom: 1px solid #ddd; }
-  td { padding: 0.6rem 1rem; border-bottom: 1px solid #eee; font-size: 0.875rem; vertical-align: middle; }
+  .divider { border: none; border-top: 2px dashed #ccc; margin: 2.5rem 0 1.75rem; }
+  table { border-collapse: collapse; width: 100%; table-layout: fixed; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.10); }
+  th { background: #f0f0f0; text-align: left; padding: 0.6rem 1rem; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: #555; border-bottom: 1px solid #ddd; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  td { padding: 0.6rem 1rem; border-bottom: 1px solid #eee; font-size: 0.875rem; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   tr:last-child td { border-bottom: none; }
   tr:hover td { background: #fafafa; }
   .num { font-variant-numeric: tabular-nums; }
@@ -221,7 +288,25 @@ const htmlTmpl = `<!DOCTYPE html>
   P85 cycle time: <strong>{{printf "%.1f" .P85}} days</strong> &nbsp;·&nbsp;
   Distribution: {{.CompletedCount}} completed issues from {{.SampleStart}} to {{.SampleEnd}}
 </p>
+{{template "table" .Items}}
+{{if .ShowCompleted}}
+<hr class="divider">
+<h2>Completed issues (percentile distribution sample)</h2>
+{{template "table" .Completed}}
+{{end}}
+</body>
+</html>
+{{define "table"}}
 <table>
+  <colgroup>
+    <col style="width: 10%">
+    <col style="width: 32%">
+    <col style="width: 8%">
+    <col style="width: 11%">
+    <col style="width: 15%">
+    <col style="width: 12%">
+    <col style="width: 12%">
+  </colgroup>
   <thead>
     <tr>
       <th>Identifier</th>
@@ -234,7 +319,7 @@ const htmlTmpl = `<!DOCTYPE html>
     </tr>
   </thead>
   <tbody>
-    {{range .Items}}
+    {{range .}}
     <tr>
       <td>{{.Identifier}}</td>
       <td>{{.Title}}</td>
@@ -247,8 +332,7 @@ const htmlTmpl = `<!DOCTYPE html>
     {{end}}
   </tbody>
 </table>
-</body>
-</html>`
+{{end}}`
 
 type htmlItemData struct {
 	Identifier string
@@ -269,20 +353,14 @@ type htmlData struct {
 	SampleStart    string
 	SampleEnd      string
 	Items          []htmlItemData
+	Completed      []htmlItemData
+	ShowCompleted  bool
 }
 
-// RenderHTML writes an HTML aging report to w.
-func RenderHTML(w io.Writer, items []Item, p85 float64, sampleStart, sampleEnd time.Time, completedCount int) error {
-	tmpl := template.Must(template.New("report").Parse(htmlTmpl))
-	data := htmlData{
-		Count:          len(items),
-		CompletedCount: completedCount,
-		P85:            p85,
-		SampleStart:    sampleStart.Format("2006-01-02"),
-		SampleEnd:      sampleEnd.Format("2006-01-02"),
-	}
+func toHTMLItems(items []Item) []htmlItemData {
+	var out []htmlItemData
 	for _, item := range items {
-		data.Items = append(data.Items, htmlItemData{
+		out = append(out, htmlItemData{
 			Identifier: item.Identifier,
 			Title:      item.Title,
 			AgeDays:    item.AgeDays,
@@ -293,6 +371,28 @@ func RenderHTML(w io.Writer, items []Item, p85 float64, sampleStart, sampleEnd t
 			StartDate:  formatStartDate(item.StartedAt),
 			Assignee:   item.Assignee,
 		})
+	}
+	return out
+}
+
+// RenderHTML writes an HTML aging report to w: in-progress issues ranked by
+// age/percentile. When showCompleted is true, a second section follows —
+// separated by a divider — listing the completed issues that make up the
+// percentile distribution itself. Both tables share the same fixed column
+// widths so they stay horizontally aligned.
+func RenderHTML(w io.Writer, items []Item, completed []Item, showCompleted bool, p85 float64, sampleStart, sampleEnd time.Time, completedCount int) error {
+	tmpl := template.Must(template.New("report").Parse(htmlTmpl))
+	data := htmlData{
+		Count:          len(items),
+		CompletedCount: completedCount,
+		P85:            p85,
+		SampleStart:    sampleStart.Format("2006-01-02"),
+		SampleEnd:      sampleEnd.Format("2006-01-02"),
+		Items:          toHTMLItems(items),
+		ShowCompleted:  showCompleted,
+	}
+	if showCompleted {
+		data.Completed = toHTMLItems(completed)
 	}
 	return tmpl.Execute(w, data)
 }

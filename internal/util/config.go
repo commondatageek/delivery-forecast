@@ -1,12 +1,14 @@
 package util
 
 import (
+	"bytes"
 	"errors"
 	"flag"
 	"fmt"
 	"os"
 	"sort"
 	"strings"
+	"text/tabwriter"
 
 	"forecasting/internal/logx"
 
@@ -91,12 +93,22 @@ func applyConfig(fs *flag.FlagSet, raw map[string]any, cliSet map[string]bool) (
 	return configSet, errors.Join(errs...)
 }
 
-// logEffectiveFlags logs, at Info level, every flag in fs with its current
-// value and where that value came from: a CLI flag beats a config file
-// value, which beats the flag's built-in default. configSet may be nil (no
-// config file applied, or path == "" in ApplyConfig) — reads on a nil map are
-// zero-valued, so every flag simply falls through to "default".
+// logEffectiveFlags logs, at Info level, an aligned table of every flag in fs
+// with its current value and where that value came from: a CLI flag beats a
+// config file value, which beats the flag's built-in default. configSet may
+// be nil (no config file applied, or path == "" in ApplyConfig) — reads on a
+// nil map are zero-valued, so every flag simply falls through to "default".
+//
+// Column alignment is computed via text/tabwriter (the same idiom
+// cmd/forecast/backtest.go uses for its table output) into a buffer, then
+// split into lines so each row still goes through logx.Infof like any other
+// log line.
 func logEffectiveFlags(fs *flag.FlagSet, cliSet, configSet map[string]bool) {
+	logx.Infof("effective flag values for this run:")
+
+	var buf bytes.Buffer
+	tw := tabwriter.NewWriter(&buf, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(tw, "FLAG\tVALUE\tSOURCE")
 	fs.VisitAll(func(f *flag.Flag) {
 		source := "default"
 		switch {
@@ -105,8 +117,13 @@ func logEffectiveFlags(fs *flag.FlagSet, cliSet, configSet map[string]bool) {
 		case configSet[f.Name]:
 			source = "config file"
 		}
-		logx.Infof("%s = %s (%s)", f.Name, f.Value.String(), source)
+		fmt.Fprintf(tw, "%s\t%s\t%s\n", f.Name, f.Value.String(), source)
 	})
+	tw.Flush()
+
+	for _, line := range strings.Split(strings.TrimSuffix(buf.String(), "\n"), "\n") {
+		logx.Infof("%s", line)
+	}
 }
 
 // stringify renders a YAML scalar or sequence into the string form the flags'

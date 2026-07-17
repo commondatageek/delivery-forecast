@@ -5,6 +5,7 @@ import (
 	"flag"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -98,6 +99,15 @@ func isFlagSet(fs *flag.FlagSet, name string) bool {
 		}
 	})
 	return set
+}
+
+// matchesRow reports whether out contains an effective-flags table row for
+// name/value/source, tolerant of tabwriter's dynamic column padding (exact
+// spacing depends on the widest value in each column across the whole
+// table) and the logx level label ("INFO  ") prefixing every line.
+func matchesRow(out, name, value, source string) bool {
+	pattern := `(?m)` + regexp.QuoteMeta(name) + `\s+` + regexp.QuoteMeta(value) + `\s+` + regexp.QuoteMeta(source) + `$`
+	return regexp.MustCompile(pattern).MatchString(out)
 }
 
 func TestApplyConfig(t *testing.T) {
@@ -194,7 +204,7 @@ func TestApplyConfig(t *testing.T) {
 				t.Error("expected error for missing file, got nil")
 			}
 		})
-		if !strings.Contains(out, "engineers = 3 (default)") {
+		if !matchesRow(out, "engineers", "3", "default") {
 			t.Errorf("expected effective-flags report even on config load error, got %q", out)
 		}
 	})
@@ -215,7 +225,7 @@ func TestApplyConfig(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
-		if !strings.Contains(out, "engineers = 3 (default)") {
+		if !matchesRow(out, "engineers", "3", "default") {
 			t.Errorf("expected default-source log for untouched flag, got %q", out)
 		}
 	})
@@ -229,7 +239,7 @@ func TestApplyConfig(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
-		if !strings.Contains(out, "engineers = 9 (config file)") {
+		if !matchesRow(out, "engineers", "9", "config file") {
 			t.Errorf("expected config-file-source log, got %q", out)
 		}
 	})
@@ -242,7 +252,7 @@ func TestApplyConfig(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
-		if !strings.Contains(out, "engineers = 2 (CLI flag)") {
+		if !matchesRow(out, "engineers", "2", "CLI flag") {
 			t.Errorf("expected CLI-flag-source log, got %q", out)
 		}
 	})
@@ -255,7 +265,7 @@ func TestApplyConfig(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
-		if !strings.Contains(out, "db =  (default)") {
+		if !matchesRow(out, "db", "", "default") {
 			t.Errorf("expected effective-flags report even with path==\"\", got %q", out)
 		}
 	})
@@ -269,7 +279,7 @@ func TestApplyConfig(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
-		if !strings.Contains(out, "engineers = 2 (CLI flag)") {
+		if !matchesRow(out, "engineers", "2", "CLI flag") {
 			t.Errorf("expected CLI value+source to win, got %q", out)
 		}
 	})
@@ -283,8 +293,24 @@ func TestApplyConfig(t *testing.T) {
 				t.Fatal("expected error for unknown key, got nil")
 			}
 		})
-		if !strings.Contains(out, "engineers = 5 (config file)") {
+		if !matchesRow(out, "engineers", "5", "config file") {
 			t.Errorf("expected succeeded key to still be attributed to config, got %q", out)
+		}
+	})
+
+	t.Run("logs_header_and_intro_line", func(t *testing.T) {
+		fs := newTestFlagSet()
+		fs.Parse([]string{})
+		out := captureStderr(t, func() {
+			if err := ApplyConfig(fs, ""); err != nil {
+				t.Fatal(err)
+			}
+		})
+		if !strings.Contains(out, "effective flag values for this run:") {
+			t.Errorf("expected intro line, got %q", out)
+		}
+		if !regexp.MustCompile(`(?m)FLAG\s+VALUE\s+SOURCE$`).MatchString(out) {
+			t.Errorf("expected aligned header row, got %q", out)
 		}
 	})
 

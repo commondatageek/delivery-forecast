@@ -36,11 +36,11 @@ func cmdSimItems(args []string) error {
 		return err
 	}
 
-	startDate, err := util.ParseDate(*sf.SampleStart)
+	now := time.Now()
+	startDate, err := util.ParseFlexibleDate(*sf.SampleStart, now)
 	if err != nil {
 		return fmt.Errorf("invalid -sample-start date: %w", err)
 	}
-	now := time.Now()
 	endDate, err := resolveEndDate(cmd, *sf.SampleEnd, now)
 	if err != nil {
 		return fmt.Errorf("invalid -sample-end date: %w", err)
@@ -155,7 +155,7 @@ func cmdSimDays(args []string) error {
 	sf := addSimFlags(cmd)
 	var items intList
 	cmd.Var(&items, "items", "number of items to complete (required); comma-separated for a grouped trajectory report (e.g. 13,12,9)")
-	targetStartStr := cmd.String("target-start-date", "today", "forecast start date used to compute calendar dates (YYYY-MM-DD, or: today, tomorrow)")
+	targetStartStr := cmd.String("target-start-date", "today", `forecast start date used to compute calendar dates (YYYY-MM-DD; or: yesterday, today, tomorrow, "-3 months")`)
 	var percentiles intList
 	cmd.Var(&percentiles, "percentile", "comma-separated percentiles to output (default: 50,75,85,95)")
 	manifestFile := cmd.String("manifest", "", `write a run-provenance JSON manifest to this path ("-" for stdout)`)
@@ -175,11 +175,11 @@ func cmdSimDays(args []string) error {
 		return err
 	}
 
-	startDate, err := util.ParseDate(*sf.SampleStart)
+	now := time.Now()
+	startDate, err := util.ParseFlexibleDate(*sf.SampleStart, now)
 	if err != nil {
 		return fmt.Errorf("invalid -sample-start date: %w", err)
 	}
-	now := time.Now()
 	endDate, err := resolveEndDate(cmd, *sf.SampleEnd, now)
 	if err != nil {
 		return fmt.Errorf("invalid -sample-end date: %w", err)
@@ -204,7 +204,7 @@ func cmdSimDays(args []string) error {
 	}
 	seed := resolveSeed(cmd, *sf.RandomSeed, now)
 
-	targetStartDate, err := resolveRelativeDate(*targetStartStr, now)
+	targetStartDate, err := util.ParseFlexibleDate(*targetStartStr, now)
 	if err != nil {
 		return fmt.Errorf("invalid -target-start-date: %w", err)
 	}
@@ -258,8 +258,8 @@ func cmdSimProbability(args []string) error {
 	dbFile := addDBFlag(cmd)
 	sf := addSimFlags(cmd)
 	days := cmd.Int("days", 0, "number of days; mutually exclusive with -target-end-date, one must be given")
-	targetStartStr := cmd.String("target-start-date", "tomorrow", `start of the target window (YYYY-MM-DD, or: today, tomorrow); default: tomorrow`)
-	targetEndStr := cmd.String("target-end-date", "", "end of the target window (YYYY-MM-DD, or: today, tomorrow); mutually exclusive with -days, one must be given")
+	targetStartStr := cmd.String("target-start-date", "tomorrow", `start of the target window (YYYY-MM-DD; or: yesterday, today, tomorrow, "-3 months"); default: tomorrow`)
+	targetEndStr := cmd.String("target-end-date", "", `end of the target window (YYYY-MM-DD; or: yesterday, today, tomorrow, "-3 months"); mutually exclusive with -days, one must be given`)
 	items := cmd.Int("items", -1, "number of items to complete (omit to show full distribution)")
 	manifestFile := cmd.String("manifest", "", `write a run-provenance JSON manifest to this path ("-" for stdout)`)
 	configFile := addConfigFlag(cmd)
@@ -287,11 +287,11 @@ func cmdSimProbability(args []string) error {
 		return fmt.Errorf("one of -days or -target-end-date must be provided")
 	}
 
-	startDate, err := util.ParseDate(*sf.SampleStart)
+	now := time.Now()
+	startDate, err := util.ParseFlexibleDate(*sf.SampleStart, now)
 	if err != nil {
 		return fmt.Errorf("invalid -sample-start date: %w", err)
 	}
-	now := time.Now()
 	endDate, err := resolveEndDate(cmd, *sf.SampleEnd, now)
 	if err != nil {
 		return fmt.Errorf("invalid -sample-end date: %w", err)
@@ -300,11 +300,11 @@ func cmdSimProbability(args []string) error {
 	effectiveDays := *days
 	var targetStart, targetEnd time.Time
 	if targetEndSet {
-		targetStart, err = resolveRelativeDate(*targetStartStr, now)
+		targetStart, err = util.ParseFlexibleDate(*targetStartStr, now)
 		if err != nil {
 			return fmt.Errorf("invalid -target-start-date: %w", err)
 		}
-		targetEnd, err = resolveRelativeDate(*targetEndStr, now)
+		targetEnd, err = util.ParseFlexibleDate(*targetEndStr, now)
 		if err != nil {
 			return fmt.Errorf("invalid -target-end-date: %w", err)
 		}

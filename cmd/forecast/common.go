@@ -155,31 +155,16 @@ func defaultDateRange() (start, end string) {
 	return now.AddDate(0, -3, 0).Format("2006-01-02"), now.Format("2006-01-02")
 }
 
-// resolveRelativeDate parses s as a calendar date, accepting YYYY-MM-DD or
-// the relative keywords today and tomorrow.
-func resolveRelativeDate(s string, now time.Time) (time.Time, error) {
-	y, m, d := now.Local().Date()
-	today := time.Date(y, m, d, 0, 0, 0, 0, time.Local)
-	switch strings.ToLower(s) {
-	case "today":
-		return today, nil
-	case "tomorrow":
-		return today.AddDate(0, 0, 1), nil
-	default:
-		return util.ParseDate(s)
-	}
-}
-
 // resolveEndDate returns the end of the sample window. If -sample-end was
-// explicitly passed, it's parsed as a calendar date (midnight, exclusive of
-// that whole day). Otherwise it defaults to the current moment, so that
-// today's already-completed work is included up to right now rather than
-// being dropped entirely by a midnight-of-today cutoff.
+// explicitly passed, it's parsed as a flexible calendar date (midnight,
+// exclusive of that whole day). Otherwise it defaults to the current moment,
+// so that today's already-completed work is included up to right now rather
+// than being dropped entirely by a midnight-of-today cutoff.
 func resolveEndDate(cmd *flag.FlagSet, sampleEnd string, now time.Time) (time.Time, error) {
 	if !isFlagSet(cmd, "sample-end") {
 		return now, nil
 	}
-	return util.ParseDate(sampleEnd)
+	return util.ParseFlexibleDate(sampleEnd, now)
 }
 
 // resolveSeed returns randomSeed if -random-seed was explicitly set, otherwise
@@ -288,8 +273,8 @@ func addSimFlags(fs *flag.FlagSet) *simFlags {
 	sf.WholeTeam = fs.Bool("whole-team", false, "use whole-team daily throughput from historical data (ignores -engineers)")
 	sf.Simulations = fs.Int("simulations", 10_000, "number of Monte Carlo simulations to run")
 	sf.Goroutines = fs.Int("goroutines", runtime.NumCPU(), "number of parallel worker goroutines")
-	sf.SampleStart = fs.String("sample-start", defaultStart, "sample data start date (YYYY-MM-DD)")
-	sf.SampleEnd = fs.String("sample-end", defaultEnd, "sample data end date (YYYY-MM-DD)")
+	sf.SampleStart = fs.String("sample-start", defaultStart, `sample data start date (YYYY-MM-DD; or: yesterday, today, tomorrow, "-3 months")`)
+	sf.SampleEnd = fs.String("sample-end", defaultEnd, `sample data end date (YYYY-MM-DD; or: yesterday, today, tomorrow, "-3 months")`)
 	sf.RandomSeed = fs.Int64("random-seed", 0, "seed for the random number generator (default: time-based, non-deterministic)")
 	fs.Var(&sf.TypicalEngineers, "typical-engineers", "comma-separated list of the team's typical engineers to build the sample pool from (default: all)")
 	fs.Var(&sf.Team, "team", "comma-separated list of specific engineer names to model individually")

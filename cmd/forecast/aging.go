@@ -17,8 +17,8 @@ import (
 func cmdAging(args []string) error {
 	cmd := flag.NewFlagSet("aging", flag.ExitOnError)
 	dbFile := addDBFlag(cmd)
-	sampleStartStr := cmd.String("sample-start", "", "start of completed-issue window (YYYY-MM-DD, default: today minus 3 months)")
-	sampleEndStr := cmd.String("sample-end", "", "end of completed-issue window (YYYY-MM-DD, default: today)")
+	sampleStartStr := cmd.String("sample-start", "", `start of completed-issue window (YYYY-MM-DD; or: yesterday, today, tomorrow, "-3 months"; default: today minus 3 months)`)
+	sampleEndStr := cmd.String("sample-end", "", `end of completed-issue window (YYYY-MM-DD; or: yesterday, today, tomorrow, "-3 months"; default: today)`)
 	format := cmd.String("format", "text", "output format: text, json, html")
 	minCycleTimeStr := cmd.String("min-cycle-time", "", "exclude completed issues with cycle time below this duration (e.g. 5m, 1h, 1d)")
 	showCompleted := cmd.Bool("show-completed", false, "text/html: also list the completed issues that make up the percentile distribution sample")
@@ -43,11 +43,12 @@ func cmdAging(args []string) error {
 		minCycleTime = d
 	}
 
-	today := util.LocalDay(time.Now())
+	now := time.Now()
+	today := util.LocalDay(now)
 
 	sampleEnd := today
 	if *sampleEndStr != "" {
-		t, err := util.ParseDate(*sampleEndStr)
+		t, err := util.ParseFlexibleDate(*sampleEndStr, now)
 		if err != nil {
 			return fmt.Errorf("invalid -sample-end %q: %w", *sampleEndStr, err)
 		}
@@ -56,7 +57,7 @@ func cmdAging(args []string) error {
 
 	sampleStart := today.AddDate(0, -3, 0)
 	if *sampleStartStr != "" {
-		t, err := util.ParseDate(*sampleStartStr)
+		t, err := util.ParseFlexibleDate(*sampleStartStr, now)
 		if err != nil {
 			return fmt.Errorf("invalid -sample-start %q: %w", *sampleStartStr, err)
 		}

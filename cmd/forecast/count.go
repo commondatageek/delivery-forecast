@@ -19,7 +19,7 @@ func cmdCount(args []string) error {
 	cmd := flag.NewFlagSet("count", flag.ExitOnError)
 	dbFile := addDBFlag(cmd)
 	milestones := cmd.Bool("milestones", false, "add a per-milestone breakdown under each project")
-	updatedSince := cmd.String("updated-since", defaultSince, "only include projects with an issue updated on/after this date (YYYY-MM-DD)")
+	updatedSince := cmd.String("updated-since", defaultSince, `only include projects with an issue updated on/after this date (YYYY-MM-DD; or: yesterday, today, tomorrow, "-3 months")`)
 	teams := addTeamsFlag(cmd, "comma-separated team keys to filter by (e.g. ENG,DESIGN); default: all teams")
 	configFile := addConfigFlag(cmd)
 	cmd.Parse(args)
@@ -32,9 +32,9 @@ func cmdCount(args []string) error {
 		return err
 	}
 
-	since, err := util.ParseDate(*updatedSince)
+	since, err := util.ParseFlexibleDate(*updatedSince, time.Now())
 	if err != nil {
-		return fmt.Errorf("invalid -updated-since %q (want YYYY-MM-DD): %w", *updatedSince, err)
+		return fmt.Errorf("invalid -updated-since %q: %w", *updatedSince, err)
 	}
 
 	opts := counts.Options{Teams: *teams, Since: since}

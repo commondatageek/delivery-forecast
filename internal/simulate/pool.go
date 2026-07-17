@@ -2,10 +2,8 @@ package simulate
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math/rand"
-	"os"
 	"sort"
 	"time"
 
@@ -47,16 +45,9 @@ type Exclusions struct {
 	Engineers map[string][]string `json:"engineers"`
 }
 
-// LoadExclusions reads an exclusions JSON file. If the file does not exist,
-// an empty Exclusions is returned without error.
-func LoadExclusions(path string) (Exclusions, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return Exclusions{}, nil
-		}
-		return Exclusions{}, fmt.Errorf("reading exclusions file: %w", err)
-	}
+// ParseExclusions parses exclusions JSON data, as read from an exclusions
+// file by the caller.
+func ParseExclusions(data []byte) (Exclusions, error) {
 	var exc Exclusions
 	if err := json.Unmarshal(data, &exc); err != nil {
 		return Exclusions{}, fmt.Errorf("parsing exclusions file: %w", err)

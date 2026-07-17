@@ -38,8 +38,8 @@ func cmdSimBacktest(args []string) error {
 	cmd.Lookup("simulations").Usage = "number of Monte Carlo simulations to run per backtested day"
 	project := cmd.String("project", "", "project name to backtest (required)")
 	milestone := cmd.String("milestone", "", "milestone name within the project (optional)")
-	replayStartStr := cmd.String("replay-start-date", "", "first day to replay from, inclusive (YYYY-MM-DD); default: earliest started_at across the issue set")
-	targetEndStr := cmd.String("target-end-date", "", "completion deadline to forecast against (YYYY-MM-DD, required)")
+	replayStartStr := cmd.String("replay-start-date", "", `first day to replay from, inclusive (YYYY-MM-DD; or: yesterday, today, tomorrow, "-3 months"); default: earliest started_at across the issue set`)
+	targetEndStr := cmd.String("target-end-date", "", `completion deadline to forecast against (YYYY-MM-DD; or: now, yesterday, today, tomorrow, "-3 months"; required)`)
 	format := cmd.String("format", "text", `output format: "text" or "csv"`)
 	configFile := addConfigFlag(cmd)
 	cmd.Parse(args)
@@ -61,17 +61,17 @@ func cmdSimBacktest(args []string) error {
 		return fmt.Errorf(`-format must be "text" or "csv"`)
 	}
 
-	targetDate, err := util.ParseDate(*targetEndStr)
+	now := time.Now()
+	targetDate, err := util.ParseFlexibleDate(*targetEndStr, now)
 	if err != nil {
 		return fmt.Errorf("invalid -target-end-date: %w", err)
 	}
 
-	now := time.Now()
-	sampleStartDate, err := util.ParseDate(*sf.SampleStart)
+	sampleStartDate, err := util.ParseFlexibleStartDate(*sf.SampleStart, now)
 	if err != nil {
 		return fmt.Errorf("invalid -sample-start: %w", err)
 	}
-	sampleEndDate, err := resolveEndDate(cmd, *sf.SampleEnd, now)
+	sampleEndDate, err := util.ParseFlexibleDate(*sf.SampleEnd, now)
 	if err != nil {
 		return fmt.Errorf("invalid -sample-end: %w", err)
 	}
@@ -115,7 +115,7 @@ func cmdSimBacktest(args []string) error {
 	// started_at across the issue set.
 	var startDate time.Time
 	if *replayStartStr != "" {
-		startDate, err = util.ParseDate(*replayStartStr)
+		startDate, err = util.ParseFlexibleStartDate(*replayStartStr, now)
 		if err != nil {
 			return fmt.Errorf("invalid -replay-start-date: %w", err)
 		}

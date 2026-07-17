@@ -15,7 +15,6 @@ import (
 	"forecasting/internal/logx"
 	"forecasting/internal/simulate"
 	"forecasting/internal/sqlite"
-	"forecasting/internal/util"
 
 	"github.com/mattn/go-isatty"
 )
@@ -148,40 +147,6 @@ func isFlagSet(fs *flag.FlagSet, name string) bool {
 	return found
 }
 
-// defaultDateRange returns a default date range of the last 3 months, formatted
-// as YYYY-MM-DD — matching the lookback used by count/aging/cfd.
-func defaultDateRange() (start, end string) {
-	now := time.Now()
-	return now.AddDate(0, -3, 0).Format("2006-01-02"), now.Format("2006-01-02")
-}
-
-// resolveRelativeDate parses s as a calendar date, accepting YYYY-MM-DD or
-// the relative keywords today and tomorrow.
-func resolveRelativeDate(s string, now time.Time) (time.Time, error) {
-	y, m, d := now.Local().Date()
-	today := time.Date(y, m, d, 0, 0, 0, 0, time.Local)
-	switch strings.ToLower(s) {
-	case "today":
-		return today, nil
-	case "tomorrow":
-		return today.AddDate(0, 0, 1), nil
-	default:
-		return util.ParseDate(s)
-	}
-}
-
-// resolveEndDate returns the end of the sample window. If -sample-end was
-// explicitly passed, it's parsed as a calendar date (midnight, exclusive of
-// that whole day). Otherwise it defaults to the current moment, so that
-// today's already-completed work is included up to right now rather than
-// being dropped entirely by a midnight-of-today cutoff.
-func resolveEndDate(cmd *flag.FlagSet, sampleEnd string, now time.Time) (time.Time, error) {
-	if !isFlagSet(cmd, "sample-end") {
-		return now, nil
-	}
-	return util.ParseDate(sampleEnd)
-}
-
 // resolveSeed returns randomSeed if -random-seed was explicitly set, otherwise
 // a time-based seed so runs are non-deterministic by default.
 func resolveSeed(cmd *flag.FlagSet, randomSeed int64, now time.Time) int64 {
@@ -281,15 +246,14 @@ type simFlags struct {
 // need (sim backtest runs simulations per backtested day) can override
 // fs.Lookup("simulations").Usage afterward.
 func addSimFlags(fs *flag.FlagSet) *simFlags {
-	defaultStart, defaultEnd := defaultDateRange()
 	sf := &simFlags{}
 	sf.ExclusionsFile = fs.String("exclusions", "exclusions.json", "path to exclusions JSON file")
 	sf.Engineers = fs.Int("engineers", 0, "number of (equivalent) engineers; one of -engineers, -team, or -whole-team is required")
 	sf.WholeTeam = fs.Bool("whole-team", false, "use whole-team daily throughput from historical data (ignores -engineers)")
 	sf.Simulations = fs.Int("simulations", 10_000, "number of Monte Carlo simulations to run")
 	sf.Goroutines = fs.Int("goroutines", runtime.NumCPU(), "number of parallel worker goroutines")
-	sf.SampleStart = fs.String("sample-start", defaultStart, "sample data start date (YYYY-MM-DD)")
-	sf.SampleEnd = fs.String("sample-end", defaultEnd, "sample data end date (YYYY-MM-DD)")
+	sf.SampleStart = fs.String("sample-start", "-3 months", `sample data start date (YYYY-MM-DD; or: yesterday, today, tomorrow, "-3 months")`)
+	sf.SampleEnd = fs.String("sample-end", "now", `sample data end date (YYYY-MM-DD; or: now, yesterday, today, tomorrow, "-3 months")`)
 	sf.RandomSeed = fs.Int64("random-seed", 0, "seed for the random number generator (default: time-based, non-deterministic)")
 	fs.Var(&sf.TypicalEngineers, "typical-engineers", "comma-separated list of the team's typical engineers to build the sample pool from (default: all)")
 	fs.Var(&sf.Team, "team", "comma-separated list of specific engineer names to model individually")

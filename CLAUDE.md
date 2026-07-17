@@ -127,7 +127,8 @@ format: json
 
 ### Conventions worth knowing
 
-- `-sample-end` semantics: if explicitly set, it's a calendar date (midnight, that day excluded). If omitted, it defaults to *now* so today's already-completed work counts (see `resolveEndDate` in `cmd/forecast/common.go`).
+- Date flags: every user-facing date flag (`-sample-start`/`-sample-end`, `-start`/`-end`, `-updated-since`, `-target-start-date`/`-target-end-date`, `-replay-start-date`) is parsed by `util.ParseFlexibleDate` (`internal/util/date.go`), the single shared helper. It accepts `YYYY-MM-DD`, the keywords `yesterday`/`today`/`tomorrow`, and relative offsets (`-3 months`, `+2 weeks`, `90 days`, `3 months ago`; units day/week/month/year, singular or plural; a leading `+` is future, a `-`/`ago`/no-sign is past; `+…ago` is rejected). All forms snap to local midnight of the resolved day. It takes `now` as a parameter (not `time.Now()`) so resolution is deterministic and testable.
+- `-sample-end` semantics: if explicitly set, it's a calendar date (midnight, that day excluded). If omitted, it defaults to *now* so today's already-completed work counts (see `resolveEndDate` in `cmd/forecast/common.go`). The exact-moment behavior is a property of the unset default only; any explicitly-given value (even `today`) is snapped to local midnight by `util.ParseFlexibleDate`.
 - Random seeding: `-random-seed` is time-based (non-deterministic) unless explicitly passed, via the `isFlagSet` flag-presence pattern in `cmd/forecast/common.go`.
 
 ## On-call modeling

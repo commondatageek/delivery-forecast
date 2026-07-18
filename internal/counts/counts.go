@@ -7,8 +7,6 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/commondatageek/delivery-forecast/internal/linear"
-	"github.com/commondatageek/delivery-forecast/internal/sqlite"
 )
 
 const (
@@ -20,11 +18,33 @@ const (
 // `forecast count` flag (and thus a `-config` YAML key of the same name).
 type Options struct {
 	// Teams is the `-teams` flag: team keys to filter by; empty means all teams.
-	Teams linear.TeamKeyList
+	Teams []string
 	// Since is the `-updated-since` flag, resolved to a concrete date
 	// (default: today minus 3 months). Projects whose most recently updated
 	// issue predates it are dropped.
 	Since time.Time
+}
+
+// ProjectMilestoneCount is a count of issues grouped by team, project and
+// milestone. Empty ProjectName / MilestoneName mean the issue had no project /
+// no milestone. The caller maps its source's fields onto it (the CLI maps
+// sqlite.ProjectMilestoneCount).
+type ProjectMilestoneCount struct {
+	TeamKey       string
+	TeamName      string
+	ProjectName   string
+	MilestoneName string
+	Count         int
+}
+
+// ProjectActivity is the most recent updated_at across all of a project's
+// issues. ProjectName is empty for issues with no project. The caller maps
+// its source's fields onto it (the CLI maps sqlite.ProjectActivity).
+type ProjectActivity struct {
+	TeamKey     string
+	TeamName    string
+	ProjectName string
+	LastUpdated time.Time
 }
 
 // Project holds the milestone breakdown for a single project, its total
@@ -59,7 +79,7 @@ type Milestone struct {
 // list of Projects. Projects whose most recently updated issue predates since
 // are dropped. The second return value is the grand total across all returned
 // projects.
-func Compute(counts []sqlite.ProjectMilestoneCount, activity []sqlite.ProjectActivity, since time.Time) ([]Project, int) {
+func Compute(counts []ProjectMilestoneCount, activity []ProjectActivity, since time.Time) ([]Project, int) {
 	type key struct{ team, project string }
 
 	lastUpdated := make(map[key]time.Time, len(activity))

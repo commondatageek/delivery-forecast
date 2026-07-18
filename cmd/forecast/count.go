@@ -13,6 +13,37 @@ import (
 	"github.com/commondatageek/delivery-forecast/internal/util"
 )
 
+// toProjectMilestoneCounts converts sqlite.ProjectMilestoneCount records to
+// counts.ProjectMilestoneCount.
+func toProjectMilestoneCounts(rows []sqlite.ProjectMilestoneCount) []counts.ProjectMilestoneCount {
+	out := make([]counts.ProjectMilestoneCount, len(rows))
+	for i, r := range rows {
+		out[i] = counts.ProjectMilestoneCount{
+			TeamKey:       r.TeamKey,
+			TeamName:      r.TeamName,
+			ProjectName:   r.ProjectName,
+			MilestoneName: r.MilestoneName,
+			Count:         r.Count,
+		}
+	}
+	return out
+}
+
+// toProjectActivity converts sqlite.ProjectActivity records to
+// counts.ProjectActivity.
+func toProjectActivity(rows []sqlite.ProjectActivity) []counts.ProjectActivity {
+	out := make([]counts.ProjectActivity, len(rows))
+	for i, r := range rows {
+		out[i] = counts.ProjectActivity{
+			TeamKey:     r.TeamKey,
+			TeamName:    r.TeamName,
+			ProjectName: r.ProjectName,
+			LastUpdated: r.LastUpdated,
+		}
+	}
+	return out
+}
+
 func cmdCount(args []string) error {
 	defaultSince := time.Now().AddDate(0, -3, 0).Format("2006-01-02")
 
@@ -87,6 +118,6 @@ func loadCountProjects(dbPath string, opts counts.Options) ([]counts.Project, in
 		return nil, 0, false, err
 	}
 
-	projects, total := counts.Compute(countRows, activity, opts.Since)
+	projects, total := counts.Compute(toProjectMilestoneCounts(countRows), toProjectActivity(activity), opts.Since)
 	return projects, total, multiTeam, nil
 }

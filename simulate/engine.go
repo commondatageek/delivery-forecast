@@ -5,6 +5,8 @@ import (
 	"sort"
 	"sync"
 	"sync/atomic"
+
+	"github.com/commondatageek/delivery-forecast/internal/util"
 )
 
 // Sum returns the total of samples.
@@ -128,4 +130,13 @@ func ProbabilityAtLeast(dist []int, n int) float64 {
 		}
 	}
 	return float64(count) / float64(len(dist)) * 100.0
+}
+
+// PercentileValue returns the value at percentile p (0-100) from sortedDist,
+// a distribution sorted in ascending order — the sorted []int that
+// RunSimulations/ItemsInDays/DaysToComplete return. It delegates to
+// internal/util's generic implementation, which callers outside this module
+// can't reach directly.
+func PercentileValue(sortedDist []int, p float64) int {
+	return util.PercentileValue(sortedDist, p)
 }

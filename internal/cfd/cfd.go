@@ -9,8 +9,6 @@ import (
 	"math"
 	"time"
 
-	"github.com/commondatageek/delivery-forecast/internal/linear"
-	"github.com/commondatageek/delivery-forecast/internal/sqlite"
 	"github.com/commondatageek/delivery-forecast/internal/util"
 )
 
@@ -22,12 +20,23 @@ var htmlTemplate string
 // the same name).
 type Options struct {
 	// Teams is the `-teams` flag: team keys to filter by; empty means all teams.
-	Teams linear.TeamKeyList
+	Teams []string
 	// Start is the `-start` flag, resolved to a concrete date (default: today
 	// minus 3 months).
 	Start time.Time
 	// End is the `-end` flag, resolved to a concrete date (default: today).
 	End time.Time
+}
+
+// Issue is the neutral input record for CFD analysis: the same fields as
+// sqlite.CFDRow. The caller maps its source's fields onto it (the CLI maps
+// sqlite.CFDRow).
+type Issue struct {
+	CreatedAt   time.Time
+	StartedAt   time.Time
+	CompletedAt time.Time
+	CanceledAt  time.Time
+	StateType   string
 }
 
 // NormalizedIssue holds per-issue lifecycle event times clamped to be
@@ -87,10 +96,10 @@ func clampMin(a, floor time.Time) time.Time {
 	return a
 }
 
-// Normalize converts a CFDRow into a NormalizedIssue with monotonically
+// Normalize converts an Issue into a NormalizedIssue with monotonically
 // non-decreasing timestamps. Returns false if the issue has no created_at and
 // should be dropped.
-func Normalize(r sqlite.CFDRow) (NormalizedIssue, bool) {
+func Normalize(r Issue) (NormalizedIssue, bool) {
 	arrival := truncDay(r.CreatedAt)
 	if arrival.IsZero() {
 		return NormalizedIssue{}, false

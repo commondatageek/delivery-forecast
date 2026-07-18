@@ -13,6 +13,21 @@ import (
 	"github.com/commondatageek/delivery-forecast/internal/util"
 )
 
+// toCFDIssues converts sqlite.CFDRow records to cfd.Issue.
+func toCFDIssues(rows []sqlite.CFDRow) []cfd.Issue {
+	out := make([]cfd.Issue, len(rows))
+	for i, r := range rows {
+		out[i] = cfd.Issue{
+			CreatedAt:   r.CreatedAt,
+			StartedAt:   r.StartedAt,
+			CompletedAt: r.CompletedAt,
+			CanceledAt:  r.CanceledAt,
+			StateType:   r.StateType,
+		}
+	}
+	return out
+}
+
 func cmdCFD(args []string) error {
 	cmd := flag.NewFlagSet("cfd", flag.ExitOnError)
 	dbFile := addDBFlag(cmd)
@@ -72,7 +87,7 @@ func cmdCFD(args []string) error {
 
 	var normalized []cfd.NormalizedIssue
 	skipped := 0
-	for _, r := range raw {
+	for _, r := range toCFDIssues(raw) {
 		ni, ok := cfd.Normalize(r)
 		if !ok {
 			skipped++

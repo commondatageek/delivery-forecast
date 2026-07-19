@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"forecasting/internal/linear"
-	"forecasting/internal/simulate"
+	"github.com/commondatageek/delivery-forecast/internal/linear"
+	"github.com/commondatageek/delivery-forecast/simulate"
 )
 
 func TestBuildInfo_Degrades(t *testing.T) {

@@ -3,8 +3,6 @@ package counts
 import (
 	"testing"
 	"time"
-
-	"forecasting/internal/sqlite"
 )
 
 func mustTime(s string) time.Time {
@@ -13,12 +11,12 @@ func mustTime(s string) time.Time {
 }
 
 func TestComputeFoldsAndFilters(t *testing.T) {
-	counts := []sqlite.ProjectMilestoneCount{
+	counts := []ProjectMilestoneCount{
 		{TeamKey: "ENG", TeamName: "Engineering", ProjectName: "Alpha", MilestoneName: "M1", Count: 3},
 		{TeamKey: "ENG", TeamName: "Engineering", ProjectName: "Alpha", MilestoneName: "M2", Count: 2},
 		{TeamKey: "ENG", TeamName: "Engineering", ProjectName: "Beta", MilestoneName: "", Count: 5},
 	}
-	activity := []sqlite.ProjectActivity{
+	activity := []ProjectActivity{
 		{TeamKey: "ENG", ProjectName: "Alpha", LastUpdated: mustTime("2024-03-01")},
 		{TeamKey: "ENG", ProjectName: "Beta", LastUpdated: mustTime("2024-01-01")}, // old
 	}
@@ -44,10 +42,10 @@ func TestComputeFoldsAndFilters(t *testing.T) {
 }
 
 func TestComputeNoProjectLabel(t *testing.T) {
-	counts := []sqlite.ProjectMilestoneCount{
+	counts := []ProjectMilestoneCount{
 		{TeamKey: "ENG", TeamName: "Engineering", ProjectName: "", MilestoneName: "", Count: 4},
 	}
-	activity := []sqlite.ProjectActivity{
+	activity := []ProjectActivity{
 		{TeamKey: "ENG", ProjectName: "", LastUpdated: mustTime("2024-03-01")},
 	}
 
@@ -64,11 +62,11 @@ func TestComputeNoProjectLabel(t *testing.T) {
 }
 
 func TestComputeSortByLastUpdated(t *testing.T) {
-	counts := []sqlite.ProjectMilestoneCount{
+	counts := []ProjectMilestoneCount{
 		{TeamKey: "ENG", ProjectName: "Older", Count: 1},
 		{TeamKey: "ENG", ProjectName: "Newer", Count: 1},
 	}
-	activity := []sqlite.ProjectActivity{
+	activity := []ProjectActivity{
 		{TeamKey: "ENG", ProjectName: "Older", LastUpdated: mustTime("2024-01-01")},
 		{TeamKey: "ENG", ProjectName: "Newer", LastUpdated: mustTime("2024-03-01")},
 	}
@@ -80,12 +78,12 @@ func TestComputeSortByLastUpdated(t *testing.T) {
 }
 
 func TestMilestonesSortedNoMilestoneLast(t *testing.T) {
-	counts := []sqlite.ProjectMilestoneCount{
+	counts := []ProjectMilestoneCount{
 		{TeamKey: "ENG", ProjectName: "P", MilestoneName: "", Count: 1},
 		{TeamKey: "ENG", ProjectName: "P", MilestoneName: "Zed", Count: 2},
 		{TeamKey: "ENG", ProjectName: "P", MilestoneName: "Alpha", Count: 3},
 	}
-	activity := []sqlite.ProjectActivity{
+	activity := []ProjectActivity{
 		{TeamKey: "ENG", ProjectName: "P", LastUpdated: mustTime("2024-03-01")},
 	}
 

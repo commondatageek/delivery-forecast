@@ -16,11 +16,11 @@ Manual build (mirrors `task build`):
 go build -o bin/forecast ./cmd/forecast
 ```
 
-Single Go module (`forecasting`, see `go.mod`) — no `go.work`. Tests exist in `cmd/forecast`, `internal/simulate`, `internal/sqlite`, `internal/linear`, and `internal/selfupdate`; `task test` (or `go test ./...`) runs them. No linting is configured.
+Single Go module (`github.com/commondatageek/delivery-forecast`, see `go.mod`) — no `go.work`. Tests exist in `cmd/forecast`, `simulate`, `aging`, `cfd`, `counts`, `internal/sqlite`, `internal/linear`, and `internal/selfupdate`; `task test` (or `go test ./...`) runs them. No linting is configured.
 
 ## Architecture
 
-This is a Linear-only delivery-forecasting toolkit: one model (`linear.Issue`) flows into a single SQLite store, which the simulation and reporting tools query.
+This is a Linear-only delivery-forecasting toolkit: one model (`linear.Issue`) flows into a single SQLite store, which the simulation and reporting tools query. Four packages — `simulate`, `aging`, `cfd`, `counts` — hold all of the actual analysis logic and are pure, IO-free, and source-agnostic (no Linear or SQLite types in their exported API); they live at the repo root rather than under `internal/` so they're usable as a standalone Go library by callers who bring their own data. Everything else (`linear`, `sqlite`, `syncer`, `util`, `logx`, `selfupdate`) is `internal/`: implementation detail of the `forecast` CLI and Linear ingest path, not part of the public surface. Each analysis package defines its own small input structs (e.g. `aging.Issue`, `cfd.Issue`, `counts.ProjectMilestoneCount`/`ProjectActivity`, mirroring `simulate`'s pre-existing `Completion`/`BacktestItem`); `cmd/forecast` is the only place that converts `linear.Issue`/`sqlite.*` rows into them (`toAgingIssues`, `toCFDIssues`, `toProjectMilestoneCounts`/`toProjectActivity`), so storage and analysis stay independent of each other. See [DATA_REQUIREMENTS.md](DATA_REQUIREMENTS.md) for exactly which `issues` columns each command/package needs.
 
 ```
 linear.Client  --Fetch-->  linear.Issue  --Upsert-->  sqlite.Store (linear.db, "issues" table)

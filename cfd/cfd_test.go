@@ -3,8 +3,6 @@ package cfd
 import (
 	"testing"
 	"time"
-
-	"forecasting/internal/sqlite"
 )
 
 func day(s string) time.Time {
@@ -14,7 +12,7 @@ func day(s string) time.Time {
 
 func TestNormalizeClamping(t *testing.T) {
 	// started_at before created_at must be clamped to created_at.
-	r := sqlite.CFDRow{
+	r := Issue{
 		CreatedAt: day("2024-01-10"),
 		StartedAt: day("2024-01-05"), // before created
 	}
@@ -27,7 +25,7 @@ func TestNormalizeClamping(t *testing.T) {
 	}
 
 	// completed_at before started_at must be clamped to started_at.
-	r2 := sqlite.CFDRow{
+	r2 := Issue{
 		CreatedAt:   day("2024-01-01"),
 		StartedAt:   day("2024-01-10"),
 		CompletedAt: day("2024-01-05"), // before started
@@ -42,7 +40,7 @@ func TestNormalizeClamping(t *testing.T) {
 }
 
 func TestNormalizeNilCreatedAt(t *testing.T) {
-	r := sqlite.CFDRow{} // zero CreatedAt
+	r := Issue{} // zero CreatedAt
 	_, ok := Normalize(r)
 	if ok {
 		t.Fatal("expected ok=false for zero created_at")

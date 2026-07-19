@@ -8,8 +8,8 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"forecasting/internal/simulate"
-	"forecasting/internal/util"
+	"github.com/commondatageek/delivery-forecast/internal/util"
+	"github.com/commondatageek/delivery-forecast/simulate"
 )
 
 func cmdSimItems(args []string) error {
@@ -85,7 +85,7 @@ func cmdSimItems(args []string) error {
 	fmt.Printf("%s, %d days -> how many items?\n", simulate.ModeLabel(mode, sf.Team, *sf.Engineers), *days)
 
 	for _, p := range percentiles {
-		fmt.Printf("  %dth percentile: %d items\n", p, util.PercentileValue(dist, float64(p)))
+		fmt.Printf("  %dth percentile: %d items\n", p, simulate.PercentileValue(dist, float64(p)))
 	}
 	return nil
 }
@@ -245,7 +245,7 @@ func cmdSimDays(args []string) error {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "Percentile\tDays\tDate")
 	for _, p := range percentiles {
-		days := util.PercentileValue(dist, float64(p))
+		days := simulate.PercentileValue(dist, float64(p))
 		date := targetStartDate.AddDate(0, 0, days)
 		fmt.Fprintf(w, "p%d\t%d\t%s\n", p, days, date.Format("2006-01-02 Mon"))
 	}

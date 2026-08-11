@@ -115,6 +115,24 @@ One of the three is required — there is no implicit default mode:
 - `-team alice,bob` — each named engineer draws from their own history.
 - `-whole-team` — sum all engineers' daily counts into one series (ignores individual variance).
 
+**Confidence vs. probability vs. percentile** — three different jobs, don't
+conflate them:
+- **Confidence** is an input: a safety level you choose, always read toward
+  the conservative side of the distribution. `sim items -confidence 85` means
+  "give me a floor I'll hit or beat 85% of the time" (fewer items, since more
+  is optimistic). `sim days -confidence 85` means "give me a ceiling I'll
+  finish within 85% of the time" (more days, since fewer is optimistic) — same
+  85, opposite arithmetic, because items and days are conservative in opposite
+  directions.
+- **Probability** (`sim probability`) is the output computed for a plan you
+  already have — not a knob. It's the exact inverse of confidence: if
+  `sim items -confidence 85` says "at least 40 items", `sim probability -items
+  40` reports ~85%.
+- **Percentile** is a plain descriptive rank with no safe side, used where
+  there's nothing to commit to — e.g. `forecast aging`, where an in-progress
+  issue's percentile against historical cycle times is a *warning* (higher is
+  older/worse), not a floor.
+
 ### `sim items` — how many items in D days?
 
 ```bash
@@ -133,11 +151,17 @@ forecast sim items -db linear.db -team alice,bob -days 30
 | `-sample-start` | 3 months ago | sample data start date (YYYY-MM-DD) |
 | `-sample-end` | now | sample data end date (YYYY-MM-DD) |
 | `-random-seed` | time-based | seed for the random number generator |
-| `-percentile` | `5,25,50,75,95` | comma-separated percentiles to output |
+| `-confidence` | `50,75,85,95` | comma-separated confidence levels to output; `-confidence 85` means "85% chance of completing at least N items" (`-percentile` is removed — see below) |
 | `-typical-engineers` | all | comma-separated list of the team's typical engineers to build the sample pool from |
 | `-team` | | comma-separated list of specific engineer names to model individually |
 | `-manifest` | | write a run-provenance JSON manifest to this path (`-` for stdout) |
 | `-config` | | path to a YAML config file supplying flag values (CLI flags override) |
+
+`-percentile` no longer exists on `sim items` — it always errors with a
+migration message. It wasn't renamed in place because its meaning was
+inverted: the old `-percentile 85` read "85% of trials landed at or below N",
+the opposite of "85% chance of at least N". The old `-percentile 85` is now
+`-confidence 15`.
 
 ### `sim days` — how many days to finish I items?
 
@@ -151,7 +175,7 @@ Same flags as `sim items`, plus:
 |---|---|---|
 | `-items` | *(required)* | number of items to complete; comma-separated for a grouped trajectory report (e.g. `13,12,9`) |
 | `-target-start-date` | `today` | forecast start date used to compute calendar dates (YYYY-MM-DD, or: today, tomorrow) |
-| `-percentile` | `50,75,85,95` | comma-separated percentiles to output |
+| `-confidence` | `50,75,85,95` | comma-separated confidence levels to output; `-confidence 85` means "85% chance of finishing within N days" (`-percentile` still works here as a deprecated alias — same meaning, since more days is already the conservative direction) |
 
 (no `-days` flag — that's `sim items`'s target quantity.)
 
@@ -161,7 +185,7 @@ Same flags as `sim items`, plus:
 forecast sim probability -db linear.db -engineers 4 -days 30 -items 40
 ```
 
-Same base flags as `sim items` (minus `-percentile`), plus:
+Same base flags as `sim items` (minus `-confidence`), plus:
 
 | Flag | Default | Description |
 |---|---|---|
@@ -286,7 +310,7 @@ YAML file, applied immediately after flag parsing. Precedence is **CLI flag
 
 - Keys equal flag names exactly as passed on the command line (e.g.
   `-sample-end` → `sample-end`).
-- List flags (`-teams`, `-team`, `-typical-engineers`, `-percentile`, `-items`) take a
+- List flags (`-teams`, `-team`, `-typical-engineers`, `-confidence`, `-items`) take a
   YAML sequence, joined into the same comma-separated string the flag
   itself accepts: `teams: [ENG, DATA]` behaves identically to
   `-teams ENG,DATA`. A plain string (`teams: "ENG,DATA"`) also works.
@@ -309,7 +333,7 @@ days: 30
 sample-start: "2025-01-01"
 sample-end: "2025-07-01"
 random-seed: 42
-percentile: [5, 25, 50, 75, 95]
+confidence: [50, 75, 85, 95]
 team: [alice, bob]
 ```
 

@@ -23,7 +23,7 @@ func (p *intList) Set(s string) error {
 		part = strings.TrimSpace(part)
 		v, err := strconv.Atoi(part)
 		if err != nil {
-			return fmt.Errorf("invalid percentile %q: %w", part, err)
+			return fmt.Errorf("invalid integer %q: %w", part, err)
 		}
 		*p = append(*p, v)
 	}

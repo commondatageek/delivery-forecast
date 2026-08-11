@@ -80,7 +80,7 @@ func TestNewManifest_Assembly(t *testing.T) {
 		Pool:        pool,
 		Issues:      issues,
 		Skipped:     1,
-		Extra:       map[string]any{"effective_percentiles": []int{5, 25, 50}},
+		Extra:       map[string]any{"effective_confidence_levels": []int{50, 75, 85}},
 	})
 
 	if m.SchemaVersion != 1 {

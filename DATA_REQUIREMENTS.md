@@ -111,7 +111,11 @@ func main() {
 		Seed:        42,
 	})
 
-	fmt.Printf("p50: %d items in 30 days\n", simulate.PercentileValue(dist, 50))
+	// ItemsAtConfidence, not PercentileValue: PercentileValue(dist, 85) is the
+	// value 85% of trials fell *at or below*, i.e. only a 15% chance of
+	// reaching it. ItemsAtConfidence(dist, 85) inverts that on purpose,
+	// returning the floor you're 85% likely to meet or beat.
+	fmt.Printf("85%% confidence: at least %d items in 30 days\n", simulate.ItemsAtConfidence(dist, 85))
 }
 ```
 

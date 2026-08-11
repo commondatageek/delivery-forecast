@@ -112,10 +112,10 @@ func cmdSimItems(args []string) error {
 }
 
 // printTrajectoryReport prints the grouped trajectory report for `sim days
-// -items g1,g2,...`: one row per group plus a Total row, with per-percentile
+// -items g1,g2,...`: one row per group plus a Total row, with per-confidence
 // Days/Date columns. All thresholds are simulated with the same seed (see
 // simulate.ComputeTrajectoryTable) so the report's invariants hold.
-func printTrajectoryReport(pool *simulate.SamplePool, mode simulate.Mode, team []string, engineers int, seed int64, simulations, goroutines int, groups, percentiles []int, targetStartDate time.Time) {
+func printTrajectoryReport(pool *simulate.SamplePool, mode simulate.Mode, team []string, engineers int, seed int64, simulations, goroutines int, groups, confidences []int, targetStartDate time.Time) {
 	cum := make([]int, len(groups))
 	total := 0
 	for g, n := range groups {
@@ -135,23 +135,23 @@ func printTrajectoryReport(pool *simulate.SamplePool, mode simulate.Mode, team [
 			Seed:        seed,
 		})
 	}
-	cells, totals := simulate.ComputeTrajectoryTable(dists, percentiles)
+	cells, totals := simulate.ComputeTrajectoryTable(dists, confidences)
 
 	fmt.Printf("%s, starting %s -> grouped trajectory\n\n", simulate.ModeLabel(mode, team, engineers), targetStartDate.Format("2006-01-02"))
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	pctRow := []string{"", ""}
+	confRow := []string{"", ""}
 	header := []string{"Group", "Items"}
-	for _, p := range percentiles {
-		pctRow = append(pctRow, fmt.Sprintf("p%d", p), "")
+	for _, c := range confidences {
+		confRow = append(confRow, fmt.Sprintf("%d%%", c), "")
 		header = append(header, "Days", "Date")
 	}
-	fmt.Fprintln(w, strings.Join(pctRow, "\t"))
+	fmt.Fprintln(w, strings.Join(confRow, "\t"))
 	fmt.Fprintln(w, strings.Join(header, "\t"))
 
 	for g := range groups {
 		row := []string{fmt.Sprintf("Group %d", g+1), fmt.Sprintf("%d", groups[g])}
-		for pi := range percentiles {
+		for pi := range confidences {
 			cell := cells[g][pi]
 			date := targetStartDate.AddDate(0, 0, cell.CumulativeDays)
 			row = append(row, fmt.Sprintf("%d", cell.MarginalDays), date.Format("2006-01-02 (Mon)"))
@@ -160,7 +160,7 @@ func printTrajectoryReport(pool *simulate.SamplePool, mode simulate.Mode, team [
 	}
 
 	totalRow := []string{"Total", fmt.Sprintf("%d", total)}
-	for pi := range percentiles {
+	for pi := range confidences {
 		days := totals[pi]
 		date := targetStartDate.AddDate(0, 0, days)
 		totalRow = append(totalRow, fmt.Sprintf("%d", days), date.Format("2006-01-02 (Mon)"))
@@ -177,8 +177,9 @@ func cmdSimDays(args []string) error {
 	var items intList
 	cmd.Var(&items, "items", "number of items to complete (required); comma-separated for a grouped trajectory report (e.g. 13,12,9)")
 	targetStartStr := cmd.String("target-start-date", "today", `forecast start date used to compute calendar dates (YYYY-MM-DD; or: yesterday, today, tomorrow, "-3 months")`)
-	var percentiles intList
-	cmd.Var(&percentiles, "percentile", "comma-separated percentiles to output (default: 50,75,85,95)")
+	var confidences intList
+	cmd.Var(&confidences, "confidence", "comma-separated confidence levels to output, e.g. 85 means \"85% chance of finishing within N days\" (default: 50,75,85,95)")
+	cmd.Var(&confidences, "percentile", "deprecated alias for -confidence (same meaning here: bigger is more conservative either way)")
 	manifestFile := cmd.String("manifest", "", `write a run-provenance JSON manifest to this path ("-" for stdout)`)
 	configFile := addConfigFlag(cmd)
 	cmd.Parse(args)
@@ -230,8 +231,8 @@ func cmdSimDays(args []string) error {
 		return fmt.Errorf("invalid -target-start-date: %w", err)
 	}
 
-	if len(percentiles) == 0 {
-		percentiles = intList{50, 75, 85, 95}
+	if len(confidences) == 0 {
+		confidences = intList{50, 75, 85, 95}
 	}
 
 	if err := writeManifest(*manifestFile, manifestInputs{
@@ -240,13 +241,13 @@ func cmdSimDays(args []string) error {
 		SampleStart: startDate, SampleEnd: endDate,
 		DBPath: *dbFile, ExclusionsPath: *sf.ExclusionsFile,
 		Exclusions: loaded.Exclusions, Pool: pool, Issues: loaded.Issues, Skipped: loaded.Skipped,
-		Extra: map[string]any{"effective_percentiles": []int(percentiles)},
+		Extra: map[string]any{"effective_confidence_levels": []int(confidences)},
 	}); err != nil {
 		return err
 	}
 
 	if len(items) > 1 {
-		printTrajectoryReport(pool, mode, sf.Team, *sf.Engineers, seed, *sf.Simulations, *sf.Goroutines, items, percentiles, targetStartDate)
+		printTrajectoryReport(pool, mode, sf.Team, *sf.Engineers, seed, *sf.Simulations, *sf.Goroutines, items, confidences, targetStartDate)
 		return nil
 	}
 
@@ -264,11 +265,11 @@ func cmdSimDays(args []string) error {
 	fmt.Printf("%s, %d items -> how many days?\n\n", simulate.ModeLabel(mode, sf.Team, *sf.Engineers), items[0])
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "Percentile\tDays\tDate")
-	for _, p := range percentiles {
-		days := simulate.PercentileValue(dist, float64(p))
+	fmt.Fprintln(w, "Confidence\tDays\tDate")
+	for _, c := range confidences {
+		days := simulate.PercentileValue(dist, float64(c))
 		date := targetStartDate.AddDate(0, 0, days)
-		fmt.Fprintf(w, "p%d\t%d\t%s\n", p, days, date.Format("2006-01-02 Mon"))
+		fmt.Fprintf(w, "%d%%\t%d\t%s\n", c, days, date.Format("2006-01-02 Mon"))
 	}
 	w.Flush()
 	return nil

@@ -137,6 +137,42 @@ func ProbabilityAtLeast(dist []int, n int) float64 {
 // RunSimulations/ItemsInDays/DaysToComplete return. It delegates to
 // internal/util's generic implementation, which callers outside this module
 // can't reach directly.
+//
+// Mind the direction before using this for a commitment: PercentileValue(dist,
+// 85) is the value 85% of trials fell *at or below* — i.e. only a 15% chance
+// of reaching it. For "85% confident of at least N", use [ItemsAtConfidence]
+// instead, which inverts this on purpose.
 func PercentileValue(sortedDist []int, p float64) int {
 	return util.PercentileValue(sortedDist, p)
+}
+
+// ItemsAtConfidence returns the largest n such that at least confidence
+// percent of trials in sortedDist (ascending, as returned by
+// RunSimulations/ItemsInDays) completed n or more items — the inverse of
+// ProbabilityAtLeast: choose a confidence level, get back the floor you can
+// commit to. Guarantees ProbabilityAtLeast(sortedDist, result) >= confidence.
+// confidence is clamped to [0, 100]; higher confidence yields a smaller (more
+// conservative) floor. An empty distribution returns 0.
+func ItemsAtConfidence(sortedDist []int, confidence float64) int {
+	if len(sortedDist) == 0 {
+		return 0
+	}
+	switch {
+	case confidence < 0:
+		confidence = 0
+	case confidence > 100:
+		confidence = 100
+	}
+	lo, hi := sortedDist[0], sortedDist[len(sortedDist)-1]
+	best := lo
+	for lo <= hi {
+		mid := lo + (hi-lo)/2
+		if ProbabilityAtLeast(sortedDist, mid) >= confidence {
+			best = mid
+			lo = mid + 1
+		} else {
+			hi = mid - 1
+		}
+	}
+	return best
 }

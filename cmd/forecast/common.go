@@ -226,7 +226,7 @@ func addTeamsFlag(fs *flag.FlagSet, usage string) *linear.TeamKeyList {
 }
 
 // simFlags bundles the sample-window/mode flag block shared by all four `sim`
-// subcommands (items/days/probability/backtest). -items/-days/-percentile/
+// subcommands (items/days/probability/backtest). -items/-days/-confidence/
 // -manifest differ per command and are declared there instead.
 type simFlags struct {
 	ExclusionsFile   *string

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -12,13 +13,24 @@ import (
 	"github.com/commondatageek/delivery-forecast/simulate"
 )
 
+// removedFlag is a flag.Value for a flag that no longer exists: Set always
+// errors with a migration message, whether triggered from the CLI or (via
+// util.ApplyConfig, which drives config values through fs.Set too) from a
+// stale config file — so neither path silently reinterprets an old value
+// under new semantics.
+type removedFlag struct{ msg string }
+
+func (r removedFlag) String() string   { return "" }
+func (r removedFlag) Set(string) error { return errors.New(r.msg) }
+
 func cmdSimItems(args []string) error {
 	cmd := flag.NewFlagSet("sim items", flag.ExitOnError)
 	dbFile := addDBFlag(cmd)
 	sf := addSimFlags(cmd)
 	days := cmd.Int("days", 30, "number of days")
-	var percentiles intList
-	cmd.Var(&percentiles, "percentile", "comma-separated percentiles to output (default: 5,25,50,75,95)")
+	var confidences intList
+	cmd.Var(&confidences, "confidence", "comma-separated confidence levels to output, e.g. 85 means \"85% chance of completing at least N items\" (default: 50,75,85,95)")
+	cmd.Var(removedFlag{"-percentile has been replaced by -confidence, whose meaning is inverted: -confidence 85 means \"85% chance of at least N items\", not \"the value 85% of trials fell at or below\". The old -percentile 85 is now -confidence 15."}, "percentile", "removed; see -confidence")
 	manifestFile := cmd.String("manifest", "", `write a run-provenance JSON manifest to this path ("-" for stdout)`)
 	configFile := addConfigFlag(cmd)
 	cmd.Parse(args)
@@ -46,6 +58,15 @@ func cmdSimItems(args []string) error {
 		return fmt.Errorf("invalid -sample-end date: %w", err)
 	}
 
+	if len(confidences) == 0 {
+		confidences = intList{50, 75, 85, 95}
+	}
+	for _, c := range confidences {
+		if c <= 0 || c > 100 {
+			return fmt.Errorf("-confidence: values must be in (0, 100], got %d", c)
+		}
+	}
+
 	loaded, err := loadPool(*dbFile, *sf.ExclusionsFile, sf.TypicalEngineers, startDate, endDate, *sf.WholeTeam)
 	if err != nil {
 		return err
@@ -56,17 +77,13 @@ func cmdSimItems(args []string) error {
 	}
 	seed := resolveSeed(cmd, *sf.RandomSeed, now)
 
-	if len(percentiles) == 0 {
-		percentiles = intList{5, 25, 50, 75, 95}
-	}
-
 	if err := writeManifest(*manifestFile, manifestInputs{
 		Subcommand: "sim items", Cmd: cmd, Mode: mode, Team: sf.Team, TypicalEngineers: sf.TypicalEngineers,
 		Engineers: *sf.Engineers, WholeTeam: *sf.WholeTeam, Seed: seed,
 		SampleStart: startDate, SampleEnd: endDate,
 		DBPath: *dbFile, ExclusionsPath: *sf.ExclusionsFile,
 		Exclusions: loaded.Exclusions, Pool: pool, Issues: loaded.Issues, Skipped: loaded.Skipped,
-		Extra: map[string]any{"effective_percentiles": []int(percentiles)},
+		Extra: map[string]any{"effective_confidence_levels": []int(confidences)},
 	}); err != nil {
 		return err
 	}
@@ -82,11 +99,15 @@ func cmdSimItems(args []string) error {
 		Seed:        seed,
 		Progress:    bar.update,
 	})
-	fmt.Printf("%s, %d days -> how many items?\n", simulate.ModeLabel(mode, sf.Team, *sf.Engineers), *days)
+	fmt.Printf("%s, %d days -> how many items?\n\n", simulate.ModeLabel(mode, sf.Team, *sf.Engineers), *days)
 
-	for _, p := range percentiles {
-		fmt.Printf("  %dth percentile: %d items\n", p, simulate.PercentileValue(dist, float64(p)))
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(w, "Confidence\tItems")
+	for _, c := range confidences {
+		n := simulate.ItemsAtConfidence(dist, float64(c))
+		fmt.Fprintf(w, "%d%%\tat least %d\n", c, n)
 	}
+	w.Flush()
 	return nil
 }
 

@@ -384,10 +384,12 @@ func cmdSimProbability(args []string) error {
 	}
 
 	if *items >= 0 {
+		p := simulate.ProbabilityAtLeast(dist, *items)
 		fmt.Printf("%s, %s, %d items -> probability of completion?\n", modeDescription, windowDescription, *items)
-		fmt.Printf("  %.1f%%\n", simulate.ProbabilityAtLeast(dist, *items))
+		fmt.Printf("  %.1f%%  (i.e. you can commit to %d items here at ~%.0f%% confidence)\n", p, *items, p)
 	} else {
 		fmt.Printf("%s, %s -> probability of completing N items\n", modeDescription, windowDescription)
+		fmt.Printf("  (each row's %% is also that many items' confidence level; see `sim items -confidence`)\n")
 		for n := 1; ; n++ {
 			p := simulate.ProbabilityAtLeast(dist, n)
 			fmt.Printf("  %d items: %.1f%%\n", n, p)

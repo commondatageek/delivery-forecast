@@ -1,17 +1,22 @@
 # delivery-forecast
 
-A Linear-only delivery-forecasting toolkit. It syncs issues from
-[Linear](https://linear.app) into a local SQLite database, then runs
-Monte Carlo forecasts and cycle-time/flow reports against that data — all
-from a single `forecast` binary.
+A delivery-forecasting toolkit: Monte Carlo forecasts, cycle-time/flow
+reports, and per-day flow metrics, all from a single `forecast` binary.
+Issues can come from [Linear](https://linear.app) (`linear sync` into a
+local SQLite database) or from a plain CSV/JSON file you already have — see
+[Bring your own data](#bring-your-own-data) below.
 
 ```
-linear.Client  --Fetch-->  linear.Issue  --Upsert-->  sqlite.Store (linear.db, "issues" table)
-                                                               |
-                                         +---------------------+----------------------+
-                                         |                                            |
-                                  forecast sim                              forecast aging/cfd/count
-                            (Monte Carlo forecasts)                   (cycle-time / WIP-age / CFD reports)
+linear.Client  --Fetch-->  issues.Issue  --Upsert-->  sqlite.Store (linear.db)  --+
+                                                                                    |
+                                       issues.ReadFile (CSV/JSON, no Linear)  ------+
+                                                                                    |
+                                                             loadIssues (-input)
+                                                                                    |
+                    +----------------------+-----------------------+---------------+
+                    |                      |                       |
+             forecast sim          forecast aging/cfd/count   forecast history
+       (Monte Carlo forecasts)  (cycle-time / WIP-age / CFD)  (per-day flow metrics)
 ```
 
 ## Install
@@ -78,6 +83,39 @@ go test ./...
 
 Run `forecast` with no arguments to see the full command list.
 
+## Bring your own data
+
+Linear isn't required. Every command reads issues via `-input`, which accepts
+a SQLite database (what `linear sync` produces), a CSV file, or a JSON file —
+no sync step, no API key. The minimum a CSV needs is an identifier and
+whichever lifecycle timestamps the command you're running uses:
+
+```csv
+identifier,created_at,started_at,completed_at
+ENG-1,2025-01-02,2025-01-03,2025-01-08
+ENG-2,2025-01-03,2025-01-04,2025-01-10
+ENG-3,2025-01-05,2025-01-06,2025-01-09
+```
+
+```bash
+forecast check -input issues.csv     # sanity-check the file before trusting it
+forecast history -input issues.csv -format text
+```
+
+A richer fixture — 30 issues spanning ~90 days, with completed, canceled,
+in-progress, and backlog work — is committed at
+[testdata/sample-issues.csv](testdata/sample-issues.csv), so you can run a
+real command against this repo in one step:
+
+```bash
+forecast history -input testdata/sample-issues.csv -format text
+```
+
+See [DATA_REQUIREMENTS.md](DATA_REQUIREMENTS.md) for the accepted CSV/JSON
+column names and timestamp formats, and exactly which fields each command
+needs. `-db` still works as a deprecated alias for `-input` wherever a
+command used to require it (SQLite only; logs a warning).
+
 ## Linear ingest
 
 `forecast linear sync` and `forecast linear teams` require a
@@ -141,7 +179,8 @@ forecast sim items -db linear.db -team alice,bob -days 30
 
 | Flag | Default | Description |
 |---|---|---|
-| `-db` | *(required)* | path to SQLite database |
+| `-input` | *(required)* | path to a SQLite database (`.db`), CSV, or JSON file — see [Bring your own data](#bring-your-own-data) |
+| `-db` | | deprecated alias for `-input` (SQLite databases only); still works but logs a warning |
 | `-exclusions` | `exclusions.json` | path to exclusions JSON file |
 | `-engineers` | *(required unless `-team`/`-whole-team`)* | number of (equivalent) engineers |
 | `-days` | `30` | number of days |
@@ -227,7 +266,8 @@ forecast aging -db linear.db -format html > aging.html
 
 | Flag | Default | Description |
 |---|---|---|
-| `-db` | *(required)* | path to SQLite database |
+| `-input` | *(required)* | path to a SQLite database (`.db`), CSV, or JSON file — see [Bring your own data](#bring-your-own-data) |
+| `-db` | | deprecated alias for `-input` (SQLite databases only); still works but logs a warning |
 | `-sample-start` | today minus 3 months | start of completed-issue window (YYYY-MM-DD) |
 | `-sample-end` | today | end of completed-issue window (YYYY-MM-DD) |
 | `-format` | `text` | output format: `text`, `json`, `html` |
@@ -248,12 +288,41 @@ forecast cfd -db linear.db -start 2025-01-01 -end 2025-07-01 -out cfd.html
 
 | Flag | Default | Description |
 |---|---|---|
-| `-db` | *(required)* | path to SQLite database |
+| `-input` | *(required)* | path to a SQLite database (`.db`), CSV, or JSON file — see [Bring your own data](#bring-your-own-data) |
+| `-db` | | deprecated alias for `-input` (SQLite databases only); still works but logs a warning |
 | `-teams` | all teams | comma-separated team keys to filter by (e.g. ENG,DATA) |
 | `-start` | today minus 3 months | start date, inclusive (YYYY-MM-DD) |
 | `-end` | today | end date, inclusive (YYYY-MM-DD) |
 | `-format` | `html` | output format: `html`, `json` |
 | `-out` | stdout | write output to this file instead of stdout |
+| `-config` | | path to a YAML config file supplying flag values (CLI flags override) |
+
+## `forecast check` — validate a source before trusting it
+
+Reads a source (SQLite db, CSV, or JSON) and reports, per command, whether
+the loaded issues support it — e.g. how many completed issues are missing an
+assignee and will be silently excluded from `sim`'s sample pool. Run this
+first against a new export instead of guessing which columns matter; see
+[DATA_REQUIREMENTS.md](DATA_REQUIREMENTS.md) for the full per-command
+requirements this checks against.
+
+```bash
+forecast check -input testdata/sample-issues.csv
+```
+
+```
+Read 30 issues from testdata/sample-issues.csv
+  history   ok
+  cfd       ok
+  aging     ok
+  count     ok
+  sim       ok
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `-input` | *(required)* | path to a SQLite database (`.db`), CSV, or JSON file; `-` reads stdin (requires `-input-format`) |
+| `-input-format` | | format of `-input` when reading stdin: `csv` or `json` |
 | `-config` | | path to a YAML config file supplying flag values (CLI flags override) |
 
 ## `forecast count` — outstanding-work report
@@ -267,11 +336,44 @@ forecast count -db linear.db -milestones
 
 | Flag | Default | Description |
 |---|---|---|
-| `-db` | *(required)* | path to SQLite database |
+| `-input` | *(required)* | path to a SQLite database (`.db`), CSV, or JSON file — see [Bring your own data](#bring-your-own-data) |
+| `-db` | | deprecated alias for `-input` (SQLite databases only); still works but logs a warning |
 | `-milestones` | `false` | add a per-milestone breakdown under each project |
 | `-updated-since` | today minus 3 months | only include projects with an issue updated on/after this date (YYYY-MM-DD) |
 | `-teams` | all teams | comma-separated team keys to filter by (e.g. ENG,DESIGN) |
 | `-config` | | path to a YAML config file supplying flag values (CLI flags override) |
+
+## `forecast history` — per-day flow metrics
+
+Emits one row per calendar day of a project's or team's life — total scope,
+completed/canceled/backlog/in-progress counts, throughput, lead/cycle-time
+percentiles, WIP age, and a Little's Law cross-check — the deterministic,
+non-Monte-Carlo counterpart to `sim backtest`.
+
+```bash
+forecast history -input testdata/sample-issues.csv -format text
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `-input` | *(required)* | path to a SQLite database (`.db`), CSV, or JSON file; `-` reads stdin (requires `-input-format`) |
+| `-input-format` | | format of `-input` when reading stdin: `csv` or `json` |
+| `-project` | all projects | exact project name to scope to |
+| `-milestone` | all milestones | exact milestone name within `-project` |
+| `-teams` | all teams | comma-separated team keys to filter by (e.g. ENG,DATA) |
+| `-start` | earliest `created_at` in scope | first day emitted, inclusive (YYYY-MM-DD; or: yesterday, today, tomorrow, `-3 months`) |
+| `-end` | today | last day emitted, inclusive |
+| `-window` | `28` | trailing window in days for rolling metrics (throughput, scope growth, net flow) |
+| `-format` | `csv` | output format: `csv`, `json`, `text` |
+| `-out` | stdout | write output to this file instead of stdout |
+| `-config` | | path to a YAML config file supplying flag values (CLI flags override) |
+
+Note: `history` day-truncates and clamps timestamps before counting (a
+completion can land a calendar day earlier than raw-timestamp comparisons
+would put it). `sim backtest` now walks the same day-walk internally, so its
+day-by-day counts match `history`'s exactly — this is a deliberate behavior
+change from `sim backtest`'s pre-`history` implementation, which compared raw
+timestamps instead.
 
 ## `forecast version` — print version and build info
 
@@ -324,10 +426,12 @@ YAML file, applied immediately after flag parsing. Precedence is **CLI flag
   no per-command sectioning (a `sim items` config and a `count` config are
   separate files).
 
-Example for `forecast sim items` (`sim-items.yaml`):
+Example for `forecast sim items` (`sim-items.yaml`) — `input:` is the
+current key; `db:` still works as a deprecated alias wherever a command
+accepts `-db`:
 
 ```yaml
-db: linear.db
+input: linear.db
 engineers: 4
 days: 30
 sample-start: "2025-01-01"
@@ -359,11 +463,14 @@ excluded only for the named engineer.
 
 ## Using as a library
 
-The `simulate`, `aging`, `cfd`, and `counts` packages are pure, IO-free, and
-independent of Linear/SQLite, so they're importable on their own —
-`github.com/commondatageek/delivery-forecast/simulate`, etc. — by anyone who
-wants the same Monte Carlo forecasting or cycle-time/CFD/count analysis over
-data from another source. See [DATA_REQUIREMENTS.md](DATA_REQUIREMENTS.md)
+The `simulate`, `aging`, `cfd`, `counts`, and `history` packages are pure,
+IO-free, and independent of Linear/SQLite, so they're importable on their
+own — `github.com/commondatageek/delivery-forecast/simulate`, etc. — by
+anyone who wants the same Monte Carlo forecasting, cycle-time/CFD/count
+analysis, or per-day flow metrics over data from another source. The
+`issues` package (also root-level) provides the shared `Issue` record plus
+`ReadCSV`/`ReadJSON`/`ReadFile` if you want file parsing without going
+through `cmd/forecast` at all. See [DATA_REQUIREMENTS.md](DATA_REQUIREMENTS.md)
 for what each package needs from your data and a short library-usage example.
 
 ## Conventions worth knowing

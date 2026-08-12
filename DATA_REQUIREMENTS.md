@@ -146,7 +146,7 @@ zone or fractional seconds); a bare local date or datetime with no zone
 (`2025-01-02`, `2025-01-02 15:04:05`, `2025-01-02T15:04:05`, interpreted as
 local time); and `""` or the literal string `null`, both of which parse as
 "not set" (the zero time), not an error. `-` as `-input` itself reads from
-stdin, which requires `-input-format csv` or `-input-format json` since
+stdin, which requires `-stdin-format csv` or `-stdin-format json` since
 there's no file extension to sniff.
 
 See [testdata/sample-issues.csv](testdata/sample-issues.csv) for a complete

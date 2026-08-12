@@ -26,7 +26,7 @@ behavior changes ship in minor releases, called out here.
 - **Bring your own data.** Every command now accepts `-input <path>`, which
   reads a SQLite database, a CSV file, or a JSON file (array or JSON Lines).
   No Linear account and no `linear sync` step required. `-input -` reads
-  stdin, given `-input-format csv|json`. Column names are the SQLite column
+  stdin, given `-stdin-format csv|json`. Column names are the SQLite column
   names; see [DATA_REQUIREMENTS.md](DATA_REQUIREMENTS.md) and the committed
   [testdata/sample-issues.csv](testdata/sample-issues.csv) fixture.
 - **`issues` package** (public, at the repo root) — the source-neutral issue

@@ -35,7 +35,7 @@ func cmdCount(args []string) error {
 	cmd := flag.NewFlagSet("count", flag.ExitOnError)
 	dbFile := addDBFlag(cmd)
 	inputFile := addInputFlag(cmd)
-	inputFormat := addInputFormatFlag(cmd)
+	stdinFormat := addStdinFormatFlag(cmd)
 	milestones := cmd.Bool("milestones", false, "add a per-milestone breakdown under each project")
 	updatedSince := cmd.String("updated-since", defaultSince, `only include projects with an issue updated on/after this date (YYYY-MM-DD; or: now, yesterday, today, tomorrow, "-3 months")`)
 	teams := addTeamsFlag(cmd, "comma-separated team keys to filter by (e.g. ENG,DESIGN); default: all teams")
@@ -58,7 +58,7 @@ func cmdCount(args []string) error {
 
 	opts := counts.Options{Teams: *teams, Since: since}
 
-	projects, total, multiTeam, err := loadCountProjects(inputPath, *inputFormat, opts)
+	projects, total, multiTeam, err := loadCountProjects(inputPath, *stdinFormat, opts)
 	if err != nil {
 		return err
 	}

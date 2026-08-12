@@ -30,7 +30,7 @@ func toHistoryIssues(items []issues.Issue) []history.Issue {
 func cmdHistory(args []string) error {
 	cmd := flag.NewFlagSet("history", flag.ExitOnError)
 	input := addInputFlag(cmd)
-	inputFormat := addInputFormatFlag(cmd)
+	stdinFormat := addStdinFormatFlag(cmd)
 	project := cmd.String("project", "", "exact project name to scope to; default: all projects")
 	milestone := cmd.String("milestone", "", "exact milestone name within -project; default: all milestones")
 	teams := addTeamsFlag(cmd, "comma-separated team keys to filter by (e.g. ENG,DATA); default: all teams")
@@ -58,7 +58,7 @@ func cmdHistory(args []string) error {
 
 	ctx := context.Background()
 
-	raw, err := loadIssues(ctx, *input, *inputFormat)
+	raw, err := loadIssues(ctx, *input, *stdinFormat)
 	if err != nil {
 		return fmt.Errorf("load issues: %w", err)
 	}

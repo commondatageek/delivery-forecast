@@ -28,7 +28,7 @@ func cmdSimItems(args []string) error {
 	cmd := flag.NewFlagSet("sim items", flag.ExitOnError)
 	dbFile := addDBFlag(cmd)
 	inputFile := addInputFlag(cmd)
-	inputFormat := addInputFormatFlag(cmd)
+	stdinFormat := addStdinFormatFlag(cmd)
 	sf := addSimFlags(cmd)
 	days := cmd.Int("days", 30, "number of days")
 	var confidences intList
@@ -71,7 +71,7 @@ func cmdSimItems(args []string) error {
 		}
 	}
 
-	all, err := loadIssues(context.Background(), inputPath, *inputFormat)
+	all, err := loadIssues(context.Background(), inputPath, *stdinFormat)
 	if err != nil {
 		return fmt.Errorf("load issues: %w", err)
 	}
@@ -183,7 +183,7 @@ func cmdSimDays(args []string) error {
 	cmd := flag.NewFlagSet("sim days", flag.ExitOnError)
 	dbFile := addDBFlag(cmd)
 	inputFile := addInputFlag(cmd)
-	inputFormat := addInputFormatFlag(cmd)
+	stdinFormat := addStdinFormatFlag(cmd)
 	sf := addSimFlags(cmd)
 	var items intList
 	cmd.Var(&items, "items", "number of items to complete (required); comma-separated for a grouped trajectory report (e.g. 13,12,9)")
@@ -228,7 +228,7 @@ func cmdSimDays(args []string) error {
 		}
 	}
 
-	all, err := loadIssues(context.Background(), inputPath, *inputFormat)
+	all, err := loadIssues(context.Background(), inputPath, *stdinFormat)
 	if err != nil {
 		return fmt.Errorf("load issues: %w", err)
 	}
@@ -296,7 +296,7 @@ func cmdSimProbability(args []string) error {
 	cmd := flag.NewFlagSet("sim probability", flag.ExitOnError)
 	dbFile := addDBFlag(cmd)
 	inputFile := addInputFlag(cmd)
-	inputFormat := addInputFormatFlag(cmd)
+	stdinFormat := addStdinFormatFlag(cmd)
 	sf := addSimFlags(cmd)
 	days := cmd.Int("days", 0, "number of days; mutually exclusive with -target-end-date, one must be given")
 	targetStartStr := cmd.String("target-start-date", "tomorrow", `start of the target window (YYYY-MM-DD; or: yesterday, today, tomorrow, "-3 months"); default: tomorrow`)
@@ -356,7 +356,7 @@ func cmdSimProbability(args []string) error {
 		effectiveDays = util.DayIndex(targetEnd, targetStart) + 1
 	}
 
-	all, err := loadIssues(context.Background(), inputPath, *inputFormat)
+	all, err := loadIssues(context.Background(), inputPath, *stdinFormat)
 	if err != nil {
 		return fmt.Errorf("load issues: %w", err)
 	}

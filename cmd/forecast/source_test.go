@@ -77,10 +77,10 @@ func TestLoadIssues_Stdin(t *testing.T) {
 	withStdin(t, csv)
 	_, err = loadIssues(context.Background(), "-", "")
 	if err == nil {
-		t.Fatal("expected an error when -input - is given without -input-format")
+		t.Fatal("expected an error when -input - is given without -stdin-format")
 	}
-	if !strings.Contains(err.Error(), "-input-format") {
-		t.Errorf("error %q should name the -input-format flag, not an internal API", err)
+	if !strings.Contains(err.Error(), "-stdin-format") {
+		t.Errorf("error %q should name the -stdin-format flag, not an internal API", err)
 	}
 }
 

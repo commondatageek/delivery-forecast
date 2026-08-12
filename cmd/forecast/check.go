@@ -71,7 +71,7 @@ func excludedStatus(n int, noun, reason string) string {
 func cmdCheck(args []string) error {
 	cmd := flag.NewFlagSet("check", flag.ExitOnError)
 	input := addInputFlag(cmd)
-	inputFormat := addInputFormatFlag(cmd)
+	stdinFormat := addStdinFormatFlag(cmd)
 	configFile := addConfigFlag(cmd)
 	cmd.Parse(args)
 
@@ -83,7 +83,7 @@ func cmdCheck(args []string) error {
 		return fmt.Errorf("-input is required")
 	}
 
-	raw, err := loadIssues(context.Background(), *input, *inputFormat)
+	raw, err := loadIssues(context.Background(), *input, *stdinFormat)
 	if err != nil {
 		return fmt.Errorf("load issues: %w", err)
 	}

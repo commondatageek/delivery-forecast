@@ -52,7 +52,7 @@ func cmdSimBacktest(args []string) error {
 	cmd := flag.NewFlagSet("sim backtest", flag.ExitOnError)
 	dbFile := addDBFlag(cmd)
 	inputFile := addInputFlag(cmd)
-	inputFormat := addInputFormatFlag(cmd)
+	stdinFormat := addStdinFormatFlag(cmd)
 	sf := addSimFlags(cmd)
 	cmd.Lookup("simulations").Usage = "number of Monte Carlo simulations to run per backtested day"
 	project := cmd.String("project", "", "project name to backtest (required)")
@@ -103,7 +103,7 @@ func cmdSimBacktest(args []string) error {
 
 	// Load the issue set once: it feeds both the sample pool and the fixed
 	// backtested set below.
-	all, err := loadIssues(context.Background(), inputPath, *inputFormat)
+	all, err := loadIssues(context.Background(), inputPath, *stdinFormat)
 	if err != nil {
 		return fmt.Errorf("load issues: %w", err)
 	}

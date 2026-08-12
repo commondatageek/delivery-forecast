@@ -182,7 +182,7 @@ forecast sim items -db linear.db -team alice,bob -days 30
 | Flag | Default | Description |
 |---|---|---|
 | `-input` | *(required)* | path to a SQLite database (`.db`), CSV, or JSON file; `-` reads stdin — see [Bring your own data](#bring-your-own-data) |
-| `-input-format` | | format of `-input` when reading stdin: `csv` or `json` |
+| `-stdin-format` | | format of `-input` when reading stdin: `csv` or `json` |
 | `-db` | | deprecated alias for `-input` (SQLite databases only); still works but logs a warning |
 | `-exclusions` | `exclusions.json` | path to exclusions JSON file |
 | `-engineers` | *(required unless `-team`/`-whole-team`)* | number of (equivalent) engineers |
@@ -270,7 +270,7 @@ forecast aging -db linear.db -format html > aging.html
 | Flag | Default | Description |
 |---|---|---|
 | `-input` | *(required)* | path to a SQLite database (`.db`), CSV, or JSON file; `-` reads stdin — see [Bring your own data](#bring-your-own-data) |
-| `-input-format` | | format of `-input` when reading stdin: `csv` or `json` |
+| `-stdin-format` | | format of `-input` when reading stdin: `csv` or `json` |
 | `-db` | | deprecated alias for `-input` (SQLite databases only); still works but logs a warning |
 | `-sample-start` | today minus 3 months | start of completed-issue window (YYYY-MM-DD) |
 | `-sample-end` | today | end of completed-issue window (YYYY-MM-DD) |
@@ -293,7 +293,7 @@ forecast cfd -db linear.db -start 2025-01-01 -end 2025-07-01 -out cfd.html
 | Flag | Default | Description |
 |---|---|---|
 | `-input` | *(required)* | path to a SQLite database (`.db`), CSV, or JSON file; `-` reads stdin — see [Bring your own data](#bring-your-own-data) |
-| `-input-format` | | format of `-input` when reading stdin: `csv` or `json` |
+| `-stdin-format` | | format of `-input` when reading stdin: `csv` or `json` |
 | `-db` | | deprecated alias for `-input` (SQLite databases only); still works but logs a warning |
 | `-teams` | all teams | comma-separated team keys to filter by (e.g. ENG,DATA) |
 | `-start` | today minus 3 months | start date, inclusive (YYYY-MM-DD) |
@@ -326,8 +326,8 @@ Read 30 issues from testdata/sample-issues.csv
 
 | Flag | Default | Description |
 |---|---|---|
-| `-input` | *(required)* | path to a SQLite database (`.db`), CSV, or JSON file; `-` reads stdin (requires `-input-format`) |
-| `-input-format` | | format of `-input` when reading stdin: `csv` or `json` |
+| `-input` | *(required)* | path to a SQLite database (`.db`), CSV, or JSON file; `-` reads stdin (requires `-stdin-format`) |
+| `-stdin-format` | | format of `-input` when reading stdin: `csv` or `json` |
 | `-config` | | path to a YAML config file supplying flag values (CLI flags override) |
 
 ## `forecast count` — outstanding-work report
@@ -342,7 +342,7 @@ forecast count -db linear.db -milestones
 | Flag | Default | Description |
 |---|---|---|
 | `-input` | *(required)* | path to a SQLite database (`.db`), CSV, or JSON file; `-` reads stdin — see [Bring your own data](#bring-your-own-data) |
-| `-input-format` | | format of `-input` when reading stdin: `csv` or `json` |
+| `-stdin-format` | | format of `-input` when reading stdin: `csv` or `json` |
 | `-db` | | deprecated alias for `-input` (SQLite databases only); still works but logs a warning |
 | `-milestones` | `false` | add a per-milestone breakdown under each project |
 | `-updated-since` | today minus 3 months | only include projects with an issue updated on/after this date (YYYY-MM-DD) |
@@ -362,8 +362,8 @@ forecast history -input testdata/sample-issues.csv -format text
 
 | Flag | Default | Description |
 |---|---|---|
-| `-input` | *(required)* | path to a SQLite database (`.db`), CSV, or JSON file; `-` reads stdin (requires `-input-format`) |
-| `-input-format` | | format of `-input` when reading stdin: `csv` or `json` |
+| `-input` | *(required)* | path to a SQLite database (`.db`), CSV, or JSON file; `-` reads stdin (requires `-stdin-format`) |
+| `-stdin-format` | | format of `-input` when reading stdin: `csv` or `json` |
 | `-project` | all projects | exact project name to scope to |
 | `-milestone` | all milestones | exact milestone name within `-project` |
 | `-teams` | all teams | comma-separated team keys to filter by (e.g. ENG,DATA) |

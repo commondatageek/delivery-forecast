@@ -20,12 +20,12 @@ import (
 //
 // A path of "-" reads stdin, which has no extension to dispatch on and so
 // requires format ("csv" or "json") — the value of the command's
-// -input-format flag. Every command routes its source through here, so
+// -stdin-format flag. Every command routes its source through here, so
 // -input - works uniformly wherever -input is accepted.
 func loadIssues(ctx context.Context, path, format string) ([]issues.Issue, error) {
 	if path == "-" {
 		if format == "" {
-			return nil, fmt.Errorf(`-input-format is required when reading from stdin (-input -): "csv" or "json"`)
+			return nil, fmt.Errorf(`-stdin-format is required when reading from stdin (-input -): "csv" or "json"`)
 		}
 		return issues.ReadStream(os.Stdin, format)
 	}
@@ -50,14 +50,14 @@ func loadIssues(ctx context.Context, path, format string) ([]issues.Issue, error
 
 // addInputFlag registers -input, the source-agnostic replacement for -db.
 func addInputFlag(fs *flag.FlagSet) *string {
-	return fs.String("input", "", "path to a SQLite database (.db), CSV, or JSON file; \"-\" reads stdin (requires -input-format)")
+	return fs.String("input", "", "path to a SQLite database (.db), CSV, or JSON file; \"-\" reads stdin (requires -stdin-format)")
 }
 
-// addInputFormatFlag registers -input-format, which names the format of
+// addStdinFormatFlag registers -stdin-format, which names the format of
 // -input when it is "-" (stdin). It pairs with addInputFlag: every command
 // that offers one offers the other, so -input's help text is true everywhere.
-func addInputFormatFlag(fs *flag.FlagSet) *string {
-	return fs.String("input-format", "", `format of -input when reading stdin ("-"): "csv" or "json"`)
+func addStdinFormatFlag(fs *flag.FlagSet) *string {
+	return fs.String("stdin-format", "", `format of -input when reading stdin ("-"): "csv" or "json"`)
 }
 
 // resolveInput returns the input path, preferring -input and falling back to

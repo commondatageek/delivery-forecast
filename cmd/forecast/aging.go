@@ -76,7 +76,7 @@ func cmdAging(args []string) error {
 	cmd := flag.NewFlagSet("aging", flag.ExitOnError)
 	dbFile := addDBFlag(cmd)
 	inputFile := addInputFlag(cmd)
-	inputFormat := addInputFormatFlag(cmd)
+	stdinFormat := addStdinFormatFlag(cmd)
 	sampleStartStr := cmd.String("sample-start", "-3 months", `start of completed-issue window (YYYY-MM-DD; or: yesterday, today, tomorrow, "-3 months")`)
 	sampleEndStr := cmd.String("sample-end", "today", `end of completed-issue window (YYYY-MM-DD; or: now, yesterday, today, tomorrow, "-3 months")`)
 	format := cmd.String("format", "text", "output format: text, json, html")
@@ -123,7 +123,7 @@ func cmdAging(args []string) error {
 
 	opts := aging.Options{Teams: *teams, SampleStart: sampleStart, SampleEnd: sampleEnd, MinCycleTime: minCycleTime}
 
-	raw, err := loadIssues(context.Background(), inputPath, *inputFormat)
+	raw, err := loadIssues(context.Background(), inputPath, *stdinFormat)
 	if err != nil {
 		return fmt.Errorf("load issues: %w", err)
 	}

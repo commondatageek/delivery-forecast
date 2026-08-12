@@ -599,7 +599,7 @@ func resolveInput(fs *flag.FlagSet, input, db *string) (string, error)
 | Flag | Type | Default | Notes |
 |---|---|---|---|
 | `-input` | string | *(required)* | path to `.db`, `.csv`, or `.json`; `-` for stdin |
-| `-input-format` | string | `""` | `csv` or `json`; required only when `-input -` |
+| `-stdin-format` | string | `""` | `csv` or `json`; required only when `-input -` |
 | `-project` | string | `""` | exact project name; empty = all projects |
 | `-milestone` | string | `""` | exact milestone name; only with `-project` |
 | `-teams` | `linear.TeamKeyList` | all | via `addTeamsFlag` |

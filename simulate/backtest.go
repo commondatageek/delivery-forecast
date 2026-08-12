@@ -3,6 +3,7 @@ package simulate
 import (
 	"time"
 
+	"github.com/commondatageek/delivery-forecast/history"
 	"github.com/commondatageek/delivery-forecast/internal/util"
 )
 
@@ -25,6 +26,14 @@ type BacktestRow struct {
 
 // CountAsOf counts how many items in the fixed set were completed by midnight
 // of d, and how many had been created by that point but were not yet complete.
+//
+// RunBacktest no longer calls this (it now walks history.Compute's rows
+// instead, which day-truncate and clamp timestamps before counting — see D4
+// in HISTORY_PLAN.md). CountAsOf keeps its original raw-timestamp semantics
+// on purpose: it's the baseline history_test.go's cross-check test compares
+// against to document that truncation's effect on boundary days, and
+// reimplementing it as a thin wrapper over history would collapse the very
+// divergence that test exists to demonstrate.
 func CountAsOf(items []BacktestItem, d time.Time) (completed, remaining int) {
 	for _, it := range items {
 		completedByD := !it.CompletedAt.IsZero() && !it.CompletedAt.After(d)
@@ -71,14 +80,36 @@ func AllCreatedBy(items []BacktestItem, d time.Time) bool {
 // it counts completed/remaining items and runs a Monte Carlo forecast for the
 // remaining window. The loop exits early once all items are complete and have
 // been created.
+//
+// The day-by-day completed/remaining counts come from history.Compute (the
+// same day-walk engine forecast history and cfd.BuildGrid use), not a
+// bespoke loop, so all three agree on which day a boundary event lands on.
+// This is D4 in HISTORY_PLAN.md: history day-truncates and clamps timestamps
+// before counting, where the old inline loop compared raw timestamps, so a
+// completion that lands mid-day can now count a calendar day earlier than it
+// used to. items carries no CanceledAt (the backtested issue set already
+// excludes canceled/duplicate issues via SQL), so history's Canceled tier is
+// always zero here and Remaining reduces to Total−Completed, matching the
+// old behavior exactly modulo that truncation.
 func RunBacktest(pool *SamplePool, items []BacktestItem, startDate, targetDate time.Time, p Params) []BacktestRow {
+	historyItems := make([]history.Issue, len(items))
+	for i, it := range items {
+		historyItems[i] = history.Issue{CreatedAt: it.CreatedAt, StartedAt: it.StartedAt, CompletedAt: it.CompletedAt}
+	}
+	// startDate/targetDate are validated by the caller (cmd/forecast/backtest.go
+	// requires targetDate after startDate) before RunBacktest is ever called,
+	// so history.Compute's Start/End preconditions always hold here.
+	res, err := history.Compute(historyItems, history.Options{Start: startDate, End: targetDate})
+	if err != nil {
+		return nil
+	}
+
 	var rows []BacktestRow
-	for d := startDate; !d.After(targetDate); d = d.AddDate(0, 0, 1) {
-		completed, remaining := CountAsOf(items, d)
-		daysToTarget := util.DayIndex(targetDate, d) + 1
+	for _, r := range res.Rows {
+		daysToTarget := util.DayIndex(targetDate, r.Date) + 1
 
 		var prob float64
-		if remaining == 0 {
+		if r.Remaining == 0 {
 			prob = 100.0
 		} else {
 			dist := ItemsInDays(pool, Params{
@@ -90,11 +121,11 @@ func RunBacktest(pool *SamplePool, items []BacktestItem, startDate, targetDate t
 				Workers:     p.Workers,
 				Seed:        p.Seed,
 			})
-			prob = ProbabilityAtLeast(dist, remaining)
+			prob = ProbabilityAtLeast(dist, r.Remaining)
 		}
-		rows = append(rows, BacktestRow{d, completed, remaining, prob})
+		rows = append(rows, BacktestRow{r.Date, r.Completed, r.Remaining, prob})
 
-		if remaining == 0 && AllCreatedBy(items, d) {
+		if r.Remaining == 0 && AllCreatedBy(items, r.Date) {
 			break
 		}
 	}

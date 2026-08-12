@@ -9,16 +9,15 @@ import (
 	"time"
 
 	"github.com/commondatageek/delivery-forecast/aging"
-	"github.com/commondatageek/delivery-forecast/internal/linear"
 	"github.com/commondatageek/delivery-forecast/internal/logx"
-	"github.com/commondatageek/delivery-forecast/internal/sqlite"
 	"github.com/commondatageek/delivery-forecast/internal/util"
+	"github.com/commondatageek/delivery-forecast/issues"
 )
 
-// toAgingIssues converts linear.Issue records to aging.Issue.
-func toAgingIssues(issues []linear.Issue) []aging.Issue {
-	out := make([]aging.Issue, len(issues))
-	for i, it := range issues {
+// toAgingIssues converts issues.Issue records to aging.Issue.
+func toAgingIssues(items []issues.Issue) []aging.Issue {
+	out := make([]aging.Issue, len(items))
+	for i, it := range items {
 		out[i] = aging.Issue{
 			Identifier:  it.Identifier,
 			Title:       it.Title,
@@ -33,9 +32,50 @@ func toAgingIssues(issues []linear.Issue) []aging.Issue {
 	return out
 }
 
+// completedBetween selects items completed in [start, end) (start inclusive,
+// end exclusive), using Issue.IsCompleted rather than a raw state_type
+// check so file sources that omit state_type still work (D7).
+//
+// Unlike sim's sample pool, this deliberately does not require a non-empty
+// assignee: aging never filters or groups by assignee, so an unassigned
+// completed issue still belongs in the cycle-time distribution. The old
+// SQL-backed CompletedBetween required one unconditionally (a query it
+// shares with sim, where the pool genuinely is per-engineer and an
+// unassigned issue has nowhere to go), which silently dropped unassigned
+// completed issues from aging's distribution — see DATA_REQUIREMENTS.md
+// footnote 1. This fixes that for every source, not just file ones.
+func completedBetween(items []issues.Issue, start, end time.Time) []issues.Issue {
+	var out []issues.Issue
+	for _, it := range items {
+		if !it.IsCompleted() || it.CompletedAt.IsZero() {
+			continue
+		}
+		if it.CompletedAt.Before(start) || !it.CompletedAt.Before(end) {
+			continue
+		}
+		out = append(out, it)
+	}
+	return out
+}
+
+// inProgress selects items currently in progress, using Issue.IsInProgress
+// rather than a raw state_type check (D7). aging.InProgressItems already
+// skips issues with a zero StartedAt, matching the old query's
+// `started_at IS NOT NULL`.
+func inProgress(items []issues.Issue) []issues.Issue {
+	var out []issues.Issue
+	for _, it := range items {
+		if it.IsInProgress() {
+			out = append(out, it)
+		}
+	}
+	return out
+}
+
 func cmdAging(args []string) error {
 	cmd := flag.NewFlagSet("aging", flag.ExitOnError)
 	dbFile := addDBFlag(cmd)
+	inputFile := addInputFlag(cmd)
 	sampleStartStr := cmd.String("sample-start", "-3 months", `start of completed-issue window (YYYY-MM-DD; or: yesterday, today, tomorrow, "-3 months")`)
 	sampleEndStr := cmd.String("sample-end", "today", `end of completed-issue window (YYYY-MM-DD; or: now, yesterday, today, tomorrow, "-3 months")`)
 	format := cmd.String("format", "text", "output format: text, json, html")
@@ -49,7 +89,8 @@ func cmdAging(args []string) error {
 		return err
 	}
 
-	if err := requireDB(dbFile); err != nil {
+	inputPath, err := resolveInput(cmd, inputFile, dbFile)
+	if err != nil {
 		return err
 	}
 
@@ -81,38 +122,27 @@ func cmdAging(args []string) error {
 
 	opts := aging.Options{Teams: *teams, SampleStart: sampleStart, SampleEnd: sampleEnd, MinCycleTime: minCycleTime}
 
-	store, err := sqlite.OpenExisting(*dbFile)
+	raw, err := loadIssues(context.Background(), inputPath)
 	if err != nil {
-		return fmt.Errorf("open db: %w", err)
-	}
-	defer store.Close()
-
-	ctx := context.Background()
-
-	if err := warnIfBlendingTeams(ctx, store, opts.Teams); err != nil {
-		return err
+		return fmt.Errorf("load issues: %w", err)
 	}
 
-	completed, err := store.CompletedBetween(ctx, opts.SampleStart, opts.SampleEnd, nil, opts.Teams)
-	if err != nil {
-		return fmt.Errorf("query completed: %w", err)
+	if msg := blendingTeamsWarning(opts.Teams, distinctTeamKeys(raw)); msg != "" {
+		logx.Warnf("%s", msg)
 	}
 
-	active, err := store.InProgress(ctx, opts.Teams)
-	if err != nil {
-		return fmt.Errorf("query in-progress: %w", err)
-	}
+	filtered := issues.Filter{Teams: opts.Teams}.Apply(raw)
 
-	agingCompleted := toAgingIssues(completed)
+	agingCompleted := toAgingIssues(completedBetween(filtered, opts.SampleStart, opts.SampleEnd))
 
 	cycleTimes := aging.CycleTimes(agingCompleted, opts.MinCycleTime)
 	sort.Float64s(cycleTimes)
 
-	inProgress := aging.InProgressItems(toAgingIssues(active), today)
-	aging.RankItems(inProgress, cycleTimes)
+	inProgressItems := aging.InProgressItems(toAgingIssues(inProgress(filtered)), today)
+	aging.RankItems(inProgressItems, cycleTimes)
 
-	sort.Slice(inProgress, func(i, j int) bool {
-		return inProgress[i].AgeDays > inProgress[j].AgeDays
+	sort.Slice(inProgressItems, func(i, j int) bool {
+		return inProgressItems[i].AgeDays > inProgressItems[j].AgeDays
 	})
 
 	var completedItems []aging.Item
@@ -133,11 +163,11 @@ func cmdAging(args []string) error {
 
 	switch *format {
 	case "text":
-		return aging.RenderText(os.Stdout, inProgress, completedItems, *showCompleted, cycleTimes, p85, opts.SampleStart, opts.SampleEnd)
+		return aging.RenderText(os.Stdout, inProgressItems, completedItems, *showCompleted, cycleTimes, p85, opts.SampleStart, opts.SampleEnd)
 	case "json":
-		return aging.RenderJSON(os.Stdout, inProgress)
+		return aging.RenderJSON(os.Stdout, inProgressItems)
 	case "html":
-		return aging.RenderHTML(os.Stdout, inProgress, completedItems, *showCompleted, p85, opts.SampleStart, opts.SampleEnd, len(cycleTimes))
+		return aging.RenderHTML(os.Stdout, inProgressItems, completedItems, *showCompleted, p85, opts.SampleStart, opts.SampleEnd, len(cycleTimes))
 	default:
 		return fmt.Errorf("unknown -format %q (use text, json, or html)", *format)
 	}

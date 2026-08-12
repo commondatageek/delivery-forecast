@@ -26,8 +26,8 @@ type Options struct {
 
 // ProjectMilestoneCount is a count of issues grouped by team, project and
 // milestone. Empty ProjectName / MilestoneName mean the issue had no project /
-// no milestone. The caller maps its source's fields onto it (the CLI maps
-// sqlite.ProjectMilestoneCount).
+// no milestone. Produced by Aggregate from a caller's own issue records (the
+// CLI calls Aggregate on issues.Issue via toCountsIssues).
 type ProjectMilestoneCount struct {
 	TeamKey       string
 	TeamName      string
@@ -37,8 +37,8 @@ type ProjectMilestoneCount struct {
 }
 
 // ProjectActivity is the most recent updated_at across all of a project's
-// issues. ProjectName is empty for issues with no project. The caller maps
-// its source's fields onto it (the CLI maps sqlite.ProjectActivity).
+// issues. ProjectName is empty for issues with no project. Produced by
+// Aggregate, same as ProjectMilestoneCount.
 type ProjectActivity struct {
 	TeamKey     string
 	TeamName    string

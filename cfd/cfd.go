@@ -28,9 +28,8 @@ type Options struct {
 	End time.Time
 }
 
-// Issue is the neutral input record for CFD analysis: the same fields as
-// sqlite.CFDRow. The caller maps its source's fields onto it (the CLI maps
-// sqlite.CFDRow).
+// Issue is the neutral input record for CFD analysis. The caller maps its
+// source's fields onto it (the CLI maps issues.Issue via toCFDIssues).
 type Issue struct {
 	CreatedAt   time.Time
 	StartedAt   time.Time

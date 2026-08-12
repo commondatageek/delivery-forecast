@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/commondatageek/delivery-forecast/internal/linear"
+	"github.com/commondatageek/delivery-forecast/issues"
 	"github.com/commondatageek/delivery-forecast/simulate"
 )
 
@@ -63,7 +63,7 @@ func TestNewManifest_Assembly(t *testing.T) {
 		"alice": {1, 0, 2},
 		"bob":   {0, 0},
 	})
-	issues := []linear.Issue{
+	testIssues := []issues.Issue{
 		{Identifier: "ENG-1", Assignee: "alice", CompletedAt: day(2025, 1, 5)},
 		{Identifier: "ENG-2", Assignee: "bob", CompletedAt: day(2025, 1, 6)},
 	}
@@ -78,7 +78,7 @@ func TestNewManifest_Assembly(t *testing.T) {
 		SampleEnd:   day(2025, 2, 1),
 		DBPath:      *dbFile,
 		Pool:        pool,
-		Issues:      issues,
+		Issues:      testIssues,
 		Skipped:     1,
 		Extra:       map[string]any{"effective_confidence_levels": []int{50, 75, 85}},
 	})

@@ -55,7 +55,7 @@ func (b *progressBar) update(done, _ int) {
 // run manifest can record exactly what fed the simulation.
 type poolData struct {
 	Pool       *simulate.SamplePool
-	Issues     []linear.Issue
+	Issues     []issues.Issue
 	Exclusions simulate.Exclusions
 	Skipped    int
 }

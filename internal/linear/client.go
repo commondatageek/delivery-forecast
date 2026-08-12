@@ -12,6 +12,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/commondatageek/delivery-forecast/issues"
 )
 
 const endpoint = "https://api.linear.app/graphql"
@@ -24,7 +26,7 @@ func GetAPIKey() (string, error) {
 	return apiKey, nil
 }
 
-// Client fetches issues from Linear and converts them to Issue.
+// Client fetches issues from Linear and converts them to issues.Issue.
 type Client struct {
 	apiKey string
 	client *http.Client
@@ -39,10 +41,10 @@ func New(apiKey string) *Client {
 }
 
 // Fetch retrieves issues updated since the given time. since == zero means full fetch.
-func (c *Client) Fetch(ctx context.Context, since time.Time, teamKeys []string) ([]Issue, error) {
+func (c *Client) Fetch(ctx context.Context, since time.Time, teamKeys []string) ([]issues.Issue, error) {
 	query := buildQuery(teamKeys, since)
 
-	var issues []Issue
+	var all []issues.Issue
 	var cursor string
 
 	for {
@@ -52,7 +54,7 @@ func (c *Client) Fetch(ctx context.Context, since time.Time, teamKeys []string) 
 		}
 
 		for _, node := range resp.Data.Issues.Nodes {
-			issues = append(issues, toIssue(node))
+			all = append(all, toIssue(node))
 		}
 
 		if !resp.Data.Issues.PageInfo.HasNextPage {
@@ -61,7 +63,7 @@ func (c *Client) Fetch(ctx context.Context, since time.Time, teamKeys []string) 
 		cursor = resp.Data.Issues.PageInfo.EndCursor
 	}
 
-	return issues, nil
+	return all, nil
 }
 
 // ListTeams writes accessible teams to the provided writer (for CLI use),
@@ -159,10 +161,10 @@ func (c *Client) do(ctx context.Context, body []byte) ([]byte, error) {
 	return raw, nil
 }
 
-// toIssue converts an issueNode to an Issue. Every issue is kept; absent
-// related objects (assignee, team, project, milestone, state) become empty
-// strings, which the store persists as NULL.
-func toIssue(n issueNode) Issue {
+// toIssue converts an issueNode to an issues.Issue. Every issue is kept;
+// absent related objects (assignee, team, project, milestone, state) become
+// empty strings, which the store persists as NULL.
+func toIssue(n issueNode) issues.Issue {
 	assigneeName := ""
 	if n.Assignee != nil {
 		assigneeName = n.Assignee.Name
@@ -192,7 +194,7 @@ func toIssue(n issueNode) Issue {
 		stateName = n.State.Name
 	}
 
-	return Issue{
+	return issues.Issue{
 		Identifier:           n.Identifier,
 		Title:                n.Title,
 		Assignee:             assigneeName,
@@ -376,8 +378,8 @@ type Team struct {
 }
 
 type teamsConnection struct {
-	Nodes    []Team `json:"nodes"`
-	PageInfo pageInfo   `json:"pageInfo"`
+	Nodes    []Team   `json:"nodes"`
+	PageInfo pageInfo `json:"pageInfo"`
 }
 
 type teamsData struct {

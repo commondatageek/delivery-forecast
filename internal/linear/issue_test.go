@@ -3,6 +3,8 @@ package linear
 import (
 	"testing"
 	"time"
+
+	"github.com/commondatageek/delivery-forecast/issues"
 )
 
 func TestToIssueNoAssigneeYieldsEmpty(t *testing.T) {
@@ -55,7 +57,7 @@ func TestToIssueFullyPopulated(t *testing.T) {
 
 	got := toIssue(n)
 
-	want := Issue{
+	want := issues.Issue{
 		Identifier:           "ENG-123",
 		Title:                "Fix bug",
 		Assignee:             "alice",

@@ -8,7 +8,7 @@ import (
 )
 
 // BacktestItem is the neutral per-issue record the backtest needs: just the
-// timestamps. The cmd layer converts source-specific records (e.g. linear.Issue)
+// timestamps. The cmd layer converts source-specific records (e.g. issues.Issue)
 // to BacktestItem before calling RunBacktest.
 type BacktestItem struct {
 	CreatedAt   time.Time

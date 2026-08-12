@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/commondatageek/delivery-forecast/internal/linear"
+	"github.com/commondatageek/delivery-forecast/issues"
 )
 
 func openTestStore(t *testing.T) *Store {
@@ -33,7 +33,7 @@ func TestUpsertAndCompletedBetween(t *testing.T) {
 	store := openTestStore(t)
 	ctx := context.Background()
 
-	completed := linear.Issue{
+	completed := issues.Issue{
 		Identifier:  "ENG-1",
 		Assignee:    "alice",
 		StateType:   "completed",
@@ -41,7 +41,7 @@ func TestUpsertAndCompletedBetween(t *testing.T) {
 		CompletedAt: mustParse(t, "2024-01-05T00:00:00Z"),
 		UpdatedAt:   mustParse(t, "2024-01-05T00:00:00Z"),
 	}
-	inProgress := linear.Issue{
+	inProgress := issues.Issue{
 		Identifier: "ENG-2",
 		Assignee:   "bob",
 		StateType:  "started",
@@ -68,7 +68,7 @@ func TestNotCompletedCounts(t *testing.T) {
 	store := openTestStore(t)
 	ctx := context.Background()
 
-	issues := []linear.Issue{
+	issues := []issues.Issue{
 		// Apollo / Beta: two not-completed.
 		{Identifier: "ENG-1", TeamKey: "ENG", StateType: "started", ProjectName: "Apollo", ProjectMilestoneName: "Beta"},
 		{Identifier: "ENG-2", TeamKey: "ENG", StateType: "backlog", ProjectName: "Apollo", ProjectMilestoneName: "Beta"},
@@ -130,7 +130,7 @@ func TestProjectLastUpdated(t *testing.T) {
 	older := mustParse(t, "2024-01-01T00:00:00Z")
 	newer := mustParse(t, "2024-03-15T12:30:00Z")
 
-	issues := []linear.Issue{
+	issues := []issues.Issue{
 		// Apollo's newest touch is a completed (terminal) issue.
 		{Identifier: "ENG-1", TeamKey: "ENG", StateType: "started", ProjectName: "Apollo", UpdatedAt: older},
 		{Identifier: "ENG-2", TeamKey: "ENG", StateType: "completed", ProjectName: "Apollo", UpdatedAt: newer},
@@ -163,13 +163,13 @@ func TestCompletedBetweenExcludesUnassigned(t *testing.T) {
 	store := openTestStore(t)
 	ctx := context.Background()
 
-	assigned := linear.Issue{
+	assigned := issues.Issue{
 		Identifier:  "ENG-1",
 		Assignee:    "alice",
 		StateType:   "completed",
 		CompletedAt: mustParse(t, "2024-01-05T00:00:00Z"),
 	}
-	unassigned := linear.Issue{
+	unassigned := issues.Issue{
 		Identifier:  "ENG-2",
 		StateType:   "completed",
 		CompletedAt: mustParse(t, "2024-01-06T00:00:00Z"),
@@ -219,14 +219,14 @@ func TestCompletedBetweenBoundary(t *testing.T) {
 	store := openTestStore(t)
 	ctx := context.Background()
 
-	atStart := linear.Issue{
+	atStart := issues.Issue{
 		Identifier:  "ENG-AT-START",
 		Assignee:    "alice",
 		StateType:   "completed",
 		StartedAt:   mustParse(t, "2024-01-01T00:00:00Z"),
 		CompletedAt: mustParse(t, "2024-01-05T00:00:00Z"),
 	}
-	atEnd := linear.Issue{
+	atEnd := issues.Issue{
 		Identifier:  "ENG-AT-END",
 		Assignee:    "alice",
 		StateType:   "completed",
@@ -252,13 +252,13 @@ func TestCompletedBetweenAssigneeFilter(t *testing.T) {
 	store := openTestStore(t)
 	ctx := context.Background()
 
-	alice := linear.Issue{
+	alice := issues.Issue{
 		Identifier:  "ENG-ALICE",
 		Assignee:    "alice",
 		StateType:   "completed",
 		CompletedAt: mustParse(t, "2024-01-05T00:00:00Z"),
 	}
-	bob := linear.Issue{
+	bob := issues.Issue{
 		Identifier:  "ENG-BOB",
 		Assignee:    "bob",
 		StateType:   "completed",
@@ -283,18 +283,18 @@ func TestInProgress(t *testing.T) {
 	store := openTestStore(t)
 	ctx := context.Background()
 
-	completed := linear.Issue{
+	completed := issues.Issue{
 		Identifier:  "ENG-1",
 		StateType:   "completed",
 		CompletedAt: mustParse(t, "2024-01-05T00:00:00Z"),
 	}
-	earlier := linear.Issue{
+	earlier := issues.Issue{
 		Identifier: "ENG-2",
 		StateType:  "started",
 		StateName:  "In Review",
 		StartedAt:  mustParse(t, "2024-01-01T00:00:00Z"),
 	}
-	later := linear.Issue{
+	later := issues.Issue{
 		Identifier: "ENG-3",
 		StateType:  "started",
 		StartedAt:  mustParse(t, "2024-01-02T00:00:00Z"),
@@ -330,9 +330,9 @@ func TestLatestUpdatedAtForTeam(t *testing.T) {
 		t.Fatalf("LatestUpdatedAtForTeam on empty db = %v, want zero time", zero)
 	}
 
-	older := linear.Issue{Identifier: "ENG-1", TeamKey: "ENG", UpdatedAt: mustParse(t, "2024-01-01T00:00:00Z")}
-	newer := linear.Issue{Identifier: "ENG-2", TeamKey: "ENG", UpdatedAt: mustParse(t, "2024-01-10T00:00:00Z")}
-	otherTeam := linear.Issue{Identifier: "DATA-1", TeamKey: "DATA", UpdatedAt: mustParse(t, "2024-06-01T00:00:00Z")}
+	older := issues.Issue{Identifier: "ENG-1", TeamKey: "ENG", UpdatedAt: mustParse(t, "2024-01-01T00:00:00Z")}
+	newer := issues.Issue{Identifier: "ENG-2", TeamKey: "ENG", UpdatedAt: mustParse(t, "2024-01-10T00:00:00Z")}
+	otherTeam := issues.Issue{Identifier: "DATA-1", TeamKey: "DATA", UpdatedAt: mustParse(t, "2024-06-01T00:00:00Z")}
 	if err := store.Upsert(ctx, older, newer, otherTeam); err != nil {
 		t.Fatalf("Upsert: %v", err)
 	}
@@ -351,10 +351,10 @@ func TestDistinctTeamKeys(t *testing.T) {
 	ctx := context.Background()
 
 	if err := store.Upsert(ctx,
-		linear.Issue{Identifier: "ENG-1", TeamKey: "ENG"},
-		linear.Issue{Identifier: "DATA-1", TeamKey: "DATA"},
-		linear.Issue{Identifier: "ENG-2", TeamKey: "ENG"},
-		linear.Issue{Identifier: "NOTEAM-1", TeamKey: ""},
+		issues.Issue{Identifier: "ENG-1", TeamKey: "ENG"},
+		issues.Issue{Identifier: "DATA-1", TeamKey: "DATA"},
+		issues.Issue{Identifier: "ENG-2", TeamKey: "ENG"},
+		issues.Issue{Identifier: "NOTEAM-1", TeamKey: ""},
 	); err != nil {
 		t.Fatalf("Upsert: %v", err)
 	}
@@ -373,10 +373,10 @@ func TestUpsertConflictUpdates(t *testing.T) {
 	store := openTestStore(t)
 	ctx := context.Background()
 
-	if err := store.Upsert(ctx, linear.Issue{Identifier: "ENG-1", Title: "first"}); err != nil {
+	if err := store.Upsert(ctx, issues.Issue{Identifier: "ENG-1", Title: "first"}); err != nil {
 		t.Fatalf("Upsert: %v", err)
 	}
-	if err := store.Upsert(ctx, linear.Issue{Identifier: "ENG-1", Title: "second"}); err != nil {
+	if err := store.Upsert(ctx, issues.Issue{Identifier: "ENG-1", Title: "second"}); err != nil {
 		t.Fatalf("Upsert: %v", err)
 	}
 
@@ -401,7 +401,7 @@ func TestUpsertNullTimeRoundTrip(t *testing.T) {
 	store := openTestStore(t)
 	ctx := context.Background()
 
-	if err := store.Upsert(ctx, linear.Issue{Identifier: "ENG-1", StateType: "started", StartedAt: mustParse(t, "2024-01-01T00:00:00Z")}); err != nil {
+	if err := store.Upsert(ctx, issues.Issue{Identifier: "ENG-1", StateType: "started", StartedAt: mustParse(t, "2024-01-01T00:00:00Z")}); err != nil {
 		t.Fatalf("Upsert: %v", err)
 	}
 
@@ -421,7 +421,7 @@ func TestProjectMilestoneIssues(t *testing.T) {
 	store := openTestStore(t)
 	ctx := context.Background()
 
-	issues := []linear.Issue{
+	issues := []issues.Issue{
 		{Identifier: "ENG-1", ProjectName: "Apollo", ProjectMilestoneName: "v1.0", StateType: "started",
 			CreatedAt: mustParse(t, "2024-01-01T00:00:00Z")},
 		{Identifier: "ENG-2", ProjectName: "Apollo", ProjectMilestoneName: "v1.0", StateType: "completed",
@@ -478,7 +478,7 @@ func TestCFDIssues(t *testing.T) {
 
 	day := func(s string) time.Time { return mustParse(t, s+"T00:00:00Z") }
 
-	issues := []linear.Issue{
+	issues := []issues.Issue{
 		// Normal completed issue: created → started → completed.
 		{Identifier: "ENG-1", TeamKey: "ENG", StateType: "completed",
 			CreatedAt: day("2024-01-01"), StartedAt: day("2024-01-03"), CompletedAt: day("2024-01-08")},
@@ -554,7 +554,7 @@ func TestUpsertStoresAbsentOptionalFieldsAsNull(t *testing.T) {
 	ctx := context.Background()
 
 	// An unassigned issue with no project/milestone — every optional field empty.
-	if err := store.Upsert(ctx, linear.Issue{Identifier: "ENG-1", StateType: "started", StartedAt: mustParse(t, "2024-01-01T00:00:00Z")}); err != nil {
+	if err := store.Upsert(ctx, issues.Issue{Identifier: "ENG-1", StateType: "started", StartedAt: mustParse(t, "2024-01-01T00:00:00Z")}); err != nil {
 		t.Fatalf("Upsert: %v", err)
 	}
 

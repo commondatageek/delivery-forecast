@@ -13,7 +13,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/commondatageek/delivery-forecast/internal/linear"
+	"github.com/commondatageek/delivery-forecast/issues"
 	"github.com/commondatageek/delivery-forecast/simulate"
 )
 
@@ -99,7 +99,7 @@ type IssuesSection struct {
 	Records      []IssueRecord `json:"records"`
 }
 
-// IssueRecord mirrors the subset of linear.Issue that CompletedBetween
+// IssueRecord mirrors the subset of issues.Issue that CompletedBetween
 // populates (TeamKey, ProjectID, milestone, ArchivedAt, etc. are not selected
 // by that query and are intentionally omitted).
 type IssueRecord struct {
@@ -208,7 +208,7 @@ type manifestInputs struct {
 	ExclusionsPath   string
 	Exclusions       simulate.Exclusions
 	Pool             *simulate.SamplePool
-	Issues           []linear.Issue
+	Issues           []issues.Issue
 	Skipped          int
 	Extra            map[string]any
 }

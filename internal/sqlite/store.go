@@ -8,7 +8,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/commondatageek/delivery-forecast/internal/linear"
+	"github.com/commondatageek/delivery-forecast/issues"
 
 	_ "modernc.org/sqlite"
 )
@@ -95,7 +95,7 @@ func (s *Store) Close() error {
 }
 
 // Upsert inserts or updates issues. The unique key is identifier.
-func (s *Store) Upsert(ctx context.Context, issues ...linear.Issue) error {
+func (s *Store) Upsert(ctx context.Context, items ...issues.Issue) error {
 	const q = `
 INSERT INTO issues
     (identifier, title, assignee, team_key, team_name, project_id, project_name,
@@ -136,7 +136,7 @@ ON CONFLICT(identifier) DO UPDATE SET
 	}
 	defer stmt.Close()
 
-	for _, it := range issues {
+	for _, it := range items {
 		_, err := stmt.ExecContext(ctx,
 			it.Identifier,
 			it.Title,
@@ -168,7 +168,7 @@ ON CONFLICT(identifier) DO UPDATE SET
 
 // AllIssues returns every row in the issues table, unfiltered, so callers can
 // apply issues.Filter in memory and get semantics identical to file sources.
-func (s *Store) AllIssues(ctx context.Context) ([]linear.Issue, error) {
+func (s *Store) AllIssues(ctx context.Context) ([]issues.Issue, error) {
 	const q = `
 SELECT identifier, title, assignee, team_key, team_name, project_id, project_name,
        project_milestone_id, project_milestone_name, state_type, state_name,
@@ -182,9 +182,9 @@ FROM issues`
 	}
 	defer rows.Close()
 
-	var out []linear.Issue
+	var out []issues.Issue
 	for rows.Next() {
-		var it linear.Issue
+		var it issues.Issue
 		var assignee, projectID, projectName, milestoneID, milestoneName sql.NullString
 		var createdAt, startedAt, completedAt, canceledAt, archivedAt, autoArchivedAt, addedToProjectAt, updatedAt sql.NullTime
 		if err := rows.Scan(
@@ -290,7 +290,7 @@ func (s *Store) DistinctTeamKeys(ctx context.Context) ([]string, error) {
 //
 // Returned issues have Identifier, Title, Assignee, Team, ProjectName,
 // StateType, StartedAt, CompletedAt, and UpdatedAt populated.
-func (s *Store) CompletedBetween(ctx context.Context, start, end time.Time, assignees []string, teamKeys []string) ([]linear.Issue, error) {
+func (s *Store) CompletedBetween(ctx context.Context, start, end time.Time, assignees []string, teamKeys []string) ([]issues.Issue, error) {
 	q := `
 SELECT identifier, title, assignee, team_name, project_name, state_type,
        started_at, completed_at, updated_at
@@ -333,9 +333,9 @@ WHERE state_type = 'completed'
 	}
 	defer rows.Close()
 
-	var issues []linear.Issue
+	var out []issues.Issue
 	for rows.Next() {
-		var it linear.Issue
+		var it issues.Issue
 		var assignee, projectName sql.NullString
 		var startedAt, completedAt, updatedAt sql.NullTime
 		if err := rows.Scan(
@@ -356,14 +356,14 @@ WHERE state_type = 'completed'
 		if updatedAt.Valid {
 			it.UpdatedAt = updatedAt.Time
 		}
-		issues = append(issues, it)
+		out = append(out, it)
 	}
-	return issues, rows.Err()
+	return out, rows.Err()
 }
 
 // InProgress returns issues whose state_type is 'started' and that have a
 // non-NULL started_at. Results are ordered by started_at ascending.
-func (s *Store) InProgress(ctx context.Context, teamKeys []string) ([]linear.Issue, error) {
+func (s *Store) InProgress(ctx context.Context, teamKeys []string) ([]issues.Issue, error) {
 	q := `
 SELECT identifier, title, assignee, team_name, project_name, state_type, state_name, started_at
 FROM issues
@@ -390,9 +390,9 @@ WHERE state_type = 'started'
 	}
 	defer rows.Close()
 
-	var issues []linear.Issue
+	var out []issues.Issue
 	for rows.Next() {
-		var it linear.Issue
+		var it issues.Issue
 		var assignee, projectName sql.NullString
 		var startedAt sql.NullTime
 		if err := rows.Scan(
@@ -406,9 +406,9 @@ WHERE state_type = 'started'
 		if startedAt.Valid {
 			it.StartedAt = startedAt.Time
 		}
-		issues = append(issues, it)
+		out = append(out, it)
 	}
-	return issues, rows.Err()
+	return out, rows.Err()
 }
 
 // ProjectMilestoneCount is a count of issues grouped by team, project and
@@ -543,7 +543,7 @@ GROUP BY team_key, team_name, project_name`
 // the given project (optionally narrowed to one milestone within it). Completed
 // issues are included so the caller can evaluate membership "as of" a given
 // date using each issue's created_at and completed_at.
-func (s *Store) ProjectMilestoneIssues(ctx context.Context, projectName, milestoneName string) ([]linear.Issue, error) {
+func (s *Store) ProjectMilestoneIssues(ctx context.Context, projectName, milestoneName string) ([]issues.Issue, error) {
 	q := `
 SELECT identifier, title, assignee, project_name, project_milestone_name,
        state_type, created_at, started_at, completed_at
@@ -563,9 +563,9 @@ WHERE project_name = ?
 	}
 	defer rows.Close()
 
-	var issues []linear.Issue
+	var out []issues.Issue
 	for rows.Next() {
-		var it linear.Issue
+		var it issues.Issue
 		var assignee, proj, milestone sql.NullString
 		var createdAt, startedAt, completedAt sql.NullTime
 		if err := rows.Scan(
@@ -587,9 +587,9 @@ WHERE project_name = ?
 		if completedAt.Valid {
 			it.CompletedAt = completedAt.Time
 		}
-		issues = append(issues, it)
+		out = append(out, it)
 	}
-	return issues, rows.Err()
+	return out, rows.Err()
 }
 
 // CFDRow holds the timestamp columns needed to build a Cumulative Flow Diagram.

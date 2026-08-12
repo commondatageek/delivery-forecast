@@ -12,6 +12,7 @@ import (
 	"github.com/commondatageek/delivery-forecast/internal/linear"
 	"github.com/commondatageek/delivery-forecast/internal/logx"
 	"github.com/commondatageek/delivery-forecast/internal/sqlite"
+	"github.com/commondatageek/delivery-forecast/issues"
 )
 
 // Options controls which teams are synced and how. Every field mirrors a
@@ -34,7 +35,7 @@ type Options struct {
 // deliberately avoided) so Run can be exercised against a stub instead of the
 // real Linear API. *linear.Client satisfies it.
 type client interface {
-	Fetch(ctx context.Context, updatedSince time.Time, teamKeys []string) ([]linear.Issue, error)
+	Fetch(ctx context.Context, updatedSince time.Time, teamKeys []string) ([]issues.Issue, error)
 	ListTeams(ctx context.Context) ([]linear.Team, error)
 }
 
@@ -91,16 +92,16 @@ func Run(ctx context.Context, client client, store *sqlite.Store, opts Options) 
 			logx.Infof("incremental sync: team=%s since=%s", key, since.Format(time.RFC3339))
 		}
 
-		issues, err := client.Fetch(ctx, since, []string{key})
+		fetched, err := client.Fetch(ctx, since, []string{key})
 		if err != nil {
 			return fmt.Errorf("fetch %s: %w", key, err)
 		}
-		if len(issues) > 0 {
-			if err := store.Upsert(ctx, issues...); err != nil {
+		if len(fetched) > 0 {
+			if err := store.Upsert(ctx, fetched...); err != nil {
 				return fmt.Errorf("upsert %s: %w", key, err)
 			}
 		}
-		logx.Infof("upserted: team=%s count=%d", key, len(issues))
+		logx.Infof("upserted: team=%s count=%d", key, len(fetched))
 	}
 
 	return nil

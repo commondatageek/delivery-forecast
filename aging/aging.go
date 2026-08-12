@@ -32,7 +32,7 @@ type Options struct {
 
 // Issue is the neutral input record for aging analysis: just the fields
 // CycleTimes/InProgressItems/CompletedItems read. The caller maps its
-// source's fields onto it (the CLI maps linear.Issue).
+// source's fields onto it (the CLI maps issues.Issue).
 type Issue struct {
 	Identifier  string
 	Title       string

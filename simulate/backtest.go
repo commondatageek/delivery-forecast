@@ -34,6 +34,11 @@ type BacktestRow struct {
 // against to document that truncation's effect on boundary days, and
 // reimplementing it as a thin wrapper over history would collapse the very
 // divergence that test exists to demonstrate.
+//
+// Deprecated: CountAsOf is retained only as that test baseline. Its
+// raw-timestamp comparison disagrees with every other day-grain count in this
+// module on boundary days. New code — inside this module or outside it —
+// should use history.Compute and read DayRow.Completed / DayRow.Remaining.
 func CountAsOf(items []BacktestItem, d time.Time) (completed, remaining int) {
 	for _, it := range items {
 		completedByD := !it.CompletedAt.IsZero() && !it.CompletedAt.After(d)

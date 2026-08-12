@@ -64,6 +64,8 @@ Prefer to install manually? Grab the archive for your platform from the
 and extract the `forecast` binary onto your `PATH` yourself.
 
 Once installed, `forecast update` (below) handles future upgrades in place.
+Before upgrading, skim [CHANGELOG.md](CHANGELOG.md) — it records the changes
+that move numbers you may already be relying on.
 
 ## Build & test
 

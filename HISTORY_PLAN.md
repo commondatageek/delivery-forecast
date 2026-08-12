@@ -1,6 +1,26 @@
 # Implementation plan: `forecast history` + source abstraction
 
-Status: **planned, not started.** This document is the spec. Follow it in order.
+Status: **done.** All six phases shipped on the `history-command` branch; the
+document is kept as the record of why things are shaped the way they are.
+`CLAUDE.md` and `DATA_REQUIREMENTS.md` describe the code as it now stands —
+read those first. The decisions in §2 are still binding on future changes, and
+§3's metric definitions are still the normative spec for the `history` package.
+
+Two things deliberately diverged from what's written below:
+
+- **§7 step 3 (`simulate.CountAsOf`).** The plan said to delete it if unused,
+  or otherwise make it a thin wrapper over `history` and deprecate it. It has
+  no non-test callers, but deleting it would take the cross-check test in
+  `history/history_test.go` with it — that test exists to pin D4's
+  boundary-day divergence and needs the old raw-timestamp semantics to compare
+  against. It keeps its implementation and carries a `Deprecated:` marker.
+- **§10.1 (`-group-by project`).** Not built; `history` emits one row per day
+  across the whole filtered scope, which is the "default if unanswered"
+  recorded below. Still addable without breaking the existing columns.
+
+§10.2 (folding `sim backtest` into `history` behind a `-probability` flag)
+remains open by design — it was always meant to be decided after using the CSV
+for real.
 
 ---
 

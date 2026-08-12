@@ -5,7 +5,7 @@
 ## Historical Things
 - CFD
 - A chart showing how the probability of success of hitting a certain target date has changed over time.
-- A chart showing how p85 for Cycle Time has changed over time.
+- ~~A chart showing how p85 for Cycle Time has changed over time.~~ Data now available: `forecast history`'s `CycleTimeP50`/`CycleTimeP85` columns give this per day (see `history` package, `HISTORY_PLAN.md`). The chart itself — rendering it — is still TODO.
 
 ## Simulation Report
 
@@ -25,9 +25,9 @@
 
 ## Source abstraction
 Use issue data from multiple source types:
-- one or more text files
-  - JSON
-  - CSV
+- ~~one or more text files~~ Done: every `forecast` command accepts `-input <file>`, reading CSV or JSON directly (`issues` package) as an alternative to SQLite — no sync step required. See "Bring your own data" in `README.md` and `DATA_REQUIREMENTS.md`'s CSV/JSON format section.
+  - ~~JSON~~ done
+  - ~~CSV~~ done
   - other formats? XSLX?
 - authenticated connection to project management backend
 

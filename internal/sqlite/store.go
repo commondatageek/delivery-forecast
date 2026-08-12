@@ -275,59 +275,6 @@ func (s *Store) DistinctTeamKeys(ctx context.Context) ([]string, error) {
 	return keys, rows.Err()
 }
 
-// ProjectMilestoneIssues returns all non-canceled, non-duplicate issues for
-// the given project (optionally narrowed to one milestone within it). Completed
-// issues are included so the caller can evaluate membership "as of" a given
-// date using each issue's created_at and completed_at.
-func (s *Store) ProjectMilestoneIssues(ctx context.Context, projectName, milestoneName string) ([]issues.Issue, error) {
-	q := `
-SELECT identifier, title, assignee, project_name, project_milestone_name,
-       state_type, created_at, started_at, completed_at
-FROM issues
-WHERE project_name = ?
-  AND state_type NOT IN ('canceled', 'duplicate')`
-
-	args := []any{projectName}
-	if milestoneName != "" {
-		q += "\n  AND project_milestone_name = ?"
-		args = append(args, milestoneName)
-	}
-
-	rows, err := s.db.QueryContext(ctx, q, args...)
-	if err != nil {
-		return nil, fmt.Errorf("ProjectMilestoneIssues: %w", err)
-	}
-	defer rows.Close()
-
-	var out []issues.Issue
-	for rows.Next() {
-		var it issues.Issue
-		var assignee, proj, milestone sql.NullString
-		var createdAt, startedAt, completedAt sql.NullTime
-		if err := rows.Scan(
-			&it.Identifier, &it.Title, &assignee,
-			&proj, &milestone, &it.StateType,
-			&createdAt, &startedAt, &completedAt,
-		); err != nil {
-			return nil, fmt.Errorf("ProjectMilestoneIssues scan: %w", err)
-		}
-		it.Assignee = assignee.String
-		it.ProjectName = proj.String
-		it.ProjectMilestoneName = milestone.String
-		if createdAt.Valid {
-			it.CreatedAt = createdAt.Time
-		}
-		if startedAt.Valid {
-			it.StartedAt = startedAt.Time
-		}
-		if completedAt.Valid {
-			it.CompletedAt = completedAt.Time
-		}
-		out = append(out, it)
-	}
-	return out, rows.Err()
-}
-
 // nullTime converts a time.Time to sql.NullTime, treating zero as NULL.
 func nullTime(t time.Time) sql.NullTime {
 	if t.IsZero() {

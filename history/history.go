@@ -6,7 +6,6 @@ import (
 	"sort"
 	"time"
 
-	"github.com/commondatageek/delivery-forecast/cfd"
 	"github.com/commondatageek/delivery-forecast/internal/util"
 )
 
@@ -72,19 +71,13 @@ type Result struct {
 	SkippedIssues int // dropped for having no created_at
 }
 
-// normalize converts Issues into cfd.NormalizedIssues, reusing cfd's
-// clamping logic (see the package doc) rather than duplicating it. Issues
-// with no CreatedAt are dropped and counted.
-func normalize(items []Issue) ([]cfd.NormalizedIssue, int) {
-	var out []cfd.NormalizedIssue
+// normalize converts Issues into NormalizedIssues. Issues with no CreatedAt
+// are dropped and counted.
+func normalize(items []Issue) ([]NormalizedIssue, int) {
+	var out []NormalizedIssue
 	skipped := 0
 	for _, it := range items {
-		ni, ok := cfd.Normalize(cfd.Issue{
-			CreatedAt:   it.CreatedAt,
-			StartedAt:   it.StartedAt,
-			CompletedAt: it.CompletedAt,
-			CanceledAt:  it.CanceledAt,
-		})
+		ni, ok := Normalize(it)
 		if !ok {
 			skipped++
 			continue
@@ -112,9 +105,27 @@ func Compute(items []Issue, opts Options) (Result, error) {
 
 	normalized, skipped := normalize(items)
 
+	return Result{
+		Rows:          BuildRows(normalized, opts.Start, opts.End, windowDays),
+		WindowDays:    windowDays,
+		TotalIssues:   len(items),
+		SkippedIssues: skipped,
+	}, nil
+}
+
+// BuildRows is the shared day-walk engine behind Compute: given already
+// normalized issues (see Normalize), it computes one DayRow per calendar day
+// in [start, end]. cfd.BuildGrid also builds on this (mapping Total/Backlog/
+// InProgress/Completed/Canceled onto its own DayRow shape) so the two
+// packages can't disagree on which day a boundary event lands on.
+func BuildRows(normalized []NormalizedIssue, start, end time.Time, windowDays int) []DayRow {
+	if windowDays <= 0 {
+		windowDays = defaultWindowDays
+	}
+
 	var rows []DayRow
 	var prevTotal, prevCompleted, prevCanceled, prevStartedCum int
-	for d, first := opts.Start, true; !d.After(opts.End); d, first = d.AddDate(0, 0, 1), false {
+	for d, first := start, true; !d.After(end); d, first = d.AddDate(0, 0, 1), false {
 		var total, completed, canceled, startedCum int
 		for _, ni := range normalized {
 			if !ni.Arrival.After(d) {
@@ -165,18 +176,13 @@ func Compute(items []Issue, opts Options) (Result, error) {
 		rows = append(rows, row)
 	}
 
-	return Result{
-		Rows:          rows,
-		WindowDays:    windowDays,
-		TotalIssues:   len(items),
-		SkippedIssues: skipped,
-	}, nil
+	return rows
 }
 
 // computeRolling fills in row's Tier 2 rolling-metric fields as of day d,
 // using the full normalized issue set (not just issues within [Start, End])
 // so the window can look back before the emitted range.
-func computeRolling(row *DayRow, normalized []cfd.NormalizedIssue, d time.Time, windowDays, inProgress, remaining int) {
+func computeRolling(row *DayRow, normalized []NormalizedIssue, d time.Time, windowDays, inProgress, remaining int) {
 	window7Start := d.AddDate(0, 0, -7)
 	windowNStart := d.AddDate(0, 0, -windowDays)
 

@@ -1,4 +1,4 @@
-package history
+package history_test
 
 import (
 	"bytes"
@@ -6,14 +6,16 @@ import (
 	"math"
 	"strings"
 	"testing"
+
+	"github.com/commondatageek/delivery-forecast/history"
 )
 
-func naNResult() Result {
-	return Result{
+func naNResult() history.Result {
+	return history.Result{
 		WindowDays:    28,
 		TotalIssues:   3,
 		SkippedIssues: 1,
-		Rows: []DayRow{
+		Rows: []history.DayRow{
 			{
 				Date: day("2025-01-01"), Total: 3, Completed: 0, Canceled: 0, Backlog: 3, InProgress: 0, Remaining: 3,
 				Throughput7d: math.NaN(), ThroughputWindow: math.NaN(),
@@ -29,7 +31,7 @@ func naNResult() Result {
 
 func TestRenderCSV_NaNIsEmptyCell(t *testing.T) {
 	var buf bytes.Buffer
-	if err := RenderCSV(&buf, naNResult()); err != nil {
+	if err := history.RenderCSV(&buf, naNResult()); err != nil {
 		t.Fatalf("RenderCSV: %v", err)
 	}
 	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
@@ -53,7 +55,7 @@ func TestRenderCSV_NaNIsEmptyCell(t *testing.T) {
 
 func TestRenderJSON_NaNIsNullAndMarshals(t *testing.T) {
 	var buf bytes.Buffer
-	if err := RenderJSON(&buf, naNResult()); err != nil {
+	if err := history.RenderJSON(&buf, naNResult()); err != nil {
 		t.Fatalf("RenderJSON: %v", err)
 	}
 
@@ -95,7 +97,7 @@ func TestRenderJSON_NaNIsNullAndMarshals(t *testing.T) {
 
 func TestRenderText_NaNIsDash(t *testing.T) {
 	var buf bytes.Buffer
-	if err := RenderText(&buf, naNResult()); err != nil {
+	if err := history.RenderText(&buf, naNResult()); err != nil {
 		t.Fatalf("RenderText: %v", err)
 	}
 	out := buf.String()

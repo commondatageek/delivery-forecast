@@ -1,4 +1,4 @@
-package history
+package history_test
 
 import (
 	"math"
@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/commondatageek/delivery-forecast/cfd"
+	"github.com/commondatageek/delivery-forecast/history"
 	"github.com/commondatageek/delivery-forecast/simulate"
 )
 
@@ -29,8 +30,8 @@ func at(s string, hh, mm int) time.Time {
 // tier1Fixture is the 5-issue, ~10-day set used by the Tier 1 correctness
 // test and the cfd cross-check. Hand-computed expectations live alongside
 // the callers.
-func tier1Fixture() []Issue {
-	return []Issue{
+func tier1Fixture() []history.Issue {
+	return []history.Issue{
 		// I1: created 1, started 2, completed 5.
 		{CreatedAt: day("2025-01-01"), StartedAt: day("2025-01-02"), CompletedAt: day("2025-01-05")},
 		// I2: created 2, started 3, completed 9.
@@ -50,7 +51,7 @@ type tier1Want struct {
 
 func TestCompute_Tier1Correctness(t *testing.T) {
 	issues := tier1Fixture()
-	res, err := Compute(issues, Options{Start: day("2025-01-01"), End: day("2025-01-10")})
+	res, err := history.Compute(issues, history.Options{Start: day("2025-01-01"), End: day("2025-01-10")})
 	if err != nil {
 		t.Fatalf("Compute: %v", err)
 	}
@@ -86,26 +87,26 @@ func TestCompute_Tier1Correctness(t *testing.T) {
 }
 
 func TestCompute_Invariants(t *testing.T) {
-	res, err := Compute(tier1Fixture(), Options{Start: day("2025-01-01"), End: day("2025-01-10")})
+	res, err := history.Compute(tier1Fixture(), history.Options{Start: day("2025-01-01"), End: day("2025-01-10")})
 	if err != nil {
 		t.Fatalf("Compute: %v", err)
 	}
-	if err := AssertInvariants(res.Rows); err != nil {
+	if err := history.AssertInvariants(res.Rows); err != nil {
 		t.Errorf("unexpected invariant violation: %v", err)
 	}
 
-	corrupt := []DayRow{
+	corrupt := []history.DayRow{
 		{Date: day("2025-01-01"), Total: 5, Completed: 1, Canceled: 0, InProgress: 1, Backlog: 1, Remaining: 4}, // band sum (3) != Total (5)
 	}
-	if err := AssertInvariants(corrupt); err == nil {
+	if err := history.AssertInvariants(corrupt); err == nil {
 		t.Error("expected invariant violation for corrupt rows, got nil")
 	}
 
-	corruptMonotonic := []DayRow{
+	corruptMonotonic := []history.DayRow{
 		{Date: day("2025-01-01"), Total: 5, Completed: 0, Canceled: 0, InProgress: 0, Backlog: 5, Remaining: 5},
 		{Date: day("2025-01-02"), Total: 3, Completed: 0, Canceled: 0, InProgress: 0, Backlog: 3, Remaining: 3},
 	}
-	if err := AssertInvariants(corruptMonotonic); err == nil {
+	if err := history.AssertInvariants(corruptMonotonic); err == nil {
 		t.Error("expected invariant violation for non-monotonic Total, got nil")
 	}
 }
@@ -114,7 +115,7 @@ func TestCompute_CrossCheckAgainstCFD(t *testing.T) {
 	issues := tier1Fixture()
 	start, end := day("2025-01-01"), day("2025-01-10")
 
-	res, err := Compute(issues, Options{Start: start, End: end})
+	res, err := history.Compute(issues, history.Options{Start: start, End: end})
 	if err != nil {
 		t.Fatalf("Compute: %v", err)
 	}
@@ -160,11 +161,11 @@ func TestCompute_CrossCheckAgainstSimulateCountAsOf(t *testing.T) {
 	issues := append(tier1Fixture(),
 		// I6: created 1am, started 2 (2pm), completed 5 (6pm) — a
 		// non-midnight completion, to exercise D4's day-truncation.
-		Issue{CreatedAt: at("2025-01-01", 1, 0), StartedAt: at("2025-01-02", 14, 0), CompletedAt: at("2025-01-05", 18, 0)},
+		history.Issue{CreatedAt: at("2025-01-01", 1, 0), StartedAt: at("2025-01-02", 14, 0), CompletedAt: at("2025-01-05", 18, 0)},
 	)
 	start, end := day("2025-01-01"), day("2025-01-10")
 
-	res, err := Compute(issues, Options{Start: start, End: end})
+	res, err := history.Compute(issues, history.Options{Start: start, End: end})
 	if err != nil {
 		t.Fatalf("Compute: %v", err)
 	}
@@ -200,7 +201,7 @@ func TestCompute_CrossCheckAgainstSimulateCountAsOf(t *testing.T) {
 }
 
 func TestCompute_Deltas(t *testing.T) {
-	res, err := Compute(tier1Fixture(), Options{Start: day("2025-01-01"), End: day("2025-01-10")})
+	res, err := history.Compute(tier1Fixture(), history.Options{Start: day("2025-01-01"), End: day("2025-01-10")})
 	if err != nil {
 		t.Fatalf("Compute: %v", err)
 	}
@@ -230,11 +231,10 @@ func TestCompute_Deltas(t *testing.T) {
 
 // rollingFixture gives five issues a known completion cadence: all created
 // and started on day 1, completed every other day starting day 2.
-func rollingFixture() []Issue {
-	var out []Issue
-	for i, completedDay := range []string{"2025-01-02", "2025-01-04", "2025-01-06", "2025-01-08", "2025-01-10"} {
-		_ = i
-		out = append(out, Issue{
+func rollingFixture() []history.Issue {
+	var out []history.Issue
+	for _, completedDay := range []string{"2025-01-02", "2025-01-04", "2025-01-06", "2025-01-08", "2025-01-10"} {
+		out = append(out, history.Issue{
 			CreatedAt:   day("2025-01-01"),
 			StartedAt:   day("2025-01-01"),
 			CompletedAt: day(completedDay),
@@ -248,11 +248,11 @@ func almostEqual(a, b float64) bool {
 }
 
 func TestCompute_RollingMetrics(t *testing.T) {
-	res, err := Compute(rollingFixture(), Options{Start: day("2025-01-01"), End: day("2025-01-12"), WindowDays: 8})
+	res, err := history.Compute(rollingFixture(), history.Options{Start: day("2025-01-01"), End: day("2025-01-12"), WindowDays: 8})
 	if err != nil {
 		t.Fatalf("Compute: %v", err)
 	}
-	rowByDate := map[string]DayRow{}
+	rowByDate := map[string]history.DayRow{}
 	for _, r := range res.Rows {
 		rowByDate[r.Date.Format("2006-01-02")] = r
 	}
@@ -279,11 +279,11 @@ func TestCompute_RollingMetrics(t *testing.T) {
 }
 
 func TestCompute_UndefinedValues(t *testing.T) {
-	res, err := Compute(rollingFixture(), Options{Start: day("2025-01-01"), End: day("2025-01-12"), WindowDays: 8})
+	res, err := history.Compute(rollingFixture(), history.Options{Start: day("2025-01-01"), End: day("2025-01-12"), WindowDays: 8})
 	if err != nil {
 		t.Fatalf("Compute: %v", err)
 	}
-	rowByDate := map[string]DayRow{}
+	rowByDate := map[string]history.DayRow{}
 	for _, r := range res.Rows {
 		rowByDate[r.Date.Format("2006-01-02")] = r
 	}
@@ -322,10 +322,10 @@ func TestCompute_UndefinedValues(t *testing.T) {
 }
 
 func TestCompute_LeadTimeExceedsCycleTime(t *testing.T) {
-	issues := []Issue{
+	issues := []history.Issue{
 		{CreatedAt: day("2025-01-01"), StartedAt: day("2025-01-05"), CompletedAt: day("2025-01-06")},
 	}
-	res, err := Compute(issues, Options{Start: day("2025-01-06"), End: day("2025-01-06"), WindowDays: 28})
+	res, err := history.Compute(issues, history.Options{Start: day("2025-01-06"), End: day("2025-01-06"), WindowDays: 28})
 	if err != nil {
 		t.Fatalf("Compute: %v", err)
 	}
@@ -345,11 +345,11 @@ func TestCompute_LeadTimeExceedsCycleTime(t *testing.T) {
 }
 
 func TestCompute_NoEarlyExit(t *testing.T) {
-	issues := []Issue{
+	issues := []history.Issue{
 		{CreatedAt: day("2025-01-01"), StartedAt: day("2025-01-01"), CompletedAt: day("2025-01-02")},
 	}
 	start, end := day("2025-01-01"), day("2025-01-20")
-	res, err := Compute(issues, Options{Start: start, End: end})
+	res, err := history.Compute(issues, history.Options{Start: start, End: end})
 	if err != nil {
 		t.Fatalf("Compute: %v", err)
 	}
@@ -364,20 +364,20 @@ func TestCompute_NoEarlyExit(t *testing.T) {
 }
 
 func TestCompute_ValidatesOptions(t *testing.T) {
-	if _, err := Compute(nil, Options{}); err == nil {
+	if _, err := history.Compute(nil, history.Options{}); err == nil {
 		t.Error("expected error for zero Start/End")
 	}
-	if _, err := Compute(nil, Options{Start: day("2025-01-05"), End: day("2025-01-01")}); err == nil {
+	if _, err := history.Compute(nil, history.Options{Start: day("2025-01-05"), End: day("2025-01-01")}); err == nil {
 		t.Error("expected error for End before Start")
 	}
 }
 
 func TestCompute_SkipsIssuesWithNoCreatedAt(t *testing.T) {
-	issues := []Issue{
+	issues := []history.Issue{
 		{CreatedAt: day("2025-01-01"), CompletedAt: day("2025-01-02")},
 		{CompletedAt: day("2025-01-02")}, // no CreatedAt: dropped
 	}
-	res, err := Compute(issues, Options{Start: day("2025-01-01"), End: day("2025-01-02")})
+	res, err := history.Compute(issues, history.Options{Start: day("2025-01-01"), End: day("2025-01-02")})
 	if err != nil {
 		t.Fatalf("Compute: %v", err)
 	}
@@ -390,17 +390,17 @@ func TestCompute_SkipsIssuesWithNoCreatedAt(t *testing.T) {
 }
 
 func TestEarliestCreatedAt(t *testing.T) {
-	issues := []Issue{
+	issues := []history.Issue{
 		{CreatedAt: day("2025-03-01")},
 		{CreatedAt: day("2025-01-15")},
 		{},
 		{CreatedAt: day("2025-02-01")},
 	}
-	got := EarliestCreatedAt(issues)
+	got := history.EarliestCreatedAt(issues)
 	if !got.Equal(day("2025-01-15")) {
 		t.Errorf("EarliestCreatedAt = %v, want %v", got, day("2025-01-15"))
 	}
-	if got := EarliestCreatedAt(nil); !got.IsZero() {
+	if got := history.EarliestCreatedAt(nil); !got.IsZero() {
 		t.Errorf("EarliestCreatedAt(nil) = %v, want zero", got)
 	}
 }

@@ -9,36 +9,21 @@ import (
 
 	"github.com/commondatageek/delivery-forecast/counts"
 	"github.com/commondatageek/delivery-forecast/internal/logx"
-	"github.com/commondatageek/delivery-forecast/internal/sqlite"
 	"github.com/commondatageek/delivery-forecast/internal/util"
+	"github.com/commondatageek/delivery-forecast/issues"
 )
 
-// toProjectMilestoneCounts converts sqlite.ProjectMilestoneCount records to
-// counts.ProjectMilestoneCount.
-func toProjectMilestoneCounts(rows []sqlite.ProjectMilestoneCount) []counts.ProjectMilestoneCount {
-	out := make([]counts.ProjectMilestoneCount, len(rows))
-	for i, r := range rows {
-		out[i] = counts.ProjectMilestoneCount{
-			TeamKey:       r.TeamKey,
-			TeamName:      r.TeamName,
-			ProjectName:   r.ProjectName,
-			MilestoneName: r.MilestoneName,
-			Count:         r.Count,
-		}
-	}
-	return out
-}
-
-// toProjectActivity converts sqlite.ProjectActivity records to
-// counts.ProjectActivity.
-func toProjectActivity(rows []sqlite.ProjectActivity) []counts.ProjectActivity {
-	out := make([]counts.ProjectActivity, len(rows))
-	for i, r := range rows {
-		out[i] = counts.ProjectActivity{
-			TeamKey:     r.TeamKey,
-			TeamName:    r.TeamName,
-			ProjectName: r.ProjectName,
-			LastUpdated: r.LastUpdated,
+// toCountsIssues converts issues.Issue records to counts.Issue.
+func toCountsIssues(items []issues.Issue) []counts.Issue {
+	out := make([]counts.Issue, len(items))
+	for i, it := range items {
+		out[i] = counts.Issue{
+			TeamKey:              it.TeamKey,
+			TeamName:             it.TeamName,
+			ProjectName:          it.ProjectName,
+			ProjectMilestoneName: it.ProjectMilestoneName,
+			StateType:            it.StateType,
+			UpdatedAt:            it.UpdatedAt,
 		}
 	}
 	return out
@@ -49,6 +34,7 @@ func cmdCount(args []string) error {
 
 	cmd := flag.NewFlagSet("count", flag.ExitOnError)
 	dbFile := addDBFlag(cmd)
+	inputFile := addInputFlag(cmd)
 	milestones := cmd.Bool("milestones", false, "add a per-milestone breakdown under each project")
 	updatedSince := cmd.String("updated-since", defaultSince, `only include projects with an issue updated on/after this date (YYYY-MM-DD; or: now, yesterday, today, tomorrow, "-3 months")`)
 	teams := addTeamsFlag(cmd, "comma-separated team keys to filter by (e.g. ENG,DESIGN); default: all teams")
@@ -59,7 +45,8 @@ func cmdCount(args []string) error {
 		return err
 	}
 
-	if err := requireDB(dbFile); err != nil {
+	inputPath, err := resolveInput(cmd, inputFile, dbFile)
+	if err != nil {
 		return err
 	}
 
@@ -70,7 +57,7 @@ func cmdCount(args []string) error {
 
 	opts := counts.Options{Teams: *teams, Since: since}
 
-	projects, total, multiTeam, err := loadCountProjects(*dbFile, opts)
+	projects, total, multiTeam, err := loadCountProjects(inputPath, opts)
 	if err != nil {
 		return err
 	}
@@ -83,41 +70,28 @@ func cmdCount(args []string) error {
 	return counts.RenderSummary(os.Stdout, projects, total, showTeams)
 }
 
-// loadCountProjects reads the not-completed issue counts from the store and
-// returns the folded project list. It also reports whether the database holds
-// more than one team.
-func loadCountProjects(dbPath string, opts counts.Options) ([]counts.Project, int, bool, error) {
-	store, err := sqlite.OpenExisting(dbPath)
+// loadCountProjects loads issues from path and returns the folded project
+// list. It also reports whether the loaded issue set holds more than one team.
+func loadCountProjects(path string, opts counts.Options) ([]counts.Project, int, bool, error) {
+	raw, err := loadIssues(context.Background(), path)
 	if err != nil {
-		return nil, 0, false, fmt.Errorf("open db: %w", err)
+		return nil, 0, false, fmt.Errorf("load issues: %w", err)
 	}
-	defer store.Close()
 
-	ctx := context.Background()
-
-	allTeams, err := store.DistinctTeamKeys(ctx)
-	if err != nil {
-		return nil, 0, false, err
-	}
+	allTeams := distinctTeamKeys(raw)
 	multiTeam := len(allTeams) > 1
 
 	if msg := blendingTeamsWarning(opts.Teams, allTeams); msg != "" {
 		logx.Warnf("%s", msg)
 	}
 
-	countRows, err := store.NotCompletedCounts(ctx, opts.Teams)
-	if err != nil {
-		return nil, 0, false, err
-	}
-	if len(countRows) == 0 {
+	filtered := issues.Filter{Teams: opts.Teams}.Apply(raw)
+
+	pmCounts, activity := counts.Aggregate(toCountsIssues(filtered))
+	if len(pmCounts) == 0 {
 		logx.Warnf("no outstanding (non-terminal) issues found for the given filters")
 	}
 
-	activity, err := store.ProjectLastUpdated(ctx, opts.Teams)
-	if err != nil {
-		return nil, 0, false, err
-	}
-
-	projects, total := counts.Compute(toProjectMilestoneCounts(countRows), toProjectActivity(activity), opts.Since)
+	projects, total := counts.Compute(pmCounts, activity, opts.Since)
 	return projects, total, multiTeam, nil
 }

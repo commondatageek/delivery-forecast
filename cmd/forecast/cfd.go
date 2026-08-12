@@ -9,20 +9,20 @@ import (
 
 	"github.com/commondatageek/delivery-forecast/cfd"
 	"github.com/commondatageek/delivery-forecast/internal/logx"
-	"github.com/commondatageek/delivery-forecast/internal/sqlite"
 	"github.com/commondatageek/delivery-forecast/internal/util"
+	"github.com/commondatageek/delivery-forecast/issues"
 )
 
-// toCFDIssues converts sqlite.CFDRow records to cfd.Issue.
-func toCFDIssues(rows []sqlite.CFDRow) []cfd.Issue {
-	out := make([]cfd.Issue, len(rows))
-	for i, r := range rows {
+// toCFDIssues converts issues.Issue records to cfd.Issue.
+func toCFDIssues(items []issues.Issue) []cfd.Issue {
+	out := make([]cfd.Issue, len(items))
+	for i, it := range items {
 		out[i] = cfd.Issue{
-			CreatedAt:   r.CreatedAt,
-			StartedAt:   r.StartedAt,
-			CompletedAt: r.CompletedAt,
-			CanceledAt:  r.CanceledAt,
-			StateType:   r.StateType,
+			CreatedAt:   it.CreatedAt,
+			StartedAt:   it.StartedAt,
+			CompletedAt: it.CompletedAt,
+			CanceledAt:  it.CanceledAt,
+			StateType:   it.StateType,
 		}
 	}
 	return out
@@ -31,6 +31,7 @@ func toCFDIssues(rows []sqlite.CFDRow) []cfd.Issue {
 func cmdCFD(args []string) error {
 	cmd := flag.NewFlagSet("cfd", flag.ExitOnError)
 	dbFile := addDBFlag(cmd)
+	inputFile := addInputFlag(cmd)
 	startStr := cmd.String("start", "-3 months", `start date, inclusive (YYYY-MM-DD; or: yesterday, today, tomorrow, "-3 months")`)
 	endStr := cmd.String("end", "today", `end date, inclusive (YYYY-MM-DD; or: now, yesterday, today, tomorrow, "-3 months")`)
 	format := cmd.String("format", "html", "output format: html, json")
@@ -43,7 +44,8 @@ func cmdCFD(args []string) error {
 		return err
 	}
 
-	if err := requireDB(dbFile); err != nil {
+	inputPath, err := resolveInput(cmd, inputFile, dbFile)
+	if err != nil {
 		return err
 	}
 
@@ -65,29 +67,23 @@ func cmdCFD(args []string) error {
 
 	opts := cfd.Options{Teams: *teams, Start: windowStart, End: windowEnd}
 
-	store, err := sqlite.OpenExisting(*dbFile)
+	raw, err := loadIssues(context.Background(), inputPath)
 	if err != nil {
-		return fmt.Errorf("open db: %w", err)
-	}
-	defer store.Close()
-
-	ctx := context.Background()
-
-	if err := warnIfBlendingTeams(ctx, store, opts.Teams); err != nil {
-		return err
+		return fmt.Errorf("load issues: %w", err)
 	}
 
-	raw, err := store.CFDIssues(ctx, opts.Teams)
-	if err != nil {
-		return fmt.Errorf("query issues: %w", err)
+	if msg := blendingTeamsWarning(opts.Teams, distinctTeamKeys(raw)); msg != "" {
+		logx.Warnf("%s", msg)
 	}
-	if len(raw) == 0 {
-		logx.Warnf("no issues found in the database for the given team filter")
+
+	filtered := issues.Filter{Teams: opts.Teams}.Apply(raw)
+	if len(filtered) == 0 {
+		logx.Warnf("no issues found for the given team filter")
 	}
 
 	var normalized []cfd.NormalizedIssue
 	skipped := 0
-	for _, r := range toCFDIssues(raw) {
+	for _, r := range toCFDIssues(filtered) {
 		ni, ok := cfd.Normalize(r)
 		if !ok {
 			skipped++
@@ -103,7 +99,7 @@ func cmdCFD(args []string) error {
 	}
 
 	health := cfd.ComputeHealth(rows, normalized, opts.Start, opts.End)
-	health.TotalIssues = len(raw)
+	health.TotalIssues = len(filtered)
 	health.SkippedIssues = skipped
 
 	out := os.Stdout
@@ -118,7 +114,7 @@ func cmdCFD(args []string) error {
 
 	switch *format {
 	case "html":
-		return cfd.RenderHTML(out, rows, health, len(raw), skipped, opts.Start, opts.End)
+		return cfd.RenderHTML(out, rows, health, len(filtered), skipped, opts.Start, opts.End)
 	case "json":
 		return cfd.RenderJSON(out, rows, health)
 	default:

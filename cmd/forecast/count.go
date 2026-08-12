@@ -35,6 +35,7 @@ func cmdCount(args []string) error {
 	cmd := flag.NewFlagSet("count", flag.ExitOnError)
 	dbFile := addDBFlag(cmd)
 	inputFile := addInputFlag(cmd)
+	inputFormat := addInputFormatFlag(cmd)
 	milestones := cmd.Bool("milestones", false, "add a per-milestone breakdown under each project")
 	updatedSince := cmd.String("updated-since", defaultSince, `only include projects with an issue updated on/after this date (YYYY-MM-DD; or: now, yesterday, today, tomorrow, "-3 months")`)
 	teams := addTeamsFlag(cmd, "comma-separated team keys to filter by (e.g. ENG,DESIGN); default: all teams")
@@ -57,7 +58,7 @@ func cmdCount(args []string) error {
 
 	opts := counts.Options{Teams: *teams, Since: since}
 
-	projects, total, multiTeam, err := loadCountProjects(inputPath, opts)
+	projects, total, multiTeam, err := loadCountProjects(inputPath, *inputFormat, opts)
 	if err != nil {
 		return err
 	}
@@ -70,10 +71,11 @@ func cmdCount(args []string) error {
 	return counts.RenderSummary(os.Stdout, projects, total, showTeams)
 }
 
-// loadCountProjects loads issues from path and returns the folded project
-// list. It also reports whether the loaded issue set holds more than one team.
-func loadCountProjects(path string, opts counts.Options) ([]counts.Project, int, bool, error) {
-	raw, err := loadIssues(context.Background(), path)
+// loadCountProjects loads issues from path (format naming the stdin format
+// when path is "-") and returns the folded project list. It also reports
+// whether the loaded issue set holds more than one team.
+func loadCountProjects(path, format string, opts counts.Options) ([]counts.Project, int, bool, error) {
+	raw, err := loadIssues(context.Background(), path, format)
 	if err != nil {
 		return nil, 0, false, fmt.Errorf("load issues: %w", err)
 	}

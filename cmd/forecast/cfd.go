@@ -32,6 +32,7 @@ func cmdCFD(args []string) error {
 	cmd := flag.NewFlagSet("cfd", flag.ExitOnError)
 	dbFile := addDBFlag(cmd)
 	inputFile := addInputFlag(cmd)
+	inputFormat := addInputFormatFlag(cmd)
 	startStr := cmd.String("start", "-3 months", `start date, inclusive (YYYY-MM-DD; or: yesterday, today, tomorrow, "-3 months")`)
 	endStr := cmd.String("end", "today", `end date, inclusive (YYYY-MM-DD; or: now, yesterday, today, tomorrow, "-3 months")`)
 	format := cmd.String("format", "html", "output format: html, json")
@@ -67,7 +68,7 @@ func cmdCFD(args []string) error {
 
 	opts := cfd.Options{Teams: *teams, Start: windowStart, End: windowEnd}
 
-	raw, err := loadIssues(context.Background(), inputPath)
+	raw, err := loadIssues(context.Background(), inputPath, *inputFormat)
 	if err != nil {
 		return fmt.Errorf("load issues: %w", err)
 	}

@@ -30,7 +30,7 @@ func toHistoryIssues(items []issues.Issue) []history.Issue {
 func cmdHistory(args []string) error {
 	cmd := flag.NewFlagSet("history", flag.ExitOnError)
 	input := addInputFlag(cmd)
-	inputFormat := cmd.String("input-format", "", `format of -input when reading stdin ("-"): "csv" or "json"`)
+	inputFormat := addInputFormatFlag(cmd)
 	project := cmd.String("project", "", "exact project name to scope to; default: all projects")
 	milestone := cmd.String("milestone", "", "exact milestone name within -project; default: all milestones")
 	teams := addTeamsFlag(cmd, "comma-separated team keys to filter by (e.g. ENG,DATA); default: all teams")
@@ -58,16 +58,7 @@ func cmdHistory(args []string) error {
 
 	ctx := context.Background()
 
-	var raw []issues.Issue
-	var err error
-	if *input == "-" {
-		if *inputFormat == "" {
-			return fmt.Errorf("-input-format is required when reading from stdin (-input -)")
-		}
-		raw, err = issues.ReadStream(os.Stdin, *inputFormat)
-	} else {
-		raw, err = loadIssues(ctx, *input)
-	}
+	raw, err := loadIssues(ctx, *input, *inputFormat)
 	if err != nil {
 		return fmt.Errorf("load issues: %w", err)
 	}

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -26,6 +27,7 @@ func (r removedFlag) Set(string) error { return errors.New(r.msg) }
 func cmdSimItems(args []string) error {
 	cmd := flag.NewFlagSet("sim items", flag.ExitOnError)
 	dbFile := addDBFlag(cmd)
+	inputFile := addInputFlag(cmd)
 	sf := addSimFlags(cmd)
 	days := cmd.Int("days", 30, "number of days")
 	var confidences intList
@@ -39,7 +41,8 @@ func cmdSimItems(args []string) error {
 		return err
 	}
 
-	if err := requireDB(dbFile); err != nil {
+	inputPath, err := resolveInput(cmd, inputFile, dbFile)
+	if err != nil {
 		return err
 	}
 
@@ -67,7 +70,12 @@ func cmdSimItems(args []string) error {
 		}
 	}
 
-	loaded, err := loadPool(*dbFile, *sf.ExclusionsFile, sf.TypicalEngineers, startDate, endDate, *sf.WholeTeam)
+	all, err := loadIssues(context.Background(), inputPath)
+	if err != nil {
+		return fmt.Errorf("load issues: %w", err)
+	}
+
+	loaded, err := loadPool(all, *sf.ExclusionsFile, sf.TypicalEngineers, startDate, endDate, *sf.WholeTeam)
 	if err != nil {
 		return err
 	}
@@ -81,7 +89,7 @@ func cmdSimItems(args []string) error {
 		Subcommand: "sim items", Cmd: cmd, Mode: mode, Team: sf.Team, TypicalEngineers: sf.TypicalEngineers,
 		Engineers: *sf.Engineers, WholeTeam: *sf.WholeTeam, Seed: seed,
 		SampleStart: startDate, SampleEnd: endDate,
-		DBPath: *dbFile, ExclusionsPath: *sf.ExclusionsFile,
+		DBPath: inputPath, ExclusionsPath: *sf.ExclusionsFile,
 		Exclusions: loaded.Exclusions, Pool: pool, Issues: loaded.Issues, Skipped: loaded.Skipped,
 		Extra: map[string]any{"effective_confidence_levels": []int(confidences)},
 	}); err != nil {
@@ -173,6 +181,7 @@ func printTrajectoryReport(pool *simulate.SamplePool, mode simulate.Mode, team [
 func cmdSimDays(args []string) error {
 	cmd := flag.NewFlagSet("sim days", flag.ExitOnError)
 	dbFile := addDBFlag(cmd)
+	inputFile := addInputFlag(cmd)
 	sf := addSimFlags(cmd)
 	var items intList
 	cmd.Var(&items, "items", "number of items to complete (required); comma-separated for a grouped trajectory report (e.g. 13,12,9)")
@@ -188,7 +197,8 @@ func cmdSimDays(args []string) error {
 		return err
 	}
 
-	if err := requireDB(dbFile); err != nil {
+	inputPath, err := resolveInput(cmd, inputFile, dbFile)
+	if err != nil {
 		return err
 	}
 
@@ -216,7 +226,12 @@ func cmdSimDays(args []string) error {
 		}
 	}
 
-	loaded, err := loadPool(*dbFile, *sf.ExclusionsFile, sf.TypicalEngineers, startDate, endDate, *sf.WholeTeam)
+	all, err := loadIssues(context.Background(), inputPath)
+	if err != nil {
+		return fmt.Errorf("load issues: %w", err)
+	}
+
+	loaded, err := loadPool(all, *sf.ExclusionsFile, sf.TypicalEngineers, startDate, endDate, *sf.WholeTeam)
 	if err != nil {
 		return err
 	}
@@ -239,7 +254,7 @@ func cmdSimDays(args []string) error {
 		Subcommand: "sim days", Cmd: cmd, Mode: mode, Team: sf.Team, TypicalEngineers: sf.TypicalEngineers,
 		Engineers: *sf.Engineers, WholeTeam: *sf.WholeTeam, Seed: seed,
 		SampleStart: startDate, SampleEnd: endDate,
-		DBPath: *dbFile, ExclusionsPath: *sf.ExclusionsFile,
+		DBPath: inputPath, ExclusionsPath: *sf.ExclusionsFile,
 		Exclusions: loaded.Exclusions, Pool: pool, Issues: loaded.Issues, Skipped: loaded.Skipped,
 		Extra: map[string]any{"effective_confidence_levels": []int(confidences)},
 	}); err != nil {
@@ -278,6 +293,7 @@ func cmdSimDays(args []string) error {
 func cmdSimProbability(args []string) error {
 	cmd := flag.NewFlagSet("sim probability", flag.ExitOnError)
 	dbFile := addDBFlag(cmd)
+	inputFile := addInputFlag(cmd)
 	sf := addSimFlags(cmd)
 	days := cmd.Int("days", 0, "number of days; mutually exclusive with -target-end-date, one must be given")
 	targetStartStr := cmd.String("target-start-date", "tomorrow", `start of the target window (YYYY-MM-DD; or: yesterday, today, tomorrow, "-3 months"); default: tomorrow`)
@@ -291,7 +307,8 @@ func cmdSimProbability(args []string) error {
 		return err
 	}
 
-	if err := requireDB(dbFile); err != nil {
+	inputPath, err := resolveInput(cmd, inputFile, dbFile)
+	if err != nil {
 		return err
 	}
 
@@ -336,7 +353,12 @@ func cmdSimProbability(args []string) error {
 		effectiveDays = util.DayIndex(targetEnd, targetStart) + 1
 	}
 
-	loaded, err := loadPool(*dbFile, *sf.ExclusionsFile, sf.TypicalEngineers, startDate, endDate, *sf.WholeTeam)
+	all, err := loadIssues(context.Background(), inputPath)
+	if err != nil {
+		return fmt.Errorf("load issues: %w", err)
+	}
+
+	loaded, err := loadPool(all, *sf.ExclusionsFile, sf.TypicalEngineers, startDate, endDate, *sf.WholeTeam)
 	if err != nil {
 		return err
 	}
@@ -356,7 +378,7 @@ func cmdSimProbability(args []string) error {
 		Subcommand: "sim probability", Cmd: cmd, Mode: mode, Team: sf.Team, TypicalEngineers: sf.TypicalEngineers,
 		Engineers: *sf.Engineers, WholeTeam: *sf.WholeTeam, Seed: seed,
 		SampleStart: startDate, SampleEnd: endDate,
-		DBPath: *dbFile, ExclusionsPath: *sf.ExclusionsFile,
+		DBPath: inputPath, ExclusionsPath: *sf.ExclusionsFile,
 		Exclusions: loaded.Exclusions, Pool: pool, Issues: loaded.Issues, Skipped: loaded.Skipped,
 		Extra: manifestExtra,
 	}); err != nil {

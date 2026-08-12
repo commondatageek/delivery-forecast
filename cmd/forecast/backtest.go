@@ -12,28 +12,46 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/commondatageek/delivery-forecast/internal/linear"
-	"github.com/commondatageek/delivery-forecast/internal/sqlite"
 	"github.com/commondatageek/delivery-forecast/internal/util"
+	"github.com/commondatageek/delivery-forecast/issues"
 	"github.com/commondatageek/delivery-forecast/simulate"
 )
 
-// issuesToBacktestItems converts linear.Issue records to simulate.BacktestItem.
-func issuesToBacktestItems(issues []linear.Issue) []simulate.BacktestItem {
-	items := make([]simulate.BacktestItem, len(issues))
-	for i, it := range issues {
-		items[i] = simulate.BacktestItem{
+// issuesToBacktestItems converts issues.Issue records to simulate.BacktestItem.
+func issuesToBacktestItems(items []issues.Issue) []simulate.BacktestItem {
+	out := make([]simulate.BacktestItem, len(items))
+	for i, it := range items {
+		out[i] = simulate.BacktestItem{
 			CreatedAt:   it.CreatedAt,
 			StartedAt:   it.StartedAt,
 			CompletedAt: it.CompletedAt,
 		}
 	}
-	return items
+	return out
+}
+
+// backtestIssueSet selects the fixed set of issues sim backtest replays
+// against: exact project match (required), exact milestone match (optional,
+// only within that project), excluding canceled issues — Issue.IsCanceled
+// also covers "duplicate" (D7), matching the old ProjectMilestoneIssues
+// query's `state_type NOT IN ('canceled', 'duplicate')`. No team filtering,
+// same as before.
+func backtestIssueSet(all []issues.Issue, project, milestone string) []issues.Issue {
+	scoped := issues.Filter{Project: project, Milestone: milestone}.Apply(all)
+	var out []issues.Issue
+	for _, it := range scoped {
+		if it.IsCanceled() {
+			continue
+		}
+		out = append(out, it)
+	}
+	return out
 }
 
 func cmdSimBacktest(args []string) error {
 	cmd := flag.NewFlagSet("sim backtest", flag.ExitOnError)
 	dbFile := addDBFlag(cmd)
+	inputFile := addInputFlag(cmd)
 	sf := addSimFlags(cmd)
 	cmd.Lookup("simulations").Usage = "number of Monte Carlo simulations to run per backtested day"
 	project := cmd.String("project", "", "project name to backtest (required)")
@@ -48,7 +66,8 @@ func cmdSimBacktest(args []string) error {
 		return err
 	}
 
-	if err := requireDB(dbFile); err != nil {
+	inputPath, err := resolveInput(cmd, inputFile, dbFile)
+	if err != nil {
 		return err
 	}
 	if *project == "" {
@@ -81,8 +100,15 @@ func cmdSimBacktest(args []string) error {
 		return err
 	}
 
+	// Load the issue set once: it feeds both the sample pool and the fixed
+	// backtested set below.
+	all, err := loadIssues(context.Background(), inputPath)
+	if err != nil {
+		return fmt.Errorf("load issues: %w", err)
+	}
+
 	// Build the fixed sample pool once; reused for every backtested day.
-	pd, err := loadPool(*dbFile, *sf.ExclusionsFile, sf.TypicalEngineers, sampleStartDate, sampleEndDate, *sf.WholeTeam)
+	pd, err := loadPool(all, *sf.ExclusionsFile, sf.TypicalEngineers, sampleStartDate, sampleEndDate, *sf.WholeTeam)
 	if err != nil {
 		return err
 	}
@@ -91,25 +117,15 @@ func cmdSimBacktest(args []string) error {
 	}
 	seed := resolveSeed(cmd, *sf.RandomSeed, now)
 
-	// Fetch the tracked issue set once.
-	store, err := sqlite.OpenExisting(*dbFile)
-	if err != nil {
-		return fmt.Errorf("open db: %w", err)
-	}
-	defer store.Close()
-
-	issues, err := store.ProjectMilestoneIssues(context.Background(), *project, *milestone)
-	if err != nil {
-		return fmt.Errorf("querying issues: %w", err)
-	}
-	if len(issues) == 0 {
+	scoped := backtestIssueSet(all, *project, *milestone)
+	if len(scoped) == 0 {
 		if *milestone != "" {
 			return fmt.Errorf("no issues found for project %q milestone %q — check spelling", *project, *milestone)
 		}
 		return fmt.Errorf("no issues found for project %q — check spelling", *project)
 	}
 
-	btItems := issuesToBacktestItems(issues)
+	btItems := issuesToBacktestItems(scoped)
 
 	// Resolve start date: explicit flag wins; otherwise infer from the earliest
 	// started_at across the issue set.
@@ -151,7 +167,7 @@ func cmdSimBacktest(args []string) error {
 		if *milestone != "" {
 			scope += " / " + *milestone
 		}
-		printBacktestText(rows, scope, label, len(issues), startDate, sampleStartDate, sampleEndDate, today)
+		printBacktestText(rows, scope, label, len(scoped), startDate, sampleStartDate, sampleEndDate, today)
 	}
 	return nil
 }

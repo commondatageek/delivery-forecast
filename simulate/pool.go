@@ -16,7 +16,7 @@ const WholeTeamKey = "__whole_team__"
 
 // Completion is a normalized record of a completed unit of work: the engineer
 // who completed it and when. The cmd layer converts source-specific records
-// (e.g. linear.Issue) to Completion before building a pool.
+// (e.g. issues.Issue) to Completion before building a pool.
 type Completion struct {
 	Engineer    string
 	CompletedAt time.Time

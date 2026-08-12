@@ -9,6 +9,7 @@ import (
 
 	"github.com/commondatageek/delivery-forecast/internal/linear"
 	"github.com/commondatageek/delivery-forecast/internal/sqlite"
+	"github.com/commondatageek/delivery-forecast/issues"
 )
 
 type fetchCall struct {
@@ -20,13 +21,13 @@ type fetchCall struct {
 // Fetch call and returns canned issues/errors per team key.
 type stubClient struct {
 	fetchCalls []fetchCall
-	issuesFor  map[string][]linear.Issue
+	issuesFor  map[string][]issues.Issue
 	fetchErr   map[string]error
 	teams      []linear.Team
 	listErr    error
 }
 
-func (s *stubClient) Fetch(ctx context.Context, since time.Time, teamKeys []string) ([]linear.Issue, error) {
+func (s *stubClient) Fetch(ctx context.Context, since time.Time, teamKeys []string) ([]issues.Issue, error) {
 	s.fetchCalls = append(s.fetchCalls, fetchCall{since: since, teams: teamKeys})
 	key := teamKeys[0]
 	if err, ok := s.fetchErr[key]; ok {
@@ -70,7 +71,7 @@ func TestRun_EmptyDBNoCandidates(t *testing.T) {
 
 func TestRun_EmptyDBWithTeams_FullSync(t *testing.T) {
 	store := openTestStore(t)
-	sc := &stubClient{issuesFor: map[string][]linear.Issue{
+	sc := &stubClient{issuesFor: map[string][]issues.Issue{
 		"ENG": {{Identifier: "ENG-1", TeamKey: "ENG", StateType: "completed"}},
 	}}
 	if err := Run(context.Background(), sc, store, Options{Teams: linear.TeamKeyList{"ENG"}}); err != nil {
@@ -97,7 +98,7 @@ func TestRun_ExistingTeamIncremental_UsesWatermark(t *testing.T) {
 	ctx := context.Background()
 
 	watermark := time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC)
-	seed := linear.Issue{
+	seed := issues.Issue{
 		Identifier: "ENG-1", TeamKey: "ENG", StateType: "completed",
 		UpdatedAt: watermark,
 	}
@@ -105,7 +106,7 @@ func TestRun_ExistingTeamIncremental_UsesWatermark(t *testing.T) {
 		t.Fatalf("seed Upsert: %v", err)
 	}
 
-	sc := &stubClient{issuesFor: map[string][]linear.Issue{
+	sc := &stubClient{issuesFor: map[string][]issues.Issue{
 		"ENG": {{Identifier: "ENG-2", TeamKey: "ENG", StateType: "started"}},
 	}}
 	if err := Run(ctx, sc, store, Options{Teams: linear.TeamKeyList{"ENG"}}); err != nil {
@@ -124,7 +125,7 @@ func TestRun_ExistingTeamFullReload_IgnoresWatermark(t *testing.T) {
 	ctx := context.Background()
 
 	watermark := time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC)
-	seed := linear.Issue{
+	seed := issues.Issue{
 		Identifier: "ENG-1", TeamKey: "ENG", StateType: "completed",
 		UpdatedAt: watermark,
 	}
@@ -132,7 +133,7 @@ func TestRun_ExistingTeamFullReload_IgnoresWatermark(t *testing.T) {
 		t.Fatalf("seed Upsert: %v", err)
 	}
 
-	sc := &stubClient{issuesFor: map[string][]linear.Issue{"ENG": nil}}
+	sc := &stubClient{issuesFor: map[string][]issues.Issue{"ENG": nil}}
 	if err := Run(ctx, sc, store, Options{Teams: linear.TeamKeyList{"ENG"}, FullReload: true}); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -148,7 +149,7 @@ func TestRun_AllTeams_CandidatesFromListTeams(t *testing.T) {
 	store := openTestStore(t)
 	sc := &stubClient{
 		teams: []linear.Team{{Key: "ENG", Name: "Engineering"}, {Key: "DATA", Name: "Data"}},
-		issuesFor: map[string][]linear.Issue{
+		issuesFor: map[string][]issues.Issue{
 			"ENG":  {{Identifier: "ENG-1", TeamKey: "ENG", StateType: "completed"}},
 			"DATA": {{Identifier: "DATA-1", TeamKey: "DATA", StateType: "completed"}},
 		},
@@ -173,13 +174,13 @@ func TestRun_NoCandidates_SyncsExistingTeams(t *testing.T) {
 	ctx := context.Background()
 
 	if err := store.Upsert(ctx,
-		linear.Issue{Identifier: "ENG-1", TeamKey: "ENG", StateType: "completed", UpdatedAt: time.Now()},
-		linear.Issue{Identifier: "DATA-1", TeamKey: "DATA", StateType: "completed", UpdatedAt: time.Now()},
+		issues.Issue{Identifier: "ENG-1", TeamKey: "ENG", StateType: "completed", UpdatedAt: time.Now()},
+		issues.Issue{Identifier: "DATA-1", TeamKey: "DATA", StateType: "completed", UpdatedAt: time.Now()},
 	); err != nil {
 		t.Fatalf("seed Upsert: %v", err)
 	}
 
-	sc := &stubClient{issuesFor: map[string][]linear.Issue{"ENG": nil, "DATA": nil}}
+	sc := &stubClient{issuesFor: map[string][]issues.Issue{"ENG": nil, "DATA": nil}}
 	if err := Run(ctx, sc, store, Options{}); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -191,7 +192,7 @@ func TestRun_NoCandidates_SyncsExistingTeams(t *testing.T) {
 func TestRun_FetchErrorMidLoop_PriorTeamCommitted(t *testing.T) {
 	store := openTestStore(t)
 	sc := &stubClient{
-		issuesFor: map[string][]linear.Issue{
+		issuesFor: map[string][]issues.Issue{
 			"ENG": {{Identifier: "ENG-1", TeamKey: "ENG", StateType: "completed"}},
 		},
 		fetchErr: map[string]error{

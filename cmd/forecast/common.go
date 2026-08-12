@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -13,7 +12,7 @@ import (
 
 	"github.com/commondatageek/delivery-forecast/internal/linear"
 	"github.com/commondatageek/delivery-forecast/internal/logx"
-	"github.com/commondatageek/delivery-forecast/internal/sqlite"
+	"github.com/commondatageek/delivery-forecast/issues"
 	"github.com/commondatageek/delivery-forecast/simulate"
 
 	"github.com/mattn/go-isatty"
@@ -56,19 +55,52 @@ func (b *progressBar) update(done, _ int) {
 // run manifest can record exactly what fed the simulation.
 type poolData struct {
 	Pool       *simulate.SamplePool
-	Issues     []linear.Issue
+	Issues     []issues.Issue
 	Exclusions simulate.Exclusions
 	Skipped    int
 }
 
-// issuesToCompletions converts linear.Issue records to simulate.Completion.
+// issuesToCompletions converts issues.Issue records to simulate.Completion.
 // No filtering is performed; call simulate.FilterInvalid on the result.
-func issuesToCompletions(issues []linear.Issue) []simulate.Completion {
-	records := make([]simulate.Completion, len(issues))
-	for i, it := range issues {
+func issuesToCompletions(items []issues.Issue) []simulate.Completion {
+	records := make([]simulate.Completion, len(items))
+	for i, it := range items {
 		records[i] = simulate.Completion{Engineer: it.Assignee, CompletedAt: it.CompletedAt}
 	}
 	return records
+}
+
+// completedForPool selects completed issues assigned to one of engineers (or
+// any assignee, if engineers is empty) whose completed_at falls in
+// [start, end) — start inclusive, end exclusive. Mirrors the old
+// CompletedBetween SQL query (state_type = 'completed', now Issue.
+// IsCompleted so file sources without state_type still work per D7), except
+// matching is now case-sensitive-exact against the given engineer names, same
+// as the SQL IN clause was.
+//
+// Unlike aging's equivalent, this deliberately keeps CompletedBetween's
+// unconditional non-empty-assignee requirement: the pool is per-engineer, so
+// an unassigned issue has nowhere to go. See cmd/forecast/aging.go's
+// completedBetween for the contrasting case.
+func completedForPool(items []issues.Issue, start, end time.Time, engineers []string) []issues.Issue {
+	want := make(map[string]bool, len(engineers))
+	for _, e := range engineers {
+		want[e] = true
+	}
+	var out []issues.Issue
+	for _, it := range items {
+		if !it.IsCompleted() || it.CompletedAt.IsZero() || it.Assignee == "" {
+			continue
+		}
+		if it.CompletedAt.Before(start) || !it.CompletedAt.Before(end) {
+			continue
+		}
+		if len(want) > 0 && !want[it.Assignee] {
+			continue
+		}
+		out = append(out, it)
+	}
+	return out
 }
 
 // warnUnmatchedTypicalEngineers logs a warning for any name in typicalEngineers
@@ -95,21 +127,14 @@ func loadExclusions(path string) (simulate.Exclusions, error) {
 	return simulate.ParseExclusions(data)
 }
 
-// loadPool builds a SamplePool by querying the SQLite store.
-func loadPool(dbPath, exclusionsFile string, typicalEngineers []string, startDate, endDate time.Time, wholeTeam bool) (poolData, error) {
-	store, err := sqlite.OpenExisting(dbPath)
-	if err != nil {
-		return poolData{}, fmt.Errorf("open db: %w", err)
-	}
-	defer store.Close()
+// loadPool builds a SamplePool from all, an already-loaded issue set (any
+// source — sim has no -teams flag, so every team is always pooled together,
+// same as before). See completedForPool for the filtering it applies.
+func loadPool(all []issues.Issue, exclusionsFile string, typicalEngineers []string, startDate, endDate time.Time, wholeTeam bool) (poolData, error) {
+	completed := completedForPool(all, startDate, endDate, typicalEngineers)
 
-	issues, err := store.CompletedBetween(context.Background(), startDate, endDate, typicalEngineers, nil)
-	if err != nil {
-		return poolData{}, fmt.Errorf("querying db: %w", err)
-	}
-
-	engineerSeen := make(map[string]bool, len(issues))
-	for _, it := range issues {
+	engineerSeen := make(map[string]bool, len(completed))
+	for _, it := range completed {
 		engineerSeen[it.Assignee] = true
 	}
 	warnUnmatchedTypicalEngineers(typicalEngineers, engineerSeen)
@@ -119,14 +144,14 @@ func loadPool(dbPath, exclusionsFile string, typicalEngineers []string, startDat
 		return poolData{}, err
 	}
 
-	records, skipped := simulate.FilterInvalid(issuesToCompletions(issues))
+	records, skipped := simulate.FilterInvalid(issuesToCompletions(completed))
 	if skipped > 0 {
 		logx.Warnf("skipped %d completed issue(s) with no assignee or completion date", skipped)
 	}
 
 	return poolData{
 		Pool:       simulate.BuildPool(records, exc, startDate, endDate, wholeTeam),
-		Issues:     issues,
+		Issues:     completed,
 		Exclusions: exc,
 		Skipped:    skipped,
 	}, nil
@@ -172,26 +197,6 @@ func addDBFlag(fs *flag.FlagSet) *string {
 func requireDB(db *string) error {
 	if *db == "" {
 		return fmt.Errorf("-db is required")
-	}
-	return nil
-}
-
-// warnIfBlendingTeams warns on stderr when no -teams filter was given but the
-// store holds more than one team, so the caller knows the report silently
-// blends every team's data together. A no-op when teams is non-empty (the user
-// scoped explicitly) or the store holds at most one team. Used by the read-only
-// report commands (count/aging/cfd); not linear sync, where an unset -teams is
-// the intended "sync every team" default rather than an accidental blend.
-func warnIfBlendingTeams(ctx context.Context, store *sqlite.Store, teams linear.TeamKeyList) error {
-	if len(teams) > 0 {
-		return nil
-	}
-	keys, err := store.DistinctTeamKeys(ctx)
-	if err != nil {
-		return err
-	}
-	if msg := blendingTeamsWarning(teams, keys); msg != "" {
-		logx.Warnf("%s", msg)
 	}
 	return nil
 }

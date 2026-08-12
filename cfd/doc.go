@@ -4,7 +4,7 @@
 // cycle time, a Little's Law cross-check, and per-band stability trend).
 //
 // The package is pure and IO-free. Callers supply their own Issue records
-// (the CLI maps sqlite.CFDRow via toCFDIssues): Normalize clamps each issue's
+// (the CLI maps issues.Issue via toCFDIssues): Normalize clamps each issue's
 // timestamps to be monotonically non-decreasing and truncates them to day
 // resolution (local midnight) — this is the package's own day bucketing, done
 // internally, unlike package simulate's caller-supplied windows. BuildGrid

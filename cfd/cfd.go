@@ -9,7 +9,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/commondatageek/delivery-forecast/internal/util"
+	"github.com/commondatageek/delivery-forecast/history"
 )
 
 //go:embed template.html
@@ -28,9 +28,8 @@ type Options struct {
 	End time.Time
 }
 
-// Issue is the neutral input record for CFD analysis: the same fields as
-// sqlite.CFDRow. The caller maps its source's fields onto it (the CLI maps
-// sqlite.CFDRow).
+// Issue is the neutral input record for CFD analysis. The caller maps its
+// source's fields onto it (the CLI maps issues.Issue via toCFDIssues).
 type Issue struct {
 	CreatedAt   time.Time
 	StartedAt   time.Time
@@ -42,12 +41,12 @@ type Issue struct {
 // NormalizedIssue holds per-issue lifecycle event times clamped to be
 // monotonically non-decreasing. All times are truncated to day resolution
 // (local midnight). Zero means the event has not occurred.
-type NormalizedIssue struct {
-	Arrival     time.Time
-	LeftBacklog time.Time
-	Exit        time.Time
-	ExitType    string // "completed" | "canceled" | ""
-}
+//
+// This is a re-export of history.NormalizedIssue: the clamping logic moved
+// there so history could own it without cfd importing history (see
+// Normalize below). The two packages agree on which day a boundary event
+// lands on by construction, not by convention.
+type NormalizedIssue = history.NormalizedIssue
 
 // DayRow holds the four cumulative line values and the three band heights for
 // one calendar day.
@@ -82,100 +81,47 @@ type FlowHealth struct {
 	SkippedIssues       int
 }
 
-func truncDay(t time.Time) time.Time {
-	return util.LocalDay(t)
-}
-
-func clampMin(a, floor time.Time) time.Time {
-	if a.IsZero() {
-		return a
-	}
-	if a.Before(floor) {
-		return floor
-	}
-	return a
-}
-
 // Normalize converts an Issue into a NormalizedIssue with monotonically
 // non-decreasing timestamps. Returns false if the issue has no created_at and
 // should be dropped.
+//
+// This delegates to history.Normalize (Issue's four timestamp fields are a
+// superset of history.Issue's — StateType has no bearing on normalization),
+// so cfd and history can never disagree on which day a boundary event lands
+// on; see NormalizedIssue's doc comment for why the delegation runs this
+// direction.
 func Normalize(r Issue) (NormalizedIssue, bool) {
-	arrival := truncDay(r.CreatedAt)
-	if arrival.IsZero() {
-		return NormalizedIssue{}, false
-	}
-
-	completed := truncDay(r.CompletedAt)
-	canceled := truncDay(r.CanceledAt)
-	started := truncDay(r.StartedAt)
-
-	var leftBacklog time.Time
-	if !started.IsZero() {
-		leftBacklog = clampMin(started, arrival)
-	} else if !completed.IsZero() || !canceled.IsZero() {
-		// Canceled or completed without ever having started_at set.
-		// Use the terminal time so the issue exits the backlog at the moment it exits the system.
-		terminal := completed
-		if terminal.IsZero() {
-			terminal = canceled
-		}
-		leftBacklog = clampMin(terminal, arrival)
-	}
-
-	floor := leftBacklog
-	if floor.IsZero() {
-		floor = arrival
-	}
-
-	var exit time.Time
-	var exitType string
-	switch {
-	case !completed.IsZero():
-		exit = clampMin(completed, floor)
-		exitType = "completed"
-	case !canceled.IsZero():
-		exit = clampMin(canceled, floor)
-		exitType = "canceled"
-	}
-
-	return NormalizedIssue{
-		Arrival:     arrival,
-		LeftBacklog: leftBacklog,
-		Exit:        exit,
-		ExitType:    exitType,
-	}, true
+	return history.Normalize(history.Issue{
+		CreatedAt:   r.CreatedAt,
+		StartedAt:   r.StartedAt,
+		CompletedAt: r.CompletedAt,
+		CanceledAt:  r.CanceledAt,
+	})
 }
 
-// BuildGrid computes cumulative line values for each calendar day in [start, end].
+// BuildGrid computes cumulative line values for each calendar day in
+// [start, end]. It builds on history.BuildRows, the same day-walk engine
+// behind forecast history, mapping history's Tier 1 columns onto cfd's own
+// DayRow shape (Created/LeftBacklog/Departed/Completed/Backlog/InProgress/
+// Canceled/Done): LeftBacklog is recovered as Total−Backlog (history doesn't
+// expose the cumulative "left backlog" count directly, but backlog's own
+// definition, Total minus it, makes the recovery exact) and Departed is
+// Completed+Canceled.
 func BuildGrid(issues []NormalizedIssue, start, end time.Time) []DayRow {
-	var rows []DayRow
-	for d := start; !d.After(end); d = d.AddDate(0, 0, 1) {
-		var created, leftBacklog, departed, completed int
-		for _, ni := range issues {
-			if !ni.Arrival.After(d) {
-				created++
-			}
-			if !ni.LeftBacklog.IsZero() && !ni.LeftBacklog.After(d) {
-				leftBacklog++
-			}
-			if !ni.Exit.IsZero() && !ni.Exit.After(d) {
-				departed++
-				if ni.ExitType == "completed" {
-					completed++
-				}
-			}
+	hrows := history.BuildRows(issues, start, end, 0)
+	rows := make([]DayRow, len(hrows))
+	for i, r := range hrows {
+		rows[i] = DayRow{
+			Date:        r.Date,
+			Created:     r.Total,
+			LeftBacklog: r.Total - r.Backlog,
+			Departed:    r.Completed + r.Canceled,
+			Completed:   r.Completed,
+			Backlog:     r.Backlog,
+			InProgress:  r.InProgress,
+			Canceled:    r.Canceled,
+			Done:        r.Completed,
 		}
-		rows = append(rows, DayRow{
-			Date:        d,
-			Created:     created,
-			LeftBacklog: leftBacklog,
-			Departed:    departed,
-			Completed:   completed,
-			Backlog:     created - leftBacklog,
-			InProgress:  leftBacklog - departed,
-			Canceled:    departed - completed,
-			Done:        completed,
-		})
 	}
 	return rows
 }

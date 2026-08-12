@@ -5,7 +5,7 @@
 //
 // The package is pure and IO-free: no file, network, or database access, and
 // no time.Now — InProgressItems takes "today" as an explicit parameter.
-// Callers supply their own Issue records (the CLI maps linear.Issue via
+// Callers supply their own Issue records (the CLI maps issues.Issue via
 // toAgingIssues).
 //
 // Options is a convenience bundle for callers that mirror the CLI's flags; the

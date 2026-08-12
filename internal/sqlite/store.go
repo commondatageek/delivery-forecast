@@ -166,6 +166,70 @@ ON CONFLICT(identifier) DO UPDATE SET
 	return tx.Commit()
 }
 
+// AllIssues returns every row in the issues table, unfiltered, so callers can
+// apply issues.Filter in memory and get semantics identical to file sources.
+func (s *Store) AllIssues(ctx context.Context) ([]linear.Issue, error) {
+	const q = `
+SELECT identifier, title, assignee, team_key, team_name, project_id, project_name,
+       project_milestone_id, project_milestone_name, state_type, state_name,
+       created_at, started_at, completed_at, canceled_at, archived_at, auto_archived_at,
+       added_to_project_at, updated_at
+FROM issues`
+
+	rows, err := s.db.QueryContext(ctx, q)
+	if err != nil {
+		return nil, fmt.Errorf("AllIssues: %w", err)
+	}
+	defer rows.Close()
+
+	var out []linear.Issue
+	for rows.Next() {
+		var it linear.Issue
+		var assignee, projectID, projectName, milestoneID, milestoneName sql.NullString
+		var createdAt, startedAt, completedAt, canceledAt, archivedAt, autoArchivedAt, addedToProjectAt, updatedAt sql.NullTime
+		if err := rows.Scan(
+			&it.Identifier, &it.Title, &assignee, &it.TeamKey, &it.TeamName,
+			&projectID, &projectName, &milestoneID, &milestoneName,
+			&it.StateType, &it.StateName,
+			&createdAt, &startedAt, &completedAt, &canceledAt, &archivedAt, &autoArchivedAt,
+			&addedToProjectAt, &updatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("AllIssues scan: %w", err)
+		}
+		it.Assignee = assignee.String
+		it.ProjectID = projectID.String
+		it.ProjectName = projectName.String
+		it.ProjectMilestoneID = milestoneID.String
+		it.ProjectMilestoneName = milestoneName.String
+		if createdAt.Valid {
+			it.CreatedAt = createdAt.Time
+		}
+		if startedAt.Valid {
+			it.StartedAt = startedAt.Time
+		}
+		if completedAt.Valid {
+			it.CompletedAt = completedAt.Time
+		}
+		if canceledAt.Valid {
+			it.CanceledAt = canceledAt.Time
+		}
+		if archivedAt.Valid {
+			it.ArchivedAt = archivedAt.Time
+		}
+		if autoArchivedAt.Valid {
+			it.AutoArchivedAt = autoArchivedAt.Time
+		}
+		if addedToProjectAt.Valid {
+			it.AddedToProjectAt = addedToProjectAt.Time
+		}
+		if updatedAt.Valid {
+			it.UpdatedAt = updatedAt.Time
+		}
+		out = append(out, it)
+	}
+	return out, rows.Err()
+}
+
 // LatestUpdatedAtForTeam returns the maximum updated_at among issues for the
 // given team key. Returns zero time if the team has no issues yet (signals a
 // full fetch for that team).
@@ -220,7 +284,7 @@ func (s *Store) DistinctTeamKeys(ctx context.Context) ([]string, error) {
 // The store now holds every issue (all states, assigned or not), so the
 // state_type and assignee predicates here are load-bearing: they are the single
 // chokepoint that keeps unstarted/canceled/unassigned issues out of the
-// forecast. The `assignee <> ''` clause guards against an empty-string assignee
+// forecast. The `assignee <> ”` clause guards against an empty-string assignee
 // slipping through `assignee IS NOT NULL`; today the writer normalizes "" to
 // NULL (see nullString), but the reader shouldn't depend on that invariant.
 //

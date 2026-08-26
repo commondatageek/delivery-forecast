@@ -81,6 +81,7 @@ func cmdAging(args []string) error {
 	sampleEndStr := cmd.String("sample-end", "today", `end of completed-issue window (YYYY-MM-DD; or: now, yesterday, today, tomorrow, "-3 months")`)
 	format := cmd.String("format", "text", "output format: text, json, html")
 	minCycleTimeStr := cmd.String("min-cycle-time", "", "exclude completed issues with cycle time below this duration (e.g. 5m, 1h, 1d)")
+	percentile := cmd.Int("percentile", 85, "percentile of the cycle-time distribution to anchor the report to (1-100)")
 	showCompleted := cmd.Bool("show-completed", false, "text/html: also list the completed issues that make up the percentile distribution sample")
 	teams := addTeamsFlag(cmd, "comma-separated team keys to filter by (e.g. DATA,PLT); default: all teams")
 	configFile := addConfigFlag(cmd)
@@ -88,6 +89,10 @@ func cmdAging(args []string) error {
 
 	if err := util.ApplyConfig(cmd, *configFile); err != nil {
 		return err
+	}
+
+	if *percentile < 1 || *percentile > 100 {
+		return fmt.Errorf("-percentile must be between 1 and 100, got %d", *percentile)
 	}
 
 	inputPath, err := resolveInput(cmd, inputFile, dbFile)
@@ -121,7 +126,7 @@ func cmdAging(args []string) error {
 		return fmt.Errorf("-sample-start must be before -sample-end")
 	}
 
-	opts := aging.Options{Teams: *teams, SampleStart: sampleStart, SampleEnd: sampleEnd, MinCycleTime: minCycleTime}
+	opts := aging.Options{Teams: *teams, SampleStart: sampleStart, SampleEnd: sampleEnd, MinCycleTime: minCycleTime, Percentile: *percentile}
 
 	raw, err := loadIssues(context.Background(), inputPath, *stdinFormat)
 	if err != nil {
@@ -139,8 +144,18 @@ func cmdAging(args []string) error {
 	cycleTimes := aging.CycleTimes(agingCompleted, opts.MinCycleTime)
 	sort.Float64s(cycleTimes)
 
+	threshold := util.PercentileValue(cycleTimes, float64(opts.Percentile))
+
+	meta := aging.Meta{
+		Percentile:     opts.Percentile,
+		Threshold:      threshold,
+		SampleStart:    opts.SampleStart,
+		SampleEnd:      opts.SampleEnd,
+		CompletedCount: len(cycleTimes),
+	}
+
 	inProgressItems := aging.InProgressItems(toAgingIssues(inProgress(filtered)), today)
-	aging.RankItems(inProgressItems, cycleTimes)
+	aging.RankItems(inProgressItems, cycleTimes, threshold)
 
 	sort.Slice(inProgressItems, func(i, j int) bool {
 		return inProgressItems[i].AgeDays > inProgressItems[j].AgeDays
@@ -149,26 +164,24 @@ func cmdAging(args []string) error {
 	var completedItems []aging.Item
 	if *showCompleted {
 		completedItems = aging.CompletedItems(agingCompleted, opts.MinCycleTime)
-		aging.RankItems(completedItems, cycleTimes)
+		aging.RankItems(completedItems, cycleTimes, threshold)
 
 		sort.Slice(completedItems, func(i, j int) bool {
 			return completedItems[i].AgeDays > completedItems[j].AgeDays
 		})
 	}
 
-	p85 := util.PercentileValue(cycleTimes, 85)
-
 	if len(cycleTimes) == 0 {
-		logx.Warnf("no completed issues found in the sample window; percentiles will be 0")
+		logx.Warnf("no completed issues found in the sample window; percentiles will be 0 and multipliers blank")
 	}
 
 	switch *format {
 	case "text":
-		return aging.RenderText(os.Stdout, inProgressItems, completedItems, *showCompleted, cycleTimes, p85, opts.SampleStart, opts.SampleEnd)
+		return aging.RenderText(os.Stdout, inProgressItems, completedItems, *showCompleted, meta)
 	case "json":
-		return aging.RenderJSON(os.Stdout, inProgressItems)
+		return aging.RenderJSON(os.Stdout, inProgressItems, meta)
 	case "html":
-		return aging.RenderHTML(os.Stdout, inProgressItems, completedItems, *showCompleted, p85, opts.SampleStart, opts.SampleEnd, len(cycleTimes))
+		return aging.RenderHTML(os.Stdout, inProgressItems, completedItems, *showCompleted, meta)
 	default:
 		return fmt.Errorf("unknown -format %q (use text, json, or html)", *format)
 	}

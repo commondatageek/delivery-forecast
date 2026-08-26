@@ -1,7 +1,10 @@
 package aging
 
 import (
+	"bytes"
+	"math"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 )
@@ -101,7 +104,9 @@ func TestRankItems(t *testing.T) {
 		{AgeDays: 0.5},  // 0th percentile (below all)
 	}
 
-	RankItems(items, cycleTimes)
+	// util.PercentileValue(cycleTimes, 85) = sorted[round(0.85*9)] = sorted[8] = 9.0
+	const threshold = 9.0
+	RankItems(items, cycleTimes, threshold)
 
 	if items[0].Percentile != 50 {
 		t.Errorf("5.0 days: got %d%%, want 50%%", items[0].Percentile)
@@ -111,5 +116,83 @@ func TestRankItems(t *testing.T) {
 	}
 	if items[2].Percentile != 0 {
 		t.Errorf("0.5 days: got %d%%, want 0%%", items[2].Percentile)
+	}
+
+	wantMult := []float64{5.0 / 9.0, 10.0 / 9.0, 0.5 / 9.0}
+	for i, want := range wantMult {
+		if math.Abs(items[i].Multiplier-want) > 1e-9 {
+			t.Errorf("items[%d].Multiplier: got %v, want %v", i, items[i].Multiplier, want)
+		}
+	}
+}
+
+func TestRankItemsZeroThreshold(t *testing.T) {
+	cycleTimes := []float64{1, 2, 3}
+	items := []Item{{AgeDays: 5.0}, {AgeDays: 0.0}}
+
+	RankItems(items, cycleTimes, 0)
+
+	for i, item := range items {
+		if item.Multiplier != 0 {
+			t.Errorf("items[%d].Multiplier: got %v, want 0", i, item.Multiplier)
+		}
+		if math.IsNaN(item.Multiplier) || math.IsInf(item.Multiplier, 0) {
+			t.Errorf("items[%d].Multiplier: got %v, want a finite non-NaN value", i, item.Multiplier)
+		}
+	}
+}
+
+func TestAgeClassFromMultiplier(t *testing.T) {
+	tests := []struct {
+		mult         float64
+		hasThreshold bool
+		want         string
+	}{
+		{1.00, true, "high"},
+		{1.01, true, "high"},
+		{0.99, true, "medium"},
+		{0.85, true, "medium"},
+		{0.84, true, "normal"},
+		{0.0, true, "normal"},
+		{1.50, false, "normal"},
+	}
+	for _, tt := range tests {
+		got := ageClass(tt.mult, tt.hasThreshold)
+		if got != tt.want {
+			t.Errorf("ageClass(%v, %v) = %q, want %q", tt.mult, tt.hasThreshold, got, tt.want)
+		}
+	}
+}
+
+func TestRenderTextMultiplierColumn(t *testing.T) {
+	item := Item{Identifier: "ENG-1", AgeDays: 6.0, Multiplier: 1.5}
+
+	var buf bytes.Buffer
+	meta := Meta{Percentile: 90, Threshold: 4}
+	if err := RenderText(&buf, []Item{item}, nil, false, meta); err != nil {
+		t.Fatalf("RenderText: %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "MULTIPLIER") {
+		t.Errorf("expected header to contain MULTIPLIER, got:\n%s", out)
+	}
+	if !strings.Contains(out, "1.50x") {
+		t.Errorf("expected row to contain 1.50x, got:\n%s", out)
+	}
+	if !strings.Contains(out, "P90: 4.0 days") {
+		t.Errorf("expected summary line to contain P90: 4.0 days, got:\n%s", out)
+	}
+
+	buf.Reset()
+	zeroMeta := Meta{Percentile: 90, Threshold: 0}
+	if err := RenderText(&buf, []Item{item}, nil, false, zeroMeta); err != nil {
+		t.Fatalf("RenderText: %v", err)
+	}
+	out = buf.String()
+	if !strings.Contains(out, "—") {
+		t.Errorf("expected degenerate output to contain an em dash, got:\n%s", out)
+	}
+	if strings.Contains(out, "1.50x") {
+		t.Errorf("expected degenerate output to have no multiplier value, got:\n%s", out)
 	}
 }

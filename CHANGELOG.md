@@ -34,6 +34,11 @@ behavior changes ship in minor releases, called out here.
 - **`history` package** (public, at the repo root) — the pure day-walk behind
   `forecast history`, now also the single implementation `cfd.BuildGrid` and
   `simulate.RunBacktest` both build on.
+- **`forecast aging -percentile`** (default `85`) chooses which percentile of
+  the cycle-time distribution the report is anchored to — previously
+  hardcoded. Every item also gets a `MULTIPLIER` column (`multiplier` key in
+  JSON): its age expressed as a multiple of the cycle time at that
+  percentile, so `1.34x` reads as "34% older than the anchor."
 
 ### Changed
 
@@ -52,6 +57,13 @@ behavior changes ship in minor releases, called out here.
   issue was silently excluded from the percentile baseline. Aging percentiles
   may move slightly if your data has unassigned completed work. `sim` still
   requires an assignee, where a per-engineer pool genuinely needs one.
+- **`forecast aging -format json` gains a `multiplier` key** on every object.
+  Relevant to anyone decoding the output strictly.
+- **`forecast aging`'s text/HTML color bands now key on the multiplier**
+  (`>= 1.00x` high, `>= 0.85x` medium) rather than on the percentile rank
+  (`>= 85` / `>= 70`). At the default `-percentile 85` the two agree on
+  roughly 99.5% of rows; the rest are hairline cases that used to be colored
+  against the number printed beside them.
 
 ### Deprecated
 

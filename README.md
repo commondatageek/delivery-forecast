@@ -262,6 +262,14 @@ Note: `-simulations` here means "simulations per backtested day" (same default, 
 
 Computes the historical cycle-time distribution from completed issues, then
 ranks currently in-progress issues by percentile against that distribution.
+Every item also gets a `MULTIPLIER`: its age divided by the cycle time at
+`-percentile` (the "threshold"), so `1.34x` means 34% older than that
+anchor and `0.80x` means 20% younger. The `PERCENTILE` and `MULTIPLIER`
+columns answer related but different questions computed by different
+methods (cumulative rank vs. nearest rank), so on rare rows near a
+boundary they can disagree by a hair about which side of the anchor an
+item falls on — the color bands are keyed on the multiplier specifically
+so a cell's color always agrees with the number printed in it.
 
 ```bash
 forecast aging -db linear.db -format html > aging.html
@@ -276,6 +284,7 @@ forecast aging -db linear.db -format html > aging.html
 | `-sample-end` | today | end of completed-issue window (YYYY-MM-DD) |
 | `-format` | `text` | output format: `text`, `json`, `html` |
 | `-min-cycle-time` | | exclude completed issues with cycle time below this duration (e.g. `5m`, `1h`, `1d`) |
+| `-percentile` | `85` | percentile of the cycle-time distribution to anchor the report to; the `MULTIPLIER` column shows each item's age as a multiple of that threshold |
 | `-teams` | all teams | comma-separated team keys to filter by (e.g. DATA,PLT) |
 | `-config` | | path to a YAML config file supplying flag values (CLI flags override) |
 

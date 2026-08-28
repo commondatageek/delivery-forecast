@@ -238,6 +238,21 @@ var textColumns = []string{
 	"STATE", "START DATE", "ASSIGNEE",
 }
 
+// numericTextColumns are the textColumns indices RenderText colors by
+// ageClass when color is enabled — DAYS, PERCENTILE, MULTIPLIER — matching
+// the HTML renderer's ".num" cells.
+var numericTextColumns = map[int]bool{2: true, 3: true, 4: true}
+
+// ageColor is the ANSI code RenderText wraps a numeric cell in for a given
+// ageClass, matching the severity colors internal/logx uses for warn/error.
+// "normal" has no entry, so it renders uncolored.
+var ageColor = map[string]string{
+	"high":   "\033[31m", // red
+	"medium": "\033[33m", // yellow
+}
+
+const colorReset = "\033[0m"
+
 // formatMultiplier renders an item's age as a multiple of the report's
 // percentile threshold, e.g. "1.34x". An em dash stands in when the
 // distribution has no usable threshold to divide by.
@@ -290,12 +305,20 @@ const textColGap = "  "
 // writeTextRow pads each cell to widths (via go-runewidth, so wide runes
 // don't overshoot their column) and joins them with a two-space gutter, the
 // same layout tabwriter used to produce. The last column is left unpadded,
-// matching tabwriter's treatment of a non-tab-terminated trailing cell.
-func writeTextRow(w io.Writer, cells []string, widths []int) {
+// matching tabwriter's treatment of a non-tab-terminated trailing cell. When
+// color is true, cls names an ageClass, and the column is numeric, the cell
+// is wrapped in its ageColor code after padding — so the escape bytes never
+// factor into alignment.
+func writeTextRow(w io.Writer, cells []string, widths []int, cls string, color bool) {
 	parts := make([]string, len(cells))
 	for i, cell := range cells {
 		if i < len(cells)-1 {
 			cell = runewidth.FillRight(cell, widths[i])
+		}
+		if color && numericTextColumns[i] {
+			if code, ok := ageColor[cls]; ok {
+				cell = code + cell + colorReset
+			}
 		}
 		parts[i] = cell
 	}
@@ -316,8 +339,11 @@ func writeTextDivider(w io.Writer, widths []int) {
 // up the percentile distribution itself. Both tables share a single
 // column-width pass so they stay horizontally aligned with each other, and
 // that pass measures display width (not raw rune count) so a wide rune such
-// as an emoji in a title doesn't misalign the columns after it.
-func RenderText(w io.Writer, items []Item, completed []Item, showCompleted bool, meta Meta) error {
+// as an emoji in a title doesn't misalign the columns after it. When color
+// is true, DAYS/PERCENTILE/MULTIPLIER cells are colored by ageClass; the
+// caller decides color based on isatty/NO_COLOR, keeping this package
+// IO-agnostic.
+func RenderText(w io.Writer, items []Item, completed []Item, showCompleted bool, meta Meta, color bool) error {
 	fmt.Fprintf(w, "Cycle time distribution: %d completed issues (%s to %s)  ·  %s: %.1f days\n\n",
 		meta.CompletedCount,
 		meta.SampleStart.Format("2006-01-02"),
@@ -340,15 +366,15 @@ func RenderText(w io.Writer, items []Item, completed []Item, showCompleted bool,
 
 	widths := textColumnWidths(itemRows, completedRows)
 
-	writeTextRow(w, textColumns, widths)
-	for _, row := range itemRows {
-		writeTextRow(w, row, widths)
+	writeTextRow(w, textColumns, widths, "", false)
+	for i, row := range itemRows {
+		writeTextRow(w, row, widths, ageClass(items[i].Multiplier, meta.HasThreshold()), color)
 	}
 	if showCompleted {
 		writeTextDivider(w, widths)
-		writeTextRow(w, textColumns, widths)
-		for _, row := range completedRows {
-			writeTextRow(w, row, widths)
+		writeTextRow(w, textColumns, widths, "", false)
+		for i, row := range completedRows {
+			writeTextRow(w, row, widths, ageClass(completed[i].Multiplier, meta.HasThreshold()), color)
 		}
 	}
 	return nil

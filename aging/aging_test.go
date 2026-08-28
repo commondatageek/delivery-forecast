@@ -172,7 +172,7 @@ func TestRenderTextMultiplierColumn(t *testing.T) {
 
 	var buf bytes.Buffer
 	meta := Meta{Percentile: 90, Threshold: 4}
-	if err := RenderText(&buf, []Item{item}, nil, false, meta); err != nil {
+	if err := RenderText(&buf, []Item{item}, nil, false, meta, false); err != nil {
 		t.Fatalf("RenderText: %v", err)
 	}
 	out := buf.String()
@@ -188,7 +188,7 @@ func TestRenderTextMultiplierColumn(t *testing.T) {
 
 	buf.Reset()
 	zeroMeta := Meta{Percentile: 90, Threshold: 0}
-	if err := RenderText(&buf, []Item{item}, nil, false, zeroMeta); err != nil {
+	if err := RenderText(&buf, []Item{item}, nil, false, zeroMeta, false); err != nil {
 		t.Fatalf("RenderText: %v", err)
 	}
 	out = buf.String()
@@ -197,6 +197,55 @@ func TestRenderTextMultiplierColumn(t *testing.T) {
 	}
 	if strings.Contains(out, "1.50x") {
 		t.Errorf("expected degenerate output to have no multiplier value, got:\n%s", out)
+	}
+}
+
+func TestRenderTextColor(t *testing.T) {
+	items := []Item{
+		{Identifier: "ENG-1", AgeDays: 10.0, Multiplier: 1.2}, // high
+		{Identifier: "ENG-2", AgeDays: 5.0, Multiplier: 0.9},  // medium
+		{Identifier: "ENG-3", AgeDays: 1.0, Multiplier: 0.1},  // normal
+	}
+	meta := Meta{Percentile: 85, Threshold: 4}
+
+	var plain bytes.Buffer
+	if err := RenderText(&plain, items, nil, false, meta, false); err != nil {
+		t.Fatalf("RenderText: %v", err)
+	}
+	if strings.Contains(plain.String(), "\033[") {
+		t.Errorf("color=false must not emit ANSI escapes, got:\n%s", plain.String())
+	}
+
+	var colored bytes.Buffer
+	if err := RenderText(&colored, items, nil, false, meta, true); err != nil {
+		t.Fatalf("RenderText: %v", err)
+	}
+	lines := strings.Split(colored.String(), "\n")
+
+	var header, high, medium, normal string
+	for _, l := range lines {
+		switch {
+		case strings.Contains(l, "IDENTIFIER") && header == "":
+			header = l
+		case strings.Contains(l, "ENG-1"):
+			high = l
+		case strings.Contains(l, "ENG-2"):
+			medium = l
+		case strings.Contains(l, "ENG-3"):
+			normal = l
+		}
+	}
+	if strings.Contains(header, "\033[") {
+		t.Errorf("header row must never be colored, got:\n%s", header)
+	}
+	if !strings.Contains(high, ageColor["high"]) || !strings.Contains(high, colorReset) {
+		t.Errorf("high row should be wrapped in %q, got:\n%s", ageColor["high"], high)
+	}
+	if !strings.Contains(medium, ageColor["medium"]) || !strings.Contains(medium, colorReset) {
+		t.Errorf("medium row should be wrapped in %q, got:\n%s", ageColor["medium"], medium)
+	}
+	if strings.Contains(normal, "\033[") {
+		t.Errorf("normal row should not be colored, got:\n%s", normal)
 	}
 }
 
@@ -213,7 +262,7 @@ func TestRenderTextEmojiAlignment(t *testing.T) {
 	meta := Meta{Percentile: 85, Threshold: 0}
 
 	var buf bytes.Buffer
-	if err := RenderText(&buf, items, nil, false, meta); err != nil {
+	if err := RenderText(&buf, items, nil, false, meta, false); err != nil {
 		t.Fatalf("RenderText: %v", err)
 	}
 

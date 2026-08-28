@@ -7,6 +7,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
+
+	"github.com/mattn/go-runewidth"
 )
 
 func mustTime(s string) time.Time {
@@ -194,5 +197,70 @@ func TestRenderTextMultiplierColumn(t *testing.T) {
 	}
 	if strings.Contains(out, "1.50x") {
 		t.Errorf("expected degenerate output to have no multiplier value, got:\n%s", out)
+	}
+}
+
+// TestRenderTextEmojiAlignment guards against a wide rune (e.g. an emoji) in
+// a title throwing off the columns that follow it: tabwriter, which
+// RenderText used to rely on, pads by rune count, and an emoji is one rune
+// but two terminal cells wide, so a title's actual on-screen width used to
+// silently drift from what tabwriter assumed.
+func TestRenderTextEmojiAlignment(t *testing.T) {
+	items := []Item{
+		{Identifier: "ENG-1", Title: "🚀🎉 Ship the launch", AgeDays: 9.0},
+		{Identifier: "ENG-2", Title: "Plain ascii title", AgeDays: 9.0},
+	}
+	meta := Meta{Percentile: 85, Threshold: 0}
+
+	var buf bytes.Buffer
+	if err := RenderText(&buf, items, nil, false, meta); err != nil {
+		t.Fatalf("RenderText: %v", err)
+	}
+
+	var emojiLine, plainLine string
+	for _, l := range strings.Split(buf.String(), "\n") {
+		switch {
+		case strings.Contains(l, "ENG-1"):
+			emojiLine = l
+		case strings.Contains(l, "ENG-2"):
+			plainLine = l
+		}
+	}
+	if emojiLine == "" || plainLine == "" {
+		t.Fatalf("expected both rows in output, got:\n%s", buf.String())
+	}
+
+	idx1 := strings.Index(emojiLine, "9.0")
+	idx2 := strings.Index(plainLine, "9.0")
+	if idx1 < 0 || idx2 < 0 {
+		t.Fatalf("expected both rows to contain the DAYS value, got:\n%s\n%s", emojiLine, plainLine)
+	}
+	w1 := runewidth.StringWidth(emojiLine[:idx1])
+	w2 := runewidth.StringWidth(plainLine[:idx2])
+	if w1 != w2 {
+		t.Errorf("DAYS column starts at different display widths (emoji row %d, plain row %d):\n%s\n%s", w1, w2, emojiLine, plainLine)
+	}
+}
+
+func TestTruncateTitleValidUTF8(t *testing.T) {
+	// Multi-byte runes positioned right where the old byte-slicing
+	// truncation used to cut through mid-rune.
+	title := strings.Repeat("é", 60)
+	got := truncateTitle(title)
+	if !utf8.ValidString(got) {
+		t.Fatalf("truncateTitle produced invalid UTF-8: %q", got)
+	}
+	if w := runewidth.StringWidth(got); w > maxTitleWidth {
+		t.Errorf("truncateTitle width = %d, want <= %d", w, maxTitleWidth)
+	}
+}
+
+func TestTruncateTitleWideRunes(t *testing.T) {
+	// 40 emoji is only 40 runes but 80 display columns — well over budget
+	// even though rune count alone wouldn't say so.
+	title := strings.Repeat("🚀", 40)
+	got := truncateTitle(title)
+	if w := runewidth.StringWidth(got); w > maxTitleWidth {
+		t.Errorf("truncateTitle width = %d, want <= %d", w, maxTitleWidth)
 	}
 }

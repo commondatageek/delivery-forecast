@@ -269,7 +269,9 @@ columns answer related but different questions computed by different
 methods (cumulative rank vs. nearest rank), so on rare rows near a
 boundary they can disagree by a hair about which side of the anchor an
 item falls on — the color bands are keyed on the multiplier specifically
-so a cell's color always agrees with the number printed in it.
+so a cell's color always agrees with the number printed in it. `-format
+text` colors the same cells with ANSI codes when stdout is a terminal and
+`NO_COLOR` is unset.
 
 ```bash
 forecast aging -db linear.db -format html > aging.html

@@ -8,6 +8,8 @@ import (
 	"sort"
 	"time"
 
+	"github.com/mattn/go-isatty"
+
 	"github.com/commondatageek/delivery-forecast/aging"
 	"github.com/commondatageek/delivery-forecast/internal/logx"
 	"github.com/commondatageek/delivery-forecast/internal/util"
@@ -177,7 +179,8 @@ func cmdAging(args []string) error {
 
 	switch *format {
 	case "text":
-		return aging.RenderText(os.Stdout, inProgressItems, completedItems, *showCompleted, meta)
+		color := isatty.IsTerminal(os.Stdout.Fd()) && os.Getenv("NO_COLOR") == ""
+		return aging.RenderText(os.Stdout, inProgressItems, completedItems, *showCompleted, meta, color)
 	case "json":
 		return aging.RenderJSON(os.Stdout, inProgressItems, meta)
 	case "html":

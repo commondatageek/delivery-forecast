@@ -4,11 +4,13 @@ go 1.26
 
 require (
 	github.com/mattn/go-isatty v0.0.21
+	github.com/mattn/go-runewidth v0.0.28
 	gopkg.in/yaml.v3 v3.0.1
 	modernc.org/sqlite v1.52.0
 )
 
 require (
+	github.com/clipperhouse/uax29/v2 v2.2.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect

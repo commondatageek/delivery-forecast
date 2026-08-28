@@ -7,8 +7,9 @@ import (
 	"io"
 	"math"
 	"strings"
-	"text/tabwriter"
 	"time"
+
+	"github.com/mattn/go-runewidth"
 
 	"github.com/commondatageek/delivery-forecast/internal/util"
 )
@@ -200,12 +201,15 @@ func formatState(name, typ string) string {
 	}
 }
 
+// maxTitleWidth is the TITLE cell's budget in terminal display cells (a wide
+// rune such as an emoji counts as two), not bytes or runes: truncating by
+// byte length can cut a multi-byte UTF-8 sequence in half, and truncating by
+// rune count can still overshoot the on-screen width wide runes actually
+// occupy — either way throws off every column that follows.
+const maxTitleWidth = 50
+
 func truncateTitle(title string) string {
-	const maxLen = 50
-	if len(title) <= maxLen {
-		return title
-	}
-	return title[:maxLen] + "..."
+	return runewidth.Truncate(title, maxTitleWidth, "...")
 }
 
 // ageClass buckets an item for display by how its age compares to the
@@ -234,19 +238,20 @@ var textColumns = []string{
 	"STATE", "START DATE", "ASSIGNEE",
 }
 
-var textHeader = strings.Join(textColumns, "\t")
+// numericTextColumns are the textColumns indices RenderText colors by
+// ageClass when color is enabled — DAYS, PERCENTILE, MULTIPLIER — matching
+// the HTML renderer's ".num" cells.
+var numericTextColumns = map[int]bool{2: true, 3: true, 4: true}
 
-// textDivider is tab-separated with the same cell count as textHeader so it
-// stays within the same tabwriter column block as the rows around it —
-// otherwise the two sections' columns would be sized independently and no
-// longer line up.
-var textDivider = func() string {
-	dashes := make([]string, len(textColumns))
-	for i, c := range textColumns {
-		dashes[i] = strings.Repeat("-", len(c))
-	}
-	return strings.Join(dashes, "\t")
-}()
+// ageColor is the ANSI code RenderText wraps a numeric cell in for a given
+// ageClass, matching the severity colors internal/logx uses for warn/error.
+// "normal" has no entry, so it renders uncolored.
+var ageColor = map[string]string{
+	"high":   "\033[31m", // red
+	"medium": "\033[33m", // yellow
+}
+
+const colorReset = "\033[0m"
 
 // formatMultiplier renders an item's age as a multiple of the report's
 // percentile threshold, e.g. "1.34x". An em dash stands in when the
@@ -258,26 +263,87 @@ func formatMultiplier(m float64, meta Meta) string {
 	return fmt.Sprintf("%.2fx", m)
 }
 
-func writeItemRow(tw *tabwriter.Writer, item Item, meta Meta) {
+// itemCells renders an item's textColumns values as plain (unpadded,
+// uncolored) strings.
+func itemCells(item Item, meta Meta) []string {
 	pct := item.Percentile
-	fmt.Fprintf(tw, "%s\t%s\t%.1f\t%d%s\t%s\t%s\t%s\t%s\n",
+	return []string{
 		item.Identifier,
 		truncateTitle(item.Title),
-		item.AgeDays,
-		pct, util.OrdinalSuffix(pct),
+		fmt.Sprintf("%.1f", item.AgeDays),
+		fmt.Sprintf("%d%s", pct, util.OrdinalSuffix(pct)),
 		formatMultiplier(item.Multiplier, meta),
 		formatState(item.StateName, item.StateType),
 		formatStartDate(item.StartedAt),
 		item.Assignee,
-	)
+	}
+}
+
+// textColumnWidths measures every row across every section (header included)
+// with go-runewidth rather than a plain rune count, so a wide rune — e.g. an
+// emoji in a title — which occupies two terminal cells but is one rune,
+// doesn't throw off the padding of every column that follows it.
+func textColumnWidths(sections ...[][]string) []int {
+	widths := make([]int, len(textColumns))
+	for i, c := range textColumns {
+		widths[i] = runewidth.StringWidth(c)
+	}
+	for _, rows := range sections {
+		for _, row := range rows {
+			for i, cell := range row {
+				if w := runewidth.StringWidth(cell); w > widths[i] {
+					widths[i] = w
+				}
+			}
+		}
+	}
+	return widths
+}
+
+const textColGap = "  "
+
+// writeTextRow pads each cell to widths (via go-runewidth, so wide runes
+// don't overshoot their column) and joins them with a two-space gutter, the
+// same layout tabwriter used to produce. The last column is left unpadded,
+// matching tabwriter's treatment of a non-tab-terminated trailing cell. When
+// color is true, cls names an ageClass, and the column is numeric, the cell
+// is wrapped in its ageColor code after padding — so the escape bytes never
+// factor into alignment.
+func writeTextRow(w io.Writer, cells []string, widths []int, cls string, color bool) {
+	parts := make([]string, len(cells))
+	for i, cell := range cells {
+		if i < len(cells)-1 {
+			cell = runewidth.FillRight(cell, widths[i])
+		}
+		if color && numericTextColumns[i] {
+			if code, ok := ageColor[cls]; ok {
+				cell = code + cell + colorReset
+			}
+		}
+		parts[i] = cell
+	}
+	fmt.Fprintln(w, strings.Join(parts, textColGap))
+}
+
+func writeTextDivider(w io.Writer, widths []int) {
+	parts := make([]string, len(widths))
+	for i, wid := range widths {
+		parts[i] = strings.Repeat("-", wid)
+	}
+	fmt.Fprintln(w, strings.Join(parts, textColGap))
 }
 
 // RenderText writes a tabular aging report to w: in-progress issues ranked by
 // age/percentile/multiplier. When showCompleted is true, a second section
 // follows — separated by a divider — listing the completed issues that make
 // up the percentile distribution itself. Both tables share a single
-// tabwriter column block so their columns stay horizontally aligned.
-func RenderText(w io.Writer, items []Item, completed []Item, showCompleted bool, meta Meta) error {
+// column-width pass so they stay horizontally aligned with each other, and
+// that pass measures display width (not raw rune count) so a wide rune such
+// as an emoji in a title doesn't misalign the columns after it. When color
+// is true, DAYS/PERCENTILE/MULTIPLIER cells are colored by ageClass; the
+// caller decides color based on isatty/NO_COLOR, keeping this package
+// IO-agnostic.
+func RenderText(w io.Writer, items []Item, completed []Item, showCompleted bool, meta Meta, color bool) error {
 	fmt.Fprintf(w, "Cycle time distribution: %d completed issues (%s to %s)  ·  %s: %.1f days\n\n",
 		meta.CompletedCount,
 		meta.SampleStart.Format("2006-01-02"),
@@ -285,19 +351,33 @@ func RenderText(w io.Writer, items []Item, completed []Item, showCompleted bool,
 		meta.Label(),
 		meta.Threshold,
 	)
-	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, textHeader)
-	for _, item := range items {
-		writeItemRow(tw, item, meta)
+
+	itemRows := make([][]string, len(items))
+	for i, item := range items {
+		itemRows[i] = itemCells(item, meta)
 	}
+	var completedRows [][]string
 	if showCompleted {
-		fmt.Fprintln(tw, textDivider)
-		fmt.Fprintln(tw, textHeader)
-		for _, item := range completed {
-			writeItemRow(tw, item, meta)
+		completedRows = make([][]string, len(completed))
+		for i, item := range completed {
+			completedRows[i] = itemCells(item, meta)
 		}
 	}
-	return tw.Flush()
+
+	widths := textColumnWidths(itemRows, completedRows)
+
+	writeTextRow(w, textColumns, widths, "", false)
+	for i, row := range itemRows {
+		writeTextRow(w, row, widths, ageClass(items[i].Multiplier, meta.HasThreshold()), color)
+	}
+	if showCompleted {
+		writeTextDivider(w, widths)
+		writeTextRow(w, textColumns, widths, "", false)
+		for i, row := range completedRows {
+			writeTextRow(w, row, widths, ageClass(completed[i].Multiplier, meta.HasThreshold()), color)
+		}
+	}
+	return nil
 }
 
 type jsonItem struct {

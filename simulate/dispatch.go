@@ -11,6 +11,12 @@ type Params struct {
 	Mode Mode
 	// Engineers is the `-engineers` flag (ModeAnonymous only).
 	Engineers int
+	// EngineerNames is the `-engineers` names, if the flag was given names
+	// rather than a count; len == Engineers when set (ModeAnonymous only).
+	EngineerNames []string
+	// Calendar is the horizon calendar anchored at the target start date; nil
+	// means every day is a working day.
+	Calendar *Calendar
 	// Days is the `-days` flag (sim items; ignored by DaysToComplete).
 	Days int
 	// Items is the `-items` flag (sim days/probability; ignored by ItemsInDays).
@@ -26,30 +32,15 @@ type Params struct {
 	Progress func(done, total int)
 }
 
-// ItemsInDays answers "how many items in Days days?" dispatching to the
-// appropriate engine based on p.Mode and forwarding p.Progress to RunSimulations.
-//
-// ModeFullTeam delegates to SimulateItemsInDays with numDailyDraws=1, which
-// reproduces the single-draw-per-day loop over the whole-team series exactly.
+// ItemsInDays answers "how many items in Days days?", forwarding p.Progress
+// to RunSimulations. The mode only decides which slots draw (see
+// SamplePool.Slots); the engine itself is mode-agnostic.
 func ItemsInDays(pool *SamplePool, p Params) []int {
-	switch p.Mode {
-	case ModeFullTeam:
-		return SimulateItemsInDays(pool.PerEngineer[WholeTeamKey], 1, p.Days, p.Simulations, p.Workers, p.Seed, p.Progress)
-	default: // ModeAnonymous
-		return SimulateItemsInDays(pool.Combined, p.Engineers, p.Days, p.Simulations, p.Workers, p.Seed, p.Progress)
-	}
+	return simulateItems(pool.Slots(p), p.Calendar, p.Days, p.Simulations, p.Workers, p.Seed, p.Progress)
 }
 
-// DaysToComplete answers "how many days to finish Items items?" dispatching to
-// the appropriate engine based on p.Mode and forwarding p.Progress to RunSimulations.
-//
-// ModeFullTeam delegates to SimulateDaysToComplete with numEngineers=1, which
-// reproduces the single-draw-per-day loop over the whole-team series exactly.
+// DaysToComplete answers "how many days to finish Items items?", forwarding
+// p.Progress to RunSimulations. See ItemsInDays.
 func DaysToComplete(pool *SamplePool, p Params) []int {
-	switch p.Mode {
-	case ModeFullTeam:
-		return SimulateDaysToComplete(pool.PerEngineer[WholeTeamKey], 1, p.Items, p.Simulations, p.Workers, p.Seed, p.Progress)
-	default: // ModeAnonymous
-		return SimulateDaysToComplete(pool.Combined, p.Engineers, p.Items, p.Simulations, p.Workers, p.Seed, p.Progress)
-	}
+	return simulateDays(pool.Slots(p), p.Calendar, p.Items, p.Simulations, p.Workers, p.Seed, p.Progress)
 }

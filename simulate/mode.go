@@ -1,6 +1,9 @@
 package simulate
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // Mode is which of the two mutually-exclusive sampling strategies a simulation uses.
 type Mode int
@@ -29,14 +32,19 @@ func ResolveMode(engineersSet, wholeTeam bool) (Mode, error) {
 	}
 }
 
-// ModeLabel returns the noun phrase describing the run,
-// e.g. "whole-team throughput" or "3 equivalent engineers".
-func ModeLabel(mode Mode, engineers int) string {
+// ModeLabel returns the noun phrase describing the run, e.g. "whole-team
+// throughput", "3 equivalent engineers", or "3 equivalent engineers [alice,
+// bob, carol]" when the engineers were named.
+func ModeLabel(mode Mode, engineers int, names []string) string {
 	switch mode {
 	case ModeFullTeam:
 		return "whole-team throughput"
 	default:
-		return fmt.Sprintf("%d equivalent engineers", engineers)
+		label := fmt.Sprintf("%d equivalent engineers", engineers)
+		if len(names) > 0 {
+			label += " [" + strings.Join(names, ", ") + "]"
+		}
+		return label
 	}
 }
 

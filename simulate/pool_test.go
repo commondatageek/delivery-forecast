@@ -236,3 +236,37 @@ func TestBuildPool_PanicsOnMismatchedAnchor(t *testing.T) {
 	}()
 	BuildPool(nil, cal, start, end, false)
 }
+
+func TestSlots_Anonymous(t *testing.T) {
+	pool := NewSamplePool(map[string][]int{"alice": {1, 2}, "bob": {3}})
+	got := pool.Slots(Params{Mode: ModeAnonymous, Engineers: 3})
+	if len(got) != 3 {
+		t.Fatalf("len(slots) = %d, want 3", len(got))
+	}
+	for i, s := range got {
+		if s.Name != "" || !reflect.DeepEqual(s.Samples, []int{1, 2, 3}) {
+			t.Errorf("slot %d = %+v, want anonymous over Combined {1,2,3}", i, s)
+		}
+	}
+}
+
+func TestSlots_Named(t *testing.T) {
+	pool := NewSamplePool(map[string][]int{"alice": {1, 2}, "bob": {3}})
+	got := pool.Slots(Params{Mode: ModeAnonymous, Engineers: 2, EngineerNames: []string{"x", "y"}})
+	if len(got) != 2 || got[0].Name != "x" || got[1].Name != "y" {
+		t.Fatalf("slots = %+v, want named x, y", got)
+	}
+	for _, s := range got {
+		if !reflect.DeepEqual(s.Samples, []int{1, 2, 3}) {
+			t.Errorf("slot %q draws %v, want pooled Combined {1,2,3} (not the named engineer's own history)", s.Name, s.Samples)
+		}
+	}
+}
+
+func TestSlots_WholeTeam(t *testing.T) {
+	pool := NewSamplePool(map[string][]int{WholeTeamKey: {4, 0, 5}})
+	got := pool.Slots(Params{Mode: ModeFullTeam, Engineers: 7})
+	if len(got) != 1 || got[0].Name != "" || !reflect.DeepEqual(got[0].Samples, []int{4, 0, 5}) {
+		t.Fatalf("slots = %+v, want one anonymous slot over the whole-team series", got)
+	}
+}

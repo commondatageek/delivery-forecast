@@ -267,7 +267,7 @@ func newManifest(in manifestInputs) *Manifest {
 		Flags:         flags,
 		Resolved: Resolved{
 			Mode:             modeName(in.Mode),
-			ModeLabel:        simulate.ModeLabel(in.Mode, in.Engineers),
+			ModeLabel:        simulate.ModeLabel(in.Mode, in.Engineers, nil),
 			Engineers:        in.Engineers,
 			TypicalEngineers: in.TypicalEngineers,
 			WholeTeam:        in.WholeTeam,

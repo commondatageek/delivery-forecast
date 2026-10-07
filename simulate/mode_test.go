@@ -38,13 +38,15 @@ func TestModeLabel(t *testing.T) {
 	cases := []struct {
 		mode      Mode
 		engineers int
+		names     []string
 		want      string
 	}{
-		{ModeFullTeam, 3, "whole-team throughput"},
-		{ModeAnonymous, 3, "3 equivalent engineers"},
+		{ModeFullTeam, 3, nil, "whole-team throughput"},
+		{ModeAnonymous, 3, nil, "3 equivalent engineers"},
+		{ModeAnonymous, 3, []string{"alice", "bob", "carol"}, "3 equivalent engineers [alice, bob, carol]"},
 	}
 	for _, c := range cases {
-		if got := ModeLabel(c.mode, c.engineers); got != c.want {
+		if got := ModeLabel(c.mode, c.engineers, c.names); got != c.want {
 			t.Errorf("ModeLabel(%v) = %q, want %q", c.mode, got, c.want)
 		}
 	}

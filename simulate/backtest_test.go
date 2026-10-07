@@ -76,3 +76,45 @@ func TestRunBacktest_NoRemainingItemsStopsImmediately(t *testing.T) {
 		t.Errorf("row 0 = %+v, want {completed:1 remaining:0 prob:100}", rows[0])
 	}
 }
+
+func TestRunBacktest_CalendarAppliesPerReplayDay(t *testing.T) {
+	// One item created on day 1 and never completed, so every replayed day has
+	// Remaining == 1 and the probability comes from the Monte Carlo branch.
+	items := []BacktestItem{{CreatedAt: day(2025, 1, 1), StartedAt: day(2025, 1, 1)}}
+	start, target := day(2025, 1, 1), day(2025, 1, 5)
+	pool := &SamplePool{Combined: []int{10}, PerEngineer: map[string][]int{WholeTeamKey: {10}}}
+	p := Params{Mode: ModeAnonymous, Engineers: 1, Simulations: 50, Workers: 1, Seed: 1}
+
+	open := RunBacktest(pool, items, start, target, p)
+	for _, r := range open {
+		if r.Remaining > 0 && r.Prob != 100 {
+			t.Fatalf("no calendar: %s prob = %v, want 100 (pool is far more than enough)", r.Date.Format("2006-01-02"), r.Prob)
+		}
+	}
+
+	// Every day from the replay start through the target is off.
+	p.Calendar = NewCalendar(mustParseExclusions(t, `{"global": ["2025-01-01/2025-01-05"]}`), start)
+	closed := RunBacktest(pool, items, start, target, p)
+	if len(closed) == 0 {
+		t.Fatal("no rows")
+	}
+	for _, r := range closed {
+		if r.Remaining > 0 && r.Prob != 0 {
+			t.Errorf("all-off calendar: %s prob = %v, want 0", r.Date.Format("2006-01-02"), r.Prob)
+		}
+	}
+
+	// Per-replay-day rebasing: only Jan 3-5 are off, so replaying from Jan 1
+	// still has working days left (Jan 1-2) and from Jan 3 has none.
+	p.Calendar = NewCalendar(mustParseExclusions(t, `{"global": ["2025-01-03/2025-01-05"]}`), start)
+	mixed := RunBacktest(pool, items, start, target, p)
+	for _, r := range mixed {
+		want := 100.0
+		if !r.Date.Before(day(2025, 1, 3)) {
+			want = 0
+		}
+		if r.Prob != want {
+			t.Errorf("%s prob = %v, want %v", r.Date.Format("2006-01-02"), r.Prob, want)
+		}
+	}
+}

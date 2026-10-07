@@ -65,6 +65,11 @@ behavior changes ship in minor releases, called out here.
   (`>= 85` / `>= 70`). At the default `-percentile 85` the two agree on
   roughly 99.5% of rows; the rest are hairline cases that used to be colored
   against the number printed beside them.
+- **Pinned `-random-seed` results from earlier builds no longer reproduce.**
+  The engine now draws day-by-day across slots (to apply calendar exclusions)
+  rather than engineer-by-engineer, so the RNG stream is consumed in a
+  different order. Same-build determinism is unchanged: the same seed, inputs,
+  and `-goroutines` still give identical output every run.
 
 ### Deprecated
 

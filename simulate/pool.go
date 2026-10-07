@@ -55,6 +55,22 @@ func NewSamplePool(perEngineer map[string][]int) *SamplePool {
 	}
 }
 
+// Slots derives the simulation's slots from p: whole-team mode is one
+// anonymous slot over the summed series; anonymous mode is p.Engineers slots
+// over Combined, named after p.EngineerNames when given.
+func (sp *SamplePool) Slots(p Params) []Slot {
+	if p.Mode == ModeFullTeam {
+		return []Slot{{Samples: sp.PerEngineer[WholeTeamKey]}}
+	}
+	slots := anonymousSlots(sp.Combined, p.Engineers)
+	for i := range slots {
+		if i < len(p.EngineerNames) {
+			slots[i].Name = p.EngineerNames[i]
+		}
+	}
+	return slots
+}
+
 // combineSamples concatenates all engineers' samples into a flat slice,
 // ordered by engineer name so the result (and thus anything sampled from it
 // under a pinned seed) is deterministic across runs.

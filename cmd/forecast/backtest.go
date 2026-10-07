@@ -162,7 +162,7 @@ func cmdSimBacktest(args []string) error {
 	case "csv":
 		return printBacktestCSV(rows, today)
 	default:
-		label := simulate.ModeLabel(mode, *sf.Engineers)
+		label := simulate.ModeLabel(mode, *sf.Engineers, nil)
 		scope := *project
 		if *milestone != "" {
 			scope += " / " + *milestone

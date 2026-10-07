@@ -57,34 +57,72 @@ func RunSimulations(numSimulations, numWorkers int, seed int64, trial func(rng *
 	return results
 }
 
-// SimulateItemsInDays returns the distribution of total items completed in
-// `days` days by `numDailyDraws` equivalent engineers sampling from samples.
-func SimulateItemsInDays(samples []int, numDailyDraws, days, numSimulations, numWorkers int, seed int64, progress func(done, total int)) []int {
+// Slot is one daily draw in a simulation: a (possibly empty) engineer name
+// and the sample slice it draws from. Name "" is an anonymous slot, which a
+// Calendar can only exclude via its global rules.
+type Slot struct {
+	Name    string
+	Samples []int
+}
+
+// anonymousSlots returns n unnamed slots all drawing from samples.
+func anonymousSlots(samples []int, n int) []Slot {
+	slots := make([]Slot, n)
+	for i := range slots {
+		slots[i] = Slot{Samples: samples}
+	}
+	return slots
+}
+
+// simulateItems returns the distribution of total items completed in `days`
+// calendar days by slots. A slot contributes nothing on a day cal says it does
+// not work, and that day does not consume an RNG draw for it. Iteration is
+// day-outer, slot-inner, so the RNG stream's order depends on this loop shape.
+func simulateItems(slots []Slot, cal *Calendar, days, numSimulations, numWorkers int, seed int64, progress func(done, total int)) []int {
 	return RunSimulations(numSimulations, numWorkers, seed, func(rng *rand.Rand) int {
 		total := 0
-		for e := 0; e < numDailyDraws; e++ {
-			for d := 0; d < days; d++ {
-				total += samples[rng.Intn(len(samples))]
+		for d := 0; d < days; d++ {
+			for _, s := range slots {
+				if cal.Working(s.Name, d) {
+					total += s.Samples[rng.Intn(len(s.Samples))]
+				}
 			}
 		}
 		return total
 	}, progress)
 }
 
-// SimulateDaysToComplete returns the distribution of days needed for
-// `numEngineers` equivalent engineers to complete `items` items sampling from samples.
-func SimulateDaysToComplete(samples []int, numEngineers, items, numSimulations, numWorkers int, seed int64, progress func(done, total int)) []int {
+// simulateDays returns the distribution of calendar days needed for slots to
+// complete `items` items. Day 0 is the calendar's anchor; non-working days
+// still elapse (they are returned as part of the count) but contribute nothing.
+func simulateDays(slots []Slot, cal *Calendar, items, numSimulations, numWorkers int, seed int64, progress func(done, total int)) []int {
 	return RunSimulations(numSimulations, numWorkers, seed, func(rng *rand.Rand) int {
 		completed := 0
 		days := 0
 		for completed < items {
-			days++
-			for e := 0; e < numEngineers; e++ {
-				completed += samples[rng.Intn(len(samples))]
+			for _, s := range slots {
+				if cal.Working(s.Name, days) {
+					completed += s.Samples[rng.Intn(len(s.Samples))]
+				}
 			}
+			days++
 		}
 		return days
 	}, progress)
+}
+
+// SimulateItemsInDays returns the distribution of total items completed in
+// `days` days by `numDailyDraws` equivalent engineers sampling from samples.
+// It is simulateItems over anonymous slots with no calendar (every day works).
+func SimulateItemsInDays(samples []int, numDailyDraws, days, numSimulations, numWorkers int, seed int64, progress func(done, total int)) []int {
+	return simulateItems(anonymousSlots(samples, numDailyDraws), nil, days, numSimulations, numWorkers, seed, progress)
+}
+
+// SimulateDaysToComplete returns the distribution of days needed for
+// `numEngineers` equivalent engineers to complete `items` items sampling from
+// samples. It is simulateDays over anonymous slots with no calendar.
+func SimulateDaysToComplete(samples []int, numEngineers, items, numSimulations, numWorkers int, seed int64, progress func(done, total int)) []int {
+	return simulateDays(anonymousSlots(samples, numEngineers), nil, items, numSimulations, numWorkers, seed, progress)
 }
 
 // ProbabilityAtLeast returns the percentage (0-100) of results in dist that

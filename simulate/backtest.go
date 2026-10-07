@@ -96,6 +96,10 @@ func AllCreatedBy(items []BacktestItem, d time.Time) bool {
 // excludes canceled/duplicate issues via SQL), so history's Canceled tier is
 // always zero here and Remaining reduces to Total−Completed, matching the
 // old behavior exactly modulo that truncation.
+//
+// p.Calendar, when set, is anchored at startDate; on each replayed day r the
+// forecast horizon is [r, targetDate], so the calendar is rebased to r and any
+// exclusions inside that range apply as they would have on that day (D9).
 func RunBacktest(pool *SamplePool, items []BacktestItem, startDate, targetDate time.Time, p Params) []BacktestRow {
 	historyItems := make([]history.Issue, len(items))
 	for i, it := range items {
@@ -118,12 +122,14 @@ func RunBacktest(pool *SamplePool, items []BacktestItem, startDate, targetDate t
 			prob = 100.0
 		} else {
 			dist := ItemsInDays(pool, Params{
-				Mode:        p.Mode,
-				Engineers:   p.Engineers,
-				Days:        daysToTarget,
-				Simulations: p.Simulations,
-				Workers:     p.Workers,
-				Seed:        p.Seed,
+				Mode:          p.Mode,
+				Engineers:     p.Engineers,
+				EngineerNames: p.EngineerNames,
+				Calendar:      p.Calendar.Rebase(r.Date),
+				Days:          daysToTarget,
+				Simulations:   p.Simulations,
+				Workers:       p.Workers,
+				Seed:          p.Seed,
 			})
 			prob = ProbabilityAtLeast(dist, r.Remaining)
 		}

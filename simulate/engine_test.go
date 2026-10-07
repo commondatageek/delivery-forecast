@@ -1,6 +1,9 @@
 package simulate
 
-import "testing"
+import (
+	"math/rand"
+	"testing"
+)
 
 // assertAll fails unless every element of got equals want. Used with constant
 // sample pools, where each simulation trial is fully determined and must be identical.
@@ -28,6 +31,90 @@ func TestSimulateDaysToComplete_ConstantPool(t *testing.T) {
 	// Inexact case guards the termination off-by-one: ceil(11/2) = 6.
 	got = SimulateDaysToComplete([]int{2}, 1, 11, 1000, 4, 42, nil)
 	assertAll(t, got, 6)
+}
+
+// calFromJSON builds a Calendar anchored at day 0 = 2025-03-01 from an
+// exclusions JSON literal.
+func calFromJSON(t *testing.T, s string) *Calendar {
+	t.Helper()
+	return NewCalendar(mustParseExclusions(t, s), day(2025, 3, 1))
+}
+
+func anon(samples []int, n int) []Slot { return anonymousSlots(samples, n) }
+
+func TestSimulateItems_CalendarZeroesGlobalDays(t *testing.T) {
+	cal := calFromJSON(t, `{"global": ["2025-03-02/2025-03-04"]}`) // days 1..3
+	got := simulateItems(anon([]int{2}, 3), cal, 10, 500, 4, 42, nil)
+	assertAll(t, got, 42) // (10-3) days * 3 slots * 2
+}
+
+func TestSimulateItems_CalendarZeroesOnlyNamedSlot(t *testing.T) {
+	cal := calFromJSON(t, `{"engineers": {"alice": ["2025-03-01/2025-03-04"]}}`) // days 0..3
+	slots := []Slot{{Name: "alice", Samples: []int{2}}, {Name: "bob", Samples: []int{2}}}
+	got := simulateItems(slots, cal, 10, 500, 4, 42, nil)
+	assertAll(t, got, 10*2+6*2) // bob works all 10 days, alice 6
+}
+
+func TestSimulateItems_AnonymousSlotIgnoresPerNameRules(t *testing.T) {
+	cal := calFromJSON(t, `{"engineers": {"alice": ["2025-03-01/2025-03-10"]}}`)
+	got := simulateItems(anon([]int{2}, 3), cal, 10, 500, 4, 42, nil)
+	assertAll(t, got, 60)
+}
+
+func TestSimulateItems_OffDaysBeyondHorizonAreIrrelevant(t *testing.T) {
+	cal := calFromJSON(t, `{"global": ["2025-04-01/2025-04-30"]}`) // days 31..60
+	got := simulateItems(anon([]int{2}, 3), cal, 10, 500, 4, 42, nil)
+	assertAll(t, got, 60)
+}
+
+func TestSimulateDays_LeadingOffDaysAddCalendarDays(t *testing.T) {
+	cal := calFromJSON(t, `{"global": ["2025-03-01/2025-03-03"]}`) // days 0..2
+	got := simulateDays(anon([]int{2}, 2), cal, 20, 500, 4, 42, nil)
+	assertAll(t, got, 3+5) // 3 idle days, then 4/day for 5 days
+}
+
+func TestSimulateDays_OffDayDoesNotConsumeRNG(t *testing.T) {
+	const k = 3
+	samples := []int{0, 1, 2, 5, 0, 3}
+	cal := calFromJSON(t, `{"global": ["2025-03-01/2025-03-03"]}`) // first k days
+	slots := anon(samples, 2)
+
+	// Same seed and worker count, so trial i sees the same RNG stream in both
+	// runs; the skipped days must not shift it. Compare unsorted per-trial
+	// results by driving the trial function directly.
+	run := func(c *Calendar) []int {
+		out := make([]int, 200)
+		rng := rand.New(rand.NewSource(7))
+		for i := range out {
+			completed, days := 0, 0
+			for completed < 30 {
+				for _, s := range slots {
+					if c.Working(s.Name, days) {
+						completed += s.Samples[rng.Intn(len(s.Samples))]
+					}
+				}
+				days++
+			}
+			out[i] = days
+		}
+		return out
+	}
+	with, without := run(cal), run(nil)
+	for i := range with {
+		if with[i] != without[i]+k {
+			t.Fatalf("trial %d: with calendar = %d, without = %d, want exactly +%d", i, with[i], without[i], k)
+		}
+	}
+
+	// And the real engine agrees on the aggregate: sorted distributions shift
+	// by exactly k.
+	a := simulateDays(slots, cal, 30, 1000, 1, 7, nil)
+	b := simulateDays(slots, nil, 30, 1000, 1, 7, nil)
+	for i := range a {
+		if a[i] != b[i]+k {
+			t.Fatalf("sorted[%d]: with = %d, without = %d, want +%d", i, a[i], b[i], k)
+		}
+	}
 }
 
 func TestProbabilityAtLeast(t *testing.T) {

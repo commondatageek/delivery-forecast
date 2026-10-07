@@ -95,7 +95,7 @@ func cmdSimItems(args []string) error {
 		Seed:        seed,
 		Progress:    bar.update,
 	})
-	fmt.Printf("%s, %d days -> how many items?\n\n", simulate.ModeLabel(mode, *sf.Engineers), *days)
+	fmt.Printf("%s, %d days -> how many items?\n\n", simulate.ModeLabel(mode, *sf.Engineers, nil), *days)
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "Confidence\tItems")
@@ -132,7 +132,7 @@ func printTrajectoryReport(pool *simulate.SamplePool, mode simulate.Mode, engine
 	}
 	cells, totals := simulate.ComputeTrajectoryTable(dists, confidences)
 
-	fmt.Printf("%s, starting %s -> grouped trajectory\n\n", simulate.ModeLabel(mode, engineers), targetStartDate.Format("2006-01-02"))
+	fmt.Printf("%s, starting %s -> grouped trajectory\n\n", simulate.ModeLabel(mode, engineers, nil), targetStartDate.Format("2006-01-02"))
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	confRow := []string{"", ""}
@@ -263,7 +263,7 @@ func cmdSimDays(args []string) error {
 		Seed:        seed,
 		Progress:    bar.update,
 	})
-	fmt.Printf("%s, %d items -> how many days?\n\n", simulate.ModeLabel(mode, *sf.Engineers), items[0])
+	fmt.Printf("%s, %d items -> how many days?\n\n", simulate.ModeLabel(mode, *sf.Engineers, nil), items[0])
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "Confidence\tDays\tDate")
@@ -382,7 +382,7 @@ func cmdSimProbability(args []string) error {
 		Seed:        seed,
 		Progress:    bar.update,
 	})
-	modeDescription := simulate.ModeLabel(mode, *sf.Engineers)
+	modeDescription := simulate.ModeLabel(mode, *sf.Engineers, nil)
 
 	var windowDescription string
 	if targetEndSet {

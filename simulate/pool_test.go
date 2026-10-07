@@ -122,7 +122,7 @@ func TestBuildPool_GlobalExclusionRemovesSlot(t *testing.T) {
 		at("alice", 2025, 1, 1), // idx 0
 		at("alice", 2025, 1, 6), // idx 5
 	}
-	exc := Exclusions{Global: []string{"2025-01-02"}} // removes idx 1
+	exc := mustParseExclusions(t, `{"global": ["2025-01-02"]}`) // removes idx 1
 	pool := BuildPool(records, exc, start, end, false)
 	got := pool.PerEngineer["alice"]
 	want := []int{2, 0, 0, 0, 1, 0, 0, 0, 0} // length 9, idx1 dropped, the 1 shifts left
@@ -138,7 +138,7 @@ func TestBuildPool_PerEngineerExclusion(t *testing.T) {
 		at("alice", 2025, 1, 1), // idx 0
 		at("alice", 2025, 1, 6), // idx 5
 	}
-	exc := Exclusions{Engineers: map[string][]string{"alice": {"2025-01-06"}}} // removes idx 5
+	exc := mustParseExclusions(t, `{"engineers": {"alice": ["2025-01-06"]}}`) // removes idx 5
 	pool := BuildPool(records, exc, start, end, false)
 	got := pool.PerEngineer["alice"]
 	want := []int{2, 0, 0, 0, 0, 0, 0, 0, 0} // length 9, the lone "1" removed
@@ -175,7 +175,7 @@ func TestBuildPool_WholeTeamSumsAndIgnoresPerEngineerExclusions(t *testing.T) {
 		at("bob", 2025, 1, 6),   // idx 5
 	}
 	// Per-engineer exclusions must be ignored in whole-team mode.
-	exc := Exclusions{Engineers: map[string][]string{"bob": {"2025-01-06"}}}
+	exc := mustParseExclusions(t, `{"engineers": {"bob": ["2025-01-06"]}}`)
 	pool := BuildPool(records, exc, start, end, true)
 
 	if len(pool.PerEngineer) != 1 {

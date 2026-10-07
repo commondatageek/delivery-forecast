@@ -1,8 +1,6 @@
 package simulate
 
 import (
-	"encoding/json"
-	"fmt"
 	"sort"
 	"time"
 
@@ -36,22 +34,6 @@ func FilterInvalid(records []Completion) ([]Completion, int) {
 		out = append(out, r)
 	}
 	return out, skipped
-}
-
-// Exclusions lists calendar dates to exclude from the sample pool.
-type Exclusions struct {
-	Global    []string            `json:"global"`
-	Engineers map[string][]string `json:"engineers"`
-}
-
-// ParseExclusions parses exclusions JSON data, as read from an exclusions
-// file by the caller.
-func ParseExclusions(data []byte) (Exclusions, error) {
-	var exc Exclusions
-	if err := json.Unmarshal(data, &exc); err != nil {
-		return Exclusions{}, fmt.Errorf("parsing exclusions file: %w", err)
-	}
-	return exc, nil
 }
 
 // SamplePool holds per-engineer slices of daily completion counts, plus the
@@ -120,13 +102,8 @@ func BuildPool(records []Completion, exc Exclusions, startDate, endDate time.Tim
 
 	// Build the global excluded day-index set.
 	globalExcluded := make(map[int]bool)
-	for _, ds := range exc.Global {
-		t, err := util.ParseDate(ds)
-		if err != nil {
-			continue
-		}
-		idx := util.DayIndex(t, startDate)
-		globalExcluded[idx] = true
+	for _, t := range exc.Days("") {
+		globalExcluded[util.DayIndex(t, startDate)] = true
 	}
 
 	type engData struct {
@@ -169,13 +146,8 @@ func BuildPool(records []Completion, exc Exclusions, startDate, endDate time.Tim
 			for k := range globalExcluded {
 				excluded[k] = true
 			}
-			for _, ds := range exc.Engineers[name] {
-				t, err := util.ParseDate(ds)
-				if err != nil {
-					continue
-				}
-				idx := util.DayIndex(t, startDate)
-				excluded[idx] = true
+			for _, t := range exc.Days(name) {
+				excluded[util.DayIndex(t, startDate)] = true
 			}
 			var engineerSamples []int
 			for i, count := range eng.counts {

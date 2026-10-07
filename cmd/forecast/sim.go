@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -14,16 +13,6 @@ import (
 	"github.com/commondatageek/delivery-forecast/simulate"
 )
 
-// removedFlag is a flag.Value for a flag that no longer exists: Set always
-// errors with a migration message, whether triggered from the CLI or (via
-// util.ApplyConfig, which drives config values through fs.Set too) from a
-// stale config file — so neither path silently reinterprets an old value
-// under new semantics.
-type removedFlag struct{ msg string }
-
-func (r removedFlag) String() string   { return "" }
-func (r removedFlag) Set(string) error { return errors.New(r.msg) }
-
 func cmdSimItems(args []string) error {
 	cmd := flag.NewFlagSet("sim items", flag.ExitOnError)
 	dbFile := addDBFlag(cmd)
@@ -33,7 +22,6 @@ func cmdSimItems(args []string) error {
 	days := cmd.Int("days", 30, "number of days")
 	var confidences intList
 	cmd.Var(&confidences, "confidence", "comma-separated confidence levels to output, e.g. 85 means \"85% chance of completing at least N items\" (default: 50,75,85,95)")
-	cmd.Var(removedFlag{"-percentile has been replaced by -confidence, whose meaning is inverted: -confidence 85 means \"85% chance of at least N items\", not \"the value 85% of trials fell at or below\". The old -percentile 85 is now -confidence 15."}, "percentile", "removed; see -confidence")
 	manifestFile := cmd.String("manifest", "", `write a run-provenance JSON manifest to this path ("-" for stdout)`)
 	configFile := addConfigFlag(cmd)
 	cmd.Parse(args)
@@ -188,7 +176,6 @@ func cmdSimDays(args []string) error {
 	targetStartStr := cmd.String("target-start-date", "today", `forecast start date used to compute calendar dates (YYYY-MM-DD; or: yesterday, today, tomorrow, "-3 months")`)
 	var confidences intList
 	cmd.Var(&confidences, "confidence", "comma-separated confidence levels to output, e.g. 85 means \"85% chance of finishing within N days\" (default: 50,75,85,95)")
-	cmd.Var(&confidences, "percentile", "deprecated alias for -confidence (same meaning here: bigger is more conservative either way)")
 	manifestFile := cmd.String("manifest", "", `write a run-provenance JSON manifest to this path ("-" for stdout)`)
 	configFile := addConfigFlag(cmd)
 	cmd.Parse(args)

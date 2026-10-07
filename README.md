@@ -356,9 +356,6 @@ forecast sim items -input linear.db -engineers 2 -days 30
 | `-days` | `30` | length of the forecast window |
 | `-confidence` | `50,75,85,95` | confidence levels to report |
 
-`sim items` formerly took `-percentile`, with the opposite meaning. It now
-always errors; see [CHANGELOG.md](https://github.com/commondatageek/delivery-forecast/blob/main/CHANGELOG.md) for how to migrate.
-
 ### `sim days` — how many days for I items?
 
 ```bash
@@ -369,7 +366,7 @@ forecast sim days -input linear.db -whole-team -items 50
 |---|---|---|
 | `-items` | *(required)* | items to complete; comma-separated for a grouped trajectory (e.g. `13,12,9`) |
 | `-target-start-date` | `today` | start date used to turn day counts into calendar dates |
-| `-confidence` | `50,75,85,95` | confidence levels to report (`-percentile` is an alias here) |
+| `-confidence` | `50,75,85,95` | confidence levels to report |
 
 ### `sim probability` — how likely is this plan?
 

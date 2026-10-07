@@ -82,6 +82,9 @@ behavior changes ship in minor releases, called out here.
   lumpy and makes the forecast hypersensitive to which names were typed; it
   also invited "what if Alice worked on it instead of Bob?" comparisons the
   data can't support. Replaced in a following change by named `-engineers`.
+- **`sim items -percentile` (the always-erroring tombstone) and
+  `sim days -percentile` (alias of `-confidence`).** Use `-confidence`. Note:
+  `aging -percentile` is unrelated and unchanged.
 - `linear.Issue` (use `issues.Issue`; it was an alias for one release).
 - The per-command read methods on `sqlite.Store` — `CompletedBetween`,
   `InProgress`, `NotCompletedCounts`, `ProjectLastUpdated`, `CFDIssues`,

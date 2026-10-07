@@ -13,9 +13,6 @@ behavior changes ship in minor releases, called out here.
 
 ### Added
 
-- **`forecast check -exclusions <path>`** validates an exclusions file against
-  the input: whether it parses, entry and date counts (past vs. future), and
-  engineer names that match no assignee.
 - **Exclusions now apply to the forecast horizon.** One `exclusions.json` is a
   calendar of non-working days for everyone (`global`) or a named engineer
   (`engineers`, via `-engineers alice,bob`), and each date takes effect on
@@ -26,18 +23,21 @@ behavior changes ship in minor releases, called out here.
   applies exclusions per replayed day. `-whole-team` honors only `global`
   entries and warns about per-engineer ones; names matching neither the data
   nor `-engineers` are warned about.
-- **`sim items -target-start-date` / `-target-end-date`**, with the same rules
-  as `probability`: exactly one of `-days` or `-target-end-date`, end inclusive.
-  The report header now shows the dated window.
-- **`-engineers` accepts names.** `-engineers 3` is still three anonymous
-  engineers; `-engineers alice,bob,carol` is three *named* ones, each still
-  drawing from the pooled history. Names exist so per-engineer exclusions can
-  attach to a slot; they need not appear in the data.
 - **Exclusion ranges and reasons.** Entries in `exclusions.json` may now be a
   single day (`"2025-12-25"`), an inclusive range (`"2025-12-22/2026-01-02"`),
   or an object with `date` (or `from`/`to`) and an optional `reason`. Existing
   files stay valid. Malformed entries are now hard errors instead of being
   silently skipped.
+- **`-engineers` accepts names.** `-engineers 3` is still three anonymous
+  engineers; `-engineers alice,bob,carol` is three *named* ones, each still
+  drawing from the pooled history. Names exist so per-engineer exclusions can
+  attach to a slot; they need not appear in the data.
+- **`sim items -target-start-date` / `-target-end-date`**, with the same rules
+  as `probability`: exactly one of `-days` or `-target-end-date`, end inclusive.
+  The report header now shows the dated window.
+- **`forecast check -exclusions <path>`** validates an exclusions file against
+  the input: whether it parses, entry and date counts (past vs. future), and
+  engineer names that match no assignee.
 - **`forecast history`** — per-day flow metrics: one row per calendar day of a
   project's or team's life (scope, completed/canceled/backlog/in-progress
   counts, daily deltas, rolling throughput, lead- and cycle-time percentiles,
@@ -81,8 +81,7 @@ behavior changes ship in minor releases, called out here.
 - **`-exclusions` no longer defaults to `./exclusions.json`.** Pass the path
   explicitly (or put `exclusions:` in a `-config` file). A path that does not
   exist is now an error instead of an empty set.
-- **`sim backtest` rows can shift by one day.** This is the one change here
-  that alters existing output. `RunBacktest` now walks `history.Compute`'s
+- **`sim backtest` rows can shift by one day.** `RunBacktest` now walks `history.Compute`'s
   rows, which day-truncate and clamp each issue's timestamps before counting,
   where the old inline loop compared raw timestamps. A completion landing
   mid-day therefore counts a calendar day earlier than it used to, so a

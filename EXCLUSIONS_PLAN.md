@@ -1,8 +1,26 @@
 # Implementation plan: calendar exclusions for `forecast sim`
 
-Status: **ready to implement.** Every decision below was settled in design
-review with the user; the reasoning is recorded so it does not get re-argued.
-Work happens on the `exclusions-calendar` branch.
+Status: **done.** All six phases shipped on the `exclusions-calendar` branch,
+one commit per step. The document is kept as the record of why things are
+shaped the way they are; `CLAUDE.md` and `README.md` describe the code as it
+now stands. The decisions in §4 are still binding on future changes, and §6
+(weekends off) remains the designed-for-but-deferred follow-up.
+
+Small things that diverged from what's written below:
+
+- **`Exclusions.Scopes()`** returns only engineer names with at least one
+  entry (the plan said "names present"), so `"bob": []` is not a scope and
+  never triggers an unmatched-name warning.
+- **`check -exclusions` "past" vs. "future".** A date counts as past when it
+  is today or earlier (today's completions are already in the default sample
+  window) and future when after today.
+- **Manifest `resolveDays`.** Per-engineer lists include the global dates
+  (that is when the engineer is actually off), and per-engineer scopes are
+  omitted entirely under `-whole-team`, which ignores them on both sides.
+- **`resolveTargetWindow`** snaps `-target-end-date` to local midnight, so
+  `now` (which carries a time of day) can't round the day count the wrong way.
+- **`printTrajectoryReport`** takes a base `simulate.Params` rather than a
+  longer argument list; the plan left this to the implementer.
 
 ---
 

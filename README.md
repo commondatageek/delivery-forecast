@@ -414,7 +414,7 @@ forecast sim probability -input linear.db -engineers 4 -days 30 -items 40
 |---|---|---|
 | `-days` | | length of the window; give this **or** `-target-end-date` |
 | `-target-start-date` | `tomorrow` | start of the target window |
-| `-target-end-date` | | end of the target window; give this **or** `-days` |
+| `-target-end-date` | | last day of the window, inclusive; give this **or** `-days` |
 | `-items` | all | items to complete; leave off to see the full distribution |
 
 ### `sim backtest` — would past forecasts have held up?
@@ -436,6 +436,10 @@ forecast sim backtest -input linear.db -whole-team -project "Q3 Migration" -targ
 | `-replay-start-date` | earliest `started_at` in the issue set | first day to replay, inclusive |
 | `-target-end-date` | *(required)* | completion deadline to forecast against |
 | `-format` | `text` | `text` or `csv` |
+
+[Exclusions](#exclusionsjson--holidays-and-time-off) apply per replayed day: on
+each day, the ones between that day and the deadline reduce the forecast just
+as they would have then.
 
 ### `exclusions.json` — holidays and time off
 
@@ -472,6 +476,17 @@ completions, so `-days 30` is still 30 calendar days with some of them
 unproductive. Which one a date affects depends only on where it falls, so the
 file can be a long-lived company calendar plus PTO.
 
+The repo ships a sample, [testdata/sample-exclusions.json](testdata/sample-exclusions.json),
+matching the example above:
+
+```bash
+forecast sim items -input sample-issues.csv -engineers alice,bob -days 20 \
+  -sample-start 2025-01-01 -sample-end 2025-04-01 -exclusions testdata/sample-exclusions.json
+```
+
+To check a file before relying on it, run
+`forecast check -input sample-issues.csv -exclusions testdata/sample-exclusions.json`.
+
 Per-engineer entries only take effect for engineers named in `-engineers
 alice,bob`; with `-engineers N` or `-whole-team` only `global` entries apply.
 `-whole-team` logs a warning if the file has per-engineer entries.
@@ -496,8 +511,9 @@ forecast sim items -config sim-items.yaml              # uses every value above
 forecast sim items -config sim-items.yaml -days 60     # the CLI's -days wins
 ```
 
-- List flags (`-teams`, `-typical-engineers`, `-confidence`,
-  `-items`) take a YAML list or a plain comma-separated string.
+- List flags (`-teams`, `-typical-engineers`, `-confidence`, `-items`) take a
+  YAML list or a plain comma-separated string. So does `-engineers` when it
+  holds names (`engineers: [alice, bob]`); `engineers: 4` is a count.
 - Config values count as explicitly set, so `random-seed: 42` pins the seed
   exactly as `-random-seed 42` would.
 - One config file serves one command; there's no per-command sectioning.

@@ -166,4 +166,6 @@ format: json
 
 ## On-call modeling
 
+`EXCLUSIONS_PLAN.md` records how calendar exclusions were built; the `simulate.Calendar` type it introduced (explicit-date rules plus a reserved weekday mask, shared by the sample pool and the forecast engine) is where an on-call or weekends-off rule would plug in.
+
 `ONCALL_MODELING.md` documents a planned (not yet implemented) feature to model on-call rotations. Two design options are discussed: a `-oncall-fraction` flag vs. separate sample pools for on-call vs. normal days.

@@ -1,5 +1,6 @@
 *.yaml
 *.json
+!testdata/*.json
 *.html
 !internal/**/*.html
 /bin

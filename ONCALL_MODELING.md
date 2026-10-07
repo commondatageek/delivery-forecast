@@ -8,9 +8,12 @@ each engineer has a 1/5 (0.2) probability of being on-call on any given day.
 On-call engineers do less (or zero) project work, depending on the week. Ignoring this
 **overestimates throughput** in the simulation.
 
-Currently, `exclusions.json` only covers major holidays — on-call days are not excluded,
-so the sample pool implicitly includes on-call days already. However, normal days and
-on-call days are mixed together, which dilutes both distributions.
+Exclusions already cover past and future days for everyone or for named engineers
+(`exclusions.json`, applied through `simulate.Calendar`), but on-call days are not
+among them, so the sample pool implicitly includes on-call days already. Normal days
+and on-call days are mixed together, which dilutes both distributions. On-call would
+be a third rule in that `Calendar`, alongside the explicit dates and the reserved
+weekday mask.
 
 ---
 

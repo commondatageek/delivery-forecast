@@ -1,6 +1,7 @@
 package linear
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -96,5 +97,11 @@ func TestToIssueNilRelationsYieldEmptyStrings(t *testing.T) {
 		got.ProjectMilestoneID != "" || got.ProjectMilestoneName != "" ||
 		got.StateType != "" || got.StateName != "" {
 		t.Fatalf("toIssue() with nil relations = %+v, want all relation fields empty", got)
+	}
+}
+
+func TestBuildQueryRequestsTrashed(t *testing.T) {
+	if !strings.Contains(buildQuery(nil, time.Time{}), "\n      trashed\n") {
+		t.Fatal("query does not request the trashed field")
 	}
 }

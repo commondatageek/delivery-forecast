@@ -41,7 +41,9 @@ func New(apiKey string) *Client {
 }
 
 // Fetch retrieves issues updated since the given time. since == zero means full fetch.
-func (c *Client) Fetch(ctx context.Context, since time.Time, teamKeys []string) ([]issues.Issue, error) {
+// Issues in Linear's trash are never returned as issues; their identifiers are
+// returned separately so the caller can purge copies stored by an earlier sync.
+func (c *Client) Fetch(ctx context.Context, since time.Time, teamKeys []string) (fetched []issues.Issue, trashed []string, err error) {
 	query := buildQuery(teamKeys, since)
 
 	var all []issues.Issue
@@ -50,10 +52,14 @@ func (c *Client) Fetch(ctx context.Context, since time.Time, teamKeys []string) 
 	for {
 		resp, err := c.fetchPage(ctx, query, cursor)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		for _, node := range resp.Data.Issues.Nodes {
+			if node.Trashed {
+				trashed = append(trashed, node.Identifier)
+				continue
+			}
 			all = append(all, toIssue(node))
 		}
 
@@ -63,7 +69,7 @@ func (c *Client) Fetch(ctx context.Context, since time.Time, teamKeys []string) 
 		cursor = resp.Data.Issues.PageInfo.EndCursor
 	}
 
-	return all, nil
+	return all, trashed, nil
 }
 
 // ListTeams writes accessible teams to the provided writer (for CLI use),
@@ -256,6 +262,7 @@ query FetchIssues($after: String) {
       archivedAt
       autoArchivedAt
       addedToProjectAt
+      trashed
       assignee {
         name
       }
@@ -308,6 +315,7 @@ type issueNode struct {
 	ArchivedAt       time.Time     `json:"archivedAt"`
 	AutoArchivedAt   time.Time     `json:"autoArchivedAt"`
 	AddedToProjectAt time.Time     `json:"addedToProjectAt"`
+	Trashed          bool          `json:"trashed"`
 	Assignee         *assignee     `json:"assignee"`
 	Team             *teamRef      `json:"team"`
 	Project          *projectRef   `json:"project"`

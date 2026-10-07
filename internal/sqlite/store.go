@@ -166,6 +166,22 @@ ON CONFLICT(identifier) DO UPDATE SET
 	return tx.Commit()
 }
 
+// Delete removes issues by identifier. Identifiers not in the store are ignored.
+func (s *Store) Delete(ctx context.Context, identifiers ...string) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	for _, id := range identifiers {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM issues WHERE identifier = ?`, id); err != nil {
+			return fmt.Errorf("delete %s: %w", id, err)
+		}
+	}
+	return tx.Commit()
+}
+
 // AllIssues returns every row in the issues table, unfiltered, so callers can
 // apply issues.Filter in memory and get semantics identical to file sources.
 func (s *Store) AllIssues(ctx context.Context) ([]issues.Issue, error) {

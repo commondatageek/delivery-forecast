@@ -22,18 +22,19 @@ type fetchCall struct {
 type stubClient struct {
 	fetchCalls []fetchCall
 	issuesFor  map[string][]issues.Issue
+	trashedFor map[string][]string
 	fetchErr   map[string]error
 	teams      []linear.Team
 	listErr    error
 }
 
-func (s *stubClient) Fetch(ctx context.Context, since time.Time, teamKeys []string) ([]issues.Issue, error) {
+func (s *stubClient) Fetch(ctx context.Context, since time.Time, teamKeys []string) ([]issues.Issue, []string, error) {
 	s.fetchCalls = append(s.fetchCalls, fetchCall{since: since, teams: teamKeys})
 	key := teamKeys[0]
 	if err, ok := s.fetchErr[key]; ok {
-		return nil, err
+		return nil, nil, err
 	}
-	return s.issuesFor[key], nil
+	return s.issuesFor[key], s.trashedFor[key], nil
 }
 
 func (s *stubClient) ListTeams(ctx context.Context) ([]linear.Team, error) {
@@ -210,5 +211,27 @@ func TestRun_FetchErrorMidLoop_PriorTeamCommitted(t *testing.T) {
 	}
 	if len(keys) != 1 || keys[0] != "ENG" {
 		t.Fatalf("DistinctTeamKeys = %v, want [ENG] (ENG's upsert must survive DATA's failure)", keys)
+	}
+}
+
+func TestRun_TrashedIssueIsPurgedFromStore(t *testing.T) {
+	store := openTestStore(t)
+	ctx := context.Background()
+	if err := store.Upsert(ctx,
+		issues.Issue{Identifier: "ENG-1", TeamKey: "ENG"},
+		issues.Issue{Identifier: "ENG-2", TeamKey: "ENG"},
+	); err != nil {
+		t.Fatalf("Upsert: %v", err)
+	}
+	sc := &stubClient{trashedFor: map[string][]string{"ENG": {"ENG-1"}}}
+	if err := Run(ctx, sc, store, Options{}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	got, err := store.AllIssues(ctx)
+	if err != nil {
+		t.Fatalf("AllIssues: %v", err)
+	}
+	if len(got) != 1 || got[0].Identifier != "ENG-2" {
+		t.Fatalf("store after sync = %+v, want only ENG-2", got)
 	}
 }

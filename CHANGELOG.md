@@ -13,6 +13,11 @@ behavior changes ship in minor releases, called out here.
 
 ### Added
 
+- **Exclusion ranges and reasons.** Entries in `exclusions.json` may now be a
+  single day (`"2025-12-25"`), an inclusive range (`"2025-12-22/2026-01-02"`),
+  or an object with `date` (or `from`/`to`) and an optional `reason`. Existing
+  files stay valid. Malformed entries are now hard errors instead of being
+  silently skipped.
 - **`forecast history`** — per-day flow metrics: one row per calendar day of a
   project's or team's life (scope, completed/canceled/backlog/in-progress
   counts, daily deltas, rolling throughput, lead- and cycle-time percentiles,
@@ -43,6 +48,9 @@ behavior changes ship in minor releases, called out here.
 
 ### Changed
 
+- **`-exclusions` no longer defaults to `./exclusions.json`.** Pass the path
+  explicitly (or put `exclusions:` in a `-config` file). A path that does not
+  exist is now an error instead of an empty set.
 - **`sim backtest` rows can shift by one day.** This is the one change here
   that alters existing output. `RunBacktest` now walks `history.Compute`'s
   rows, which day-truncate and clamp each issue's timestamps before counting,

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -117,15 +116,16 @@ func warnUnmatchedTypicalEngineers(typicalEngineers []string, seen map[string]bo
 	}
 }
 
-// loadExclusions reads and parses an exclusions JSON file. If the file does
-// not exist, an empty Exclusions is returned without error.
+// loadExclusions reads and parses an exclusions JSON file. An empty path means
+// no exclusions were requested and yields an empty Exclusions; a path that was
+// given but cannot be read is an error, never silently treated as empty.
 func loadExclusions(path string) (simulate.Exclusions, error) {
+	if path == "" {
+		return simulate.Exclusions{}, nil
+	}
 	data, err := os.ReadFile(path)
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return simulate.Exclusions{}, nil
-		}
-		return simulate.Exclusions{}, fmt.Errorf("reading exclusions file: %w", err)
+		return simulate.Exclusions{}, fmt.Errorf("reading exclusions file %q: %w", path, err)
 	}
 	return simulate.ParseExclusions(data)
 }
@@ -256,7 +256,7 @@ type simFlags struct {
 // fs.Lookup("simulations").Usage afterward.
 func addSimFlags(fs *flag.FlagSet) *simFlags {
 	sf := &simFlags{}
-	sf.ExclusionsFile = fs.String("exclusions", "exclusions.json", "path to exclusions JSON file")
+	sf.ExclusionsFile = fs.String("exclusions", "", "path to an exclusions JSON file (holidays, PTO); applies to both the sample window and the forecast horizon; default: none")
 	sf.Engineers = fs.Int("engineers", 0, "number of (equivalent) engineers; one of -engineers or -whole-team is required")
 	sf.WholeTeam = fs.Bool("whole-team", false, "use whole-team daily throughput from historical data (ignores -engineers)")
 	sf.Simulations = fs.Int("simulations", 10_000, "number of Monte Carlo simulations to run")

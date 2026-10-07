@@ -331,7 +331,7 @@ flag on other commands.)
 | `-simulations` | `10000` | Monte Carlo trials (for `backtest`: trials per backtested day) |
 | `-random-seed` | time-based | fix this to make a run reproducible |
 | `-typical-engineers` | all | restrict the sample pool to these engineers' history |
-| `-exclusions` | `exclusions.json` | [exclusions file](#exclusionsjson--holidays-and-time-off) |
+| `-exclusions` | *(none)* | [exclusions file](#exclusionsjson--holidays-and-time-off) |
 | `-goroutines` | CPU count | parallel workers |
 | `-manifest` | | write a run-provenance JSON file (`-` for stdout); on `items`, `days`, `probability` |
 
@@ -403,18 +403,42 @@ forecast sim backtest -input linear.db -whole-team -project "Q3 Migration" -targ
 
 ### `exclusions.json` — holidays and time off
 
-`sim` reads `exclusions.json` from the working directory (override with
-`-exclusions`) to drop days from the sample history. A missing file is fine.
+Pass `-exclusions <path>` to tell `sim` that nobody works on certain dates, or
+that one engineer doesn't. There is no default file: without the flag nothing is
+excluded, and a path that doesn't exist is an error.
 
 ```json
 {
-  "global": ["2024-12-25"],
-  "engineers": {"alice": ["2024-06-17"]}
+  "global": [
+    "2025-12-25",
+    "2025-12-22/2026-01-02",
+    {"from": "2026-07-03", "to": "2026-07-06", "reason": "July 4th weekend"},
+    {"date": "2026-11-26", "reason": "Thanksgiving"}
+  ],
+  "engineers": {
+    "alice": ["2026-03-02/2026-03-13", {"date": "2026-04-10", "reason": "PTO"}],
+    "bob":   ["2026-02-16"]
+  }
 }
 ```
 
-`global` dates are excluded for every engineer; `engineers` dates only for the
-named engineer.
+Each entry is a `YYYY-MM-DD` day, an inclusive `YYYY-MM-DD/YYYY-MM-DD` range,
+or an object with `date` (or `from` and `to`) and an optional `reason`. You can
+mix forms freely. Every entry must parse: a malformed date, an inverted range,
+an unknown key, or a range longer than 366 days stops the run rather than being
+skipped. `global` entries apply to every engineer; `engineers` entries apply to
+the engineer of that name.
+
+One file serves both sides of a forecast. A date inside the sample window is
+dropped from the history, so a holiday's zero isn't mistaken for a normal
+zero-throughput day; a date inside the forecast window contributes no
+completions, so `-days 30` is still 30 calendar days with some of them
+unproductive. Which one a date affects depends only on where it falls, so the
+file can be a long-lived company calendar plus PTO.
+
+Per-engineer entries only take effect for engineers named in `-engineers
+alice,bob`; with `-engineers N` or `-whole-team` only `global` entries apply.
+`-whole-team` logs a warning if the file has per-engineer entries.
 
 ## Config files
 

@@ -73,13 +73,22 @@ All commands live in the single `forecast` binary. Run `forecast` with no argume
 
 **CSV/JSON files** (read via `-input`, an equally valid alternative to a SQLite `.db`) — same shape as the `issues` table, one row/object per issue; only `identifier` plus whichever timestamp columns a given command needs are required, everything else is optional. Column/field names are the `issues.Issue` struct's JSON tags (snake_case, matching the SQLite column names exactly). See [DATA_REQUIREMENTS.md](DATA_REQUIREMENTS.md) for the accepted column names and timestamp formats, and [testdata/sample-issues.csv](testdata/sample-issues.csv) for a working example.
 
-**`exclusions.json`** (optional input to `forecast sim`, e.g. for holidays):
+**`exclusions.json`** (optional input to `forecast sim` via `-exclusions <path>`, e.g. for holidays and PTO):
 ```json
 {
-  "global": ["2024-12-25"],
-  "engineers": {"alice": ["2024-06-17"]}
+  "global": [
+    "2025-12-25",
+    "2025-12-22/2026-01-02",
+    {"from": "2026-07-03", "to": "2026-07-06", "reason": "July 4th weekend"},
+    {"date": "2026-11-26", "reason": "Thanksgiving"}
+  ],
+  "engineers": {
+    "alice": ["2026-03-02/2026-03-13", {"date": "2026-04-10", "reason": "PTO"}],
+    "bob":   ["2026-02-16"]
+  }
 }
 ```
+`-exclusions` has no default and the file must exist when given. One calendar applies on both sides: a date in the sample window is dropped from the throughput sample, a date in the forecast horizon contributes no completions.
 
 ### Config files (`-config`)
 

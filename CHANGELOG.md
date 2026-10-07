@@ -77,6 +77,11 @@ behavior changes ship in minor releases, called out here.
 
 ### Removed
 
+- **`forecast sim -team`.** Over a typical 3-month window each engineer's
+  series is ~90 mostly-zero samples, so drawing from one person's history is
+  lumpy and makes the forecast hypersensitive to which names were typed; it
+  also invited "what if Alice worked on it instead of Bob?" comparisons the
+  data can't support. Replaced in a following change by named `-engineers`.
 - `linear.Issue` (use `issues.Issue`; it was an alias for one release).
 - The per-command read methods on `sqlite.Store` — `CompletedBetween`,
   `InProgress`, `NotCompletedCounts`, `ProjectLastUpdated`, `CFDIssues`,

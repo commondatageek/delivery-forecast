@@ -30,24 +30,6 @@ func TestSimulateDaysToComplete_ConstantPool(t *testing.T) {
 	assertAll(t, got, 6)
 }
 
-func TestSimulateItemsInDaysPerEngineer_ConstantPool(t *testing.T) {
-	pool := &SamplePool{PerEngineer: map[string][]int{
-		"alice": {2},
-		"bob":   {3},
-	}}
-	got := SimulateItemsInDaysPerEngineer(pool, []string{"alice", "bob"}, 10, 1000, 4, 42, nil)
-	assertAll(t, got, 50) // (2+3) per day * 10 days
-}
-
-func TestSimulateDaysToCompletePerEngineer_ConstantPool(t *testing.T) {
-	pool := &SamplePool{PerEngineer: map[string][]int{
-		"alice": {2},
-		"bob":   {3},
-	}}
-	got := SimulateDaysToCompletePerEngineer(pool, []string{"alice", "bob"}, 10, 1000, 4, 42, nil)
-	assertAll(t, got, 2) // 5/day, need 10 -> 2 days
-}
-
 func TestProbabilityAtLeast(t *testing.T) {
 	dist := []int{1, 2, 3, 4}
 	cases := []struct {

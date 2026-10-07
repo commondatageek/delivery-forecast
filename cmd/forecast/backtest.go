@@ -96,7 +96,7 @@ func cmdSimBacktest(args []string) error {
 		return fmt.Errorf("invalid -sample-end: %w", err)
 	}
 
-	mode, err := simulate.ResolveMode(isFlagSet(cmd, "engineers"), *sf.WholeTeam, sf.Team)
+	mode, err := simulate.ResolveMode(isFlagSet(cmd, "engineers"), *sf.WholeTeam)
 	if err != nil {
 		return err
 	}
@@ -113,7 +113,7 @@ func cmdSimBacktest(args []string) error {
 	if err != nil {
 		return err
 	}
-	if err := simulate.ValidatePool(pd.Pool, mode, sf.Team, false); err != nil {
+	if err := simulate.ValidatePool(pd.Pool, mode, false); err != nil {
 		return err
 	}
 	seed := resolveSeed(cmd, *sf.RandomSeed, now)
@@ -150,7 +150,6 @@ func cmdSimBacktest(args []string) error {
 
 	rows := simulate.RunBacktest(pd.Pool, btItems, startDate, targetDate, simulate.Params{
 		Mode:        mode,
-		Team:        sf.Team,
 		Engineers:   *sf.Engineers,
 		Simulations: *sf.Simulations,
 		Workers:     *sf.Goroutines,
@@ -163,7 +162,7 @@ func cmdSimBacktest(args []string) error {
 	case "csv":
 		return printBacktestCSV(rows, today)
 	default:
-		label := simulate.ModeLabel(mode, sf.Team, *sf.Engineers)
+		label := simulate.ModeLabel(mode, *sf.Engineers)
 		scope := *project
 		if *milestone != "" {
 			scope += " / " + *milestone

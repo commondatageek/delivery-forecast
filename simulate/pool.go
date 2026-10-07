@@ -3,7 +3,6 @@ package simulate
 import (
 	"encoding/json"
 	"fmt"
-	"math/rand"
 	"sort"
 	"time"
 
@@ -71,12 +70,6 @@ func NewSamplePool(perEngineer map[string][]int) *SamplePool {
 		PerEngineer: perEngineer,
 		Combined:    combineSamples(perEngineer),
 	}
-}
-
-// DrawFromEngineer randomly samples one daily completion count for engineer.
-func (p *SamplePool) DrawFromEngineer(engineer string, rng *rand.Rand) int {
-	samples := p.PerEngineer[engineer]
-	return samples[rng.Intn(len(samples))]
 }
 
 // combineSamples concatenates all engineers' samples into a flat slice,

@@ -60,7 +60,6 @@ type Resolved struct {
 	Mode             string         `json:"mode"`
 	ModeLabel        string         `json:"mode_label"`
 	Engineers        int            `json:"engineers"`
-	Team             []string       `json:"team"`
 	TypicalEngineers []string       `json:"typical_engineers"`
 	WholeTeam        bool           `json:"whole_team"`
 	Seed             int64          `json:"seed"`
@@ -175,8 +174,6 @@ func dbFingerprint(path string) DataFile {
 
 func modeName(m simulate.Mode) string {
 	switch m {
-	case simulate.ModeNamedTeam:
-		return "named_team"
 	case simulate.ModeFullTeam:
 		return "whole_team"
 	default:
@@ -197,7 +194,6 @@ type manifestInputs struct {
 	Subcommand       string
 	Cmd              *flag.FlagSet
 	Mode             simulate.Mode
-	Team             []string
 	TypicalEngineers []string
 	Engineers        int
 	WholeTeam        bool
@@ -271,9 +267,8 @@ func newManifest(in manifestInputs) *Manifest {
 		Flags:         flags,
 		Resolved: Resolved{
 			Mode:             modeName(in.Mode),
-			ModeLabel:        simulate.ModeLabel(in.Mode, in.Team, in.Engineers),
+			ModeLabel:        simulate.ModeLabel(in.Mode, in.Engineers),
 			Engineers:        in.Engineers,
-			Team:             in.Team,
 			TypicalEngineers: in.TypicalEngineers,
 			WholeTeam:        in.WholeTeam,
 			Seed:             in.Seed,

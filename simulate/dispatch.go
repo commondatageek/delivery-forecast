@@ -6,11 +6,9 @@ package simulate
 // cmd/forecast flag (and thus a `-config` YAML key of the same name) once
 // resolved to its typed, presence-checked value.
 type Params struct {
-	// Mode is resolved from the `-engineers`/`-team`/`-whole-team` flags via
+	// Mode is resolved from the `-engineers`/`-whole-team` flags via
 	// ResolveMode; there is no single `mode` flag or YAML key.
 	Mode Mode
-	// Team holds the `-team` flag's engineer names (ModeNamedTeam only).
-	Team []string
 	// Engineers is the `-engineers` flag (ModeAnonymous only).
 	Engineers int
 	// Days is the `-days` flag (sim items; ignored by DaysToComplete).
@@ -35,8 +33,6 @@ type Params struct {
 // reproduces the single-draw-per-day loop over the whole-team series exactly.
 func ItemsInDays(pool *SamplePool, p Params) []int {
 	switch p.Mode {
-	case ModeNamedTeam:
-		return SimulateItemsInDaysPerEngineer(pool, p.Team, p.Days, p.Simulations, p.Workers, p.Seed, p.Progress)
 	case ModeFullTeam:
 		return SimulateItemsInDays(pool.PerEngineer[WholeTeamKey], 1, p.Days, p.Simulations, p.Workers, p.Seed, p.Progress)
 	default: // ModeAnonymous
@@ -51,8 +47,6 @@ func ItemsInDays(pool *SamplePool, p Params) []int {
 // reproduces the single-draw-per-day loop over the whole-team series exactly.
 func DaysToComplete(pool *SamplePool, p Params) []int {
 	switch p.Mode {
-	case ModeNamedTeam:
-		return SimulateDaysToCompletePerEngineer(pool, p.Team, p.Items, p.Simulations, p.Workers, p.Seed, p.Progress)
 	case ModeFullTeam:
 		return SimulateDaysToComplete(pool.PerEngineer[WholeTeamKey], 1, p.Items, p.Simulations, p.Workers, p.Seed, p.Progress)
 	default: // ModeAnonymous

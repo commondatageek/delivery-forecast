@@ -20,12 +20,6 @@ func TestItemsInDays_Dispatch(t *testing.T) {
 		want int
 	}{
 		{
-			name: "named team",
-			pool: constantPool(2, "alice", "bob"),
-			p:    Params{Mode: ModeNamedTeam, Team: []string{"alice", "bob"}, Days: 10, Simulations: 100, Workers: 4, Seed: 42},
-			want: 40, // (2+2) per day * 10 days
-		},
-		{
 			name: "whole team",
 			pool: &SamplePool{PerEngineer: map[string][]int{WholeTeamKey: {5}}},
 			p:    Params{Mode: ModeFullTeam, Days: 10, Simulations: 100, Workers: 4, Seed: 42},
@@ -53,12 +47,6 @@ func TestDaysToComplete_Dispatch(t *testing.T) {
 		p    Params
 		want int
 	}{
-		{
-			name: "named team",
-			pool: constantPool(2, "alice", "bob"),
-			p:    Params{Mode: ModeNamedTeam, Team: []string{"alice", "bob"}, Items: 20, Simulations: 100, Workers: 4, Seed: 42},
-			want: 5, // 4 items/day, need 20 -> 5 days
-		},
 		{
 			name: "whole team",
 			pool: &SamplePool{PerEngineer: map[string][]int{WholeTeamKey: {5}}},

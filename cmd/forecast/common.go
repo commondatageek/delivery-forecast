@@ -243,7 +243,6 @@ type simFlags struct {
 	SampleEnd        *string
 	RandomSeed       *int64
 	TypicalEngineers stringList
-	Team             stringList
 }
 
 // addSimFlags registers simFlags's block onto fs and returns the bundle. The
@@ -253,7 +252,7 @@ type simFlags struct {
 func addSimFlags(fs *flag.FlagSet) *simFlags {
 	sf := &simFlags{}
 	sf.ExclusionsFile = fs.String("exclusions", "exclusions.json", "path to exclusions JSON file")
-	sf.Engineers = fs.Int("engineers", 0, "number of (equivalent) engineers; one of -engineers, -team, or -whole-team is required")
+	sf.Engineers = fs.Int("engineers", 0, "number of (equivalent) engineers; one of -engineers or -whole-team is required")
 	sf.WholeTeam = fs.Bool("whole-team", false, "use whole-team daily throughput from historical data (ignores -engineers)")
 	sf.Simulations = fs.Int("simulations", 10_000, "number of Monte Carlo simulations to run")
 	sf.Goroutines = fs.Int("goroutines", runtime.NumCPU(), "number of parallel worker goroutines")
@@ -261,6 +260,5 @@ func addSimFlags(fs *flag.FlagSet) *simFlags {
 	sf.SampleEnd = fs.String("sample-end", "now", `sample data end date (YYYY-MM-DD; or: now, yesterday, today, tomorrow, "-3 months")`)
 	sf.RandomSeed = fs.Int64("random-seed", 0, "seed for the random number generator (default: time-based, non-deterministic)")
 	fs.Var(&sf.TypicalEngineers, "typical-engineers", "comma-separated list of the team's typical engineers to build the sample pool from (default: all)")
-	fs.Var(&sf.Team, "team", "comma-separated list of specific engineer names to model individually")
 	return sf
 }

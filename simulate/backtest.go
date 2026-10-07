@@ -119,7 +119,6 @@ func RunBacktest(pool *SamplePool, items []BacktestItem, startDate, targetDate t
 		} else {
 			dist := ItemsInDays(pool, Params{
 				Mode:        p.Mode,
-				Team:        p.Team,
 				Engineers:   p.Engineers,
 				Days:        daysToTarget,
 				Simulations: p.Simulations,

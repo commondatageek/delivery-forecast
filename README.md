@@ -316,12 +316,11 @@ before you rely on them.
 Pick **exactly one** of these; there is no default.
 
 - `-engineers N` — pool everyone's history and draw for N interchangeable engineers.
-- `-team alice,bob` — each named engineer draws from their own history.
 - `-whole-team` — sum everyone's completions into one daily series (ignores
   individual variance).
 
-(`-team` here names *engineers*, and is unrelated to `-teams`, the issue-tracker
-team filter used by other commands. `sim` pools every team.)
+(`sim` pools every team; `-teams`, the issue-tracker team filter, is a separate
+flag on other commands.)
 
 ### Sampling flags (all four subcommands)
 
@@ -349,7 +348,7 @@ Three different jobs; don't conflate them.
 ### `sim items` — how many items in D days?
 
 ```bash
-forecast sim items -input linear.db -team alice,bob -days 30
+forecast sim items -input linear.db -engineers 2 -days 30
 ```
 
 | Flag | Default | Description |
@@ -440,7 +439,7 @@ forecast sim items -config sim-items.yaml              # uses every value above
 forecast sim items -config sim-items.yaml -days 60     # the CLI's -days wins
 ```
 
-- List flags (`-teams`, `-team`, `-typical-engineers`, `-confidence`,
+- List flags (`-teams`, `-typical-engineers`, `-confidence`,
   `-items`) take a YAML list or a plain comma-separated string.
 - Config values count as explicitly set, so `random-seed: 42` pins the seed
   exactly as `-random-seed 42` would.

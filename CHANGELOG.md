@@ -13,6 +13,9 @@ behavior changes ship in minor releases, called out here.
 
 ### Added
 
+- **`forecast check -exclusions <path>`** validates an exclusions file against
+  the input: whether it parses, entry and date counts (past vs. future), and
+  engineer names that match no assignee.
 - **Exclusions now apply to the forecast horizon.** One `exclusions.json` is a
   calendar of non-working days for everyone (`global`) or a named engineer
   (`engineers`, via `-engineers alice,bob`), and each date takes effect on

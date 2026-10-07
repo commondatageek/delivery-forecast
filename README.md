@@ -215,7 +215,24 @@ first against any new export; see the sample output in [Quick start](#quick-star
 forecast check -input issues.csv
 ```
 
-Takes only the shared flags (`-input`, `-stdin-format`, `-config`).
+Takes the shared flags (`-input`, `-stdin-format`, `-config`), plus
+`-exclusions <path>` to validate an [exclusions file](#exclusionsjson--holidays-and-time-off)
+against the same input: whether it parses, how many entries and dates it has
+(split into past and future), and any engineer names that match no assignee.
+
+```bash
+forecast check -input issues.csv -exclusions exclusions.json
+```
+
+```
+Exclusions: exclusions.json
+  entries   2 global, 1 engineers (alice: 2)
+  span      2025-12-25 .. 2026-04-10 (1 dates past, 4 future, as of 2026-01-15)
+  engineers ok
+```
+
+A file that doesn't parse (or doesn't exist) is reported on an `invalid` line
+rather than failing the command.
 
 ### `history` — per-day flow metrics
 

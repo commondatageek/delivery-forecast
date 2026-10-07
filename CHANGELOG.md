@@ -13,6 +13,9 @@ behavior changes ship in minor releases, called out here.
 
 ### Added
 
+- **`sim items -target-start-date` / `-target-end-date`**, with the same rules
+  as `probability`: exactly one of `-days` or `-target-end-date`, end inclusive.
+  The report header now shows the dated window.
 - **`-engineers` accepts names.** `-engineers 3` is still three anonymous
   engineers; `-engineers alice,bob,carol` is three *named* ones, each still
   drawing from the pooled history. Names exist so per-engineer exclusions can
@@ -52,6 +55,12 @@ behavior changes ship in minor releases, called out here.
 
 ### Changed
 
+- **`sim days` dates shift one day later.** The default `-target-start-date` is
+  now `tomorrow` (was `today`), matching `probability`; today's completions are
+  already in the sample via `-sample-end now`. Pass `-target-start-date today`
+  for the old dates.
+- **`sim items -days` has no default** (was 30): give `-days` or
+  `-target-end-date`, like `probability`.
 - **`-exclusions` no longer defaults to `./exclusions.json`.** Pass the path
   explicitly (or put `exclusions:` in a `-config` file). A path that does not
   exist is now an error instead of an empty set.

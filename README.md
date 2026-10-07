@@ -90,13 +90,14 @@ forecast cfd -input sample-issues.csv -start 2025-01-01 -end 2025-03-15 -out cfd
 # Open work, per project and milestone
 forecast count -input sample-issues.csv -updated-since 2025-01-01 -milestones
 
-# A forecast: how many items could the whole team finish in 14 days?
+# A forecast: how many items could the whole team finish in 14 days,
+# starting 2025-03-16? (-target-start-date defaults to tomorrow.)
 forecast sim items -input sample-issues.csv -whole-team -days 14 \
-  -sample-start 2025-01-01 -sample-end 2025-03-15
+  -sample-start 2025-01-01 -sample-end 2025-03-15 -target-start-date 2025-03-16
 ```
 
 ```
-whole-team throughput, 14 days -> how many items?
+whole-team throughput, 2025-03-16 to 2025-03-29 (14 days) -> how many items?
 
 Confidence  Items
 50%         at least 5
@@ -369,7 +370,9 @@ forecast sim items -input linear.db -engineers 2 -days 30
 
 | Flag | Default | Description |
 |---|---|---|
-| `-days` | `30` | length of the forecast window |
+| `-days` | | length of the forecast window; give this **or** `-target-end-date` |
+| `-target-start-date` | `tomorrow` | first day of the forecast window |
+| `-target-end-date` | | last day of the window, inclusive; give this **or** `-days` |
 | `-confidence` | `50,75,85,95` | confidence levels to report |
 
 ### `sim days` — how many days for I items?
@@ -381,7 +384,7 @@ forecast sim days -input linear.db -whole-team -items 50
 | Flag | Default | Description |
 |---|---|---|
 | `-items` | *(required)* | items to complete; comma-separated for a grouped trajectory (e.g. `13,12,9`) |
-| `-target-start-date` | `today` | start date used to turn day counts into calendar dates |
+| `-target-start-date` | `tomorrow` | start date used to turn day counts into calendar dates |
 | `-confidence` | `50,75,85,95` | confidence levels to report |
 
 ### `sim probability` — how likely is this plan?

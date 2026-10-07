@@ -11,6 +11,7 @@ import (
 
 	"github.com/commondatageek/delivery-forecast/internal/linear"
 	"github.com/commondatageek/delivery-forecast/internal/logx"
+	"github.com/commondatageek/delivery-forecast/internal/util"
 	"github.com/commondatageek/delivery-forecast/issues"
 	"github.com/commondatageek/delivery-forecast/simulate"
 
@@ -131,6 +132,49 @@ func loadExclusions(path string) (simulate.Exclusions, error) {
 		return simulate.Exclusions{}, fmt.Errorf("reading exclusions file %q: %w", path, err)
 	}
 	return simulate.ParseExclusions(data)
+}
+
+// resolveTargetWindow resolves a forecast horizon from -target-start-date and
+// exactly one of -days / -target-end-date. end is inclusive; effectiveDays is
+// the calendar-day count of [start, end].
+func resolveTargetWindow(cmd *flag.FlagSet, days int, startStr, endStr string, now time.Time) (start, end time.Time, effectiveDays int, err error) {
+	daysSet := isFlagSet(cmd, "days")
+	endSet := isFlagSet(cmd, "target-end-date")
+	if daysSet && endSet {
+		return start, end, 0, fmt.Errorf("-days and -target-end-date are mutually exclusive")
+	}
+	if !daysSet && !endSet {
+		return start, end, 0, fmt.Errorf("one of -days or -target-end-date must be provided")
+	}
+
+	start, err = util.ParseFlexibleStartDate(startStr, now)
+	if err != nil {
+		return start, end, 0, fmt.Errorf("invalid -target-start-date: %w", err)
+	}
+
+	if daysSet {
+		if days <= 0 {
+			return start, end, 0, fmt.Errorf("-days must be positive")
+		}
+		return start, start.AddDate(0, 0, days-1), days, nil
+	}
+
+	end, err = util.ParseFlexibleDate(endStr, now)
+	if err != nil {
+		return start, end, 0, fmt.Errorf("invalid -target-end-date: %w", err)
+	}
+	// "now" carries a time of day; the window is whole calendar days.
+	end = util.LocalDay(end)
+	if !end.After(start) {
+		return start, end, 0, fmt.Errorf("-target-end-date must be after -target-start-date")
+	}
+	return start, end, util.DayIndex(end, start) + 1, nil
+}
+
+// describeWindow renders a forecast horizon for report headers, e.g.
+// "2026-10-08 to 2026-11-06 (30 days)".
+func describeWindow(start, end time.Time, days int) string {
+	return fmt.Sprintf("%s to %s (%d days)", start.Format("2006-01-02"), end.Format("2006-01-02"), days)
 }
 
 // unmatchedExclusionNames returns, sorted, the engineer names in exc that are

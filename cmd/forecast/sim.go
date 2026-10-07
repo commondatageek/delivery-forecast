@@ -19,7 +19,9 @@ func cmdSimItems(args []string) error {
 	inputFile := addInputFlag(cmd)
 	stdinFormat := addStdinFormatFlag(cmd)
 	sf := addSimFlags(cmd)
-	days := cmd.Int("days", 30, "number of days")
+	days := cmd.Int("days", 0, "number of days; mutually exclusive with -target-end-date, one must be given")
+	targetStartStr := cmd.String("target-start-date", "tomorrow", `start of the target window (YYYY-MM-DD; or: yesterday, today, tomorrow, "-3 months"); default: tomorrow`)
+	targetEndStr := cmd.String("target-end-date", "", `end of the target window, inclusive (YYYY-MM-DD; or: now, yesterday, today, tomorrow, "-3 months"); mutually exclusive with -days, one must be given`)
 	var confidences intList
 	cmd.Var(&confidences, "confidence", "comma-separated confidence levels to output, e.g. 85 means \"85% chance of completing at least N items\" (default: 50,75,85,95)")
 	manifestFile := cmd.String("manifest", "", `write a run-provenance JSON manifest to this path ("-" for stdout)`)
@@ -48,6 +50,11 @@ func cmdSimItems(args []string) error {
 	endDate, err := util.ParseFlexibleDate(*sf.SampleEnd, now)
 	if err != nil {
 		return fmt.Errorf("invalid -sample-end date: %w", err)
+	}
+
+	targetStart, targetEnd, effectiveDays, err := resolveTargetWindow(cmd, *days, *targetStartStr, *targetEndStr, now)
+	if err != nil {
+		return err
 	}
 
 	if len(confidences) == 0 {
@@ -81,7 +88,12 @@ func cmdSimItems(args []string) error {
 		SampleStart: startDate, SampleEnd: endDate,
 		DBPath: inputPath, ExclusionsPath: *sf.ExclusionsFile,
 		Exclusions: loaded.Exclusions, Pool: pool, Issues: loaded.Issues, Skipped: loaded.Skipped,
-		Extra: map[string]any{"effective_confidence_levels": []int(confidences)},
+		Extra: map[string]any{
+			"effective_confidence_levels": []int(confidences),
+			"target_start_date":           targetStart.Format("2006-01-02"),
+			"target_end_date":             targetEnd.Format("2006-01-02"),
+			"effective_days":              effectiveDays,
+		},
 	}); err != nil {
 		return err
 	}
@@ -91,13 +103,13 @@ func cmdSimItems(args []string) error {
 		Mode:          mode,
 		Engineers:     sf.Engineers.Count(),
 		EngineerNames: sf.Engineers.Names(),
-		Days:          *days,
+		Days:          effectiveDays,
 		Simulations:   *sf.Simulations,
 		Workers:       *sf.Goroutines,
 		Seed:          seed,
 		Progress:      bar.update,
 	})
-	fmt.Printf("%s, %d days -> how many items?\n\n", simulate.ModeLabel(mode, sf.Engineers.Count(), sf.Engineers.Names()), *days)
+	fmt.Printf("%s, %s -> how many items?\n\n", simulate.ModeLabel(mode, sf.Engineers.Count(), sf.Engineers.Names()), describeWindow(targetStart, targetEnd, effectiveDays))
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "Confidence\tItems")
@@ -170,7 +182,7 @@ func cmdSimDays(args []string) error {
 	sf := addSimFlags(cmd)
 	var items intList
 	cmd.Var(&items, "items", "number of items to complete (required); comma-separated for a grouped trajectory report (e.g. 13,12,9)")
-	targetStartStr := cmd.String("target-start-date", "today", `forecast start date used to compute calendar dates (YYYY-MM-DD; or: yesterday, today, tomorrow, "-3 months")`)
+	targetStartStr := cmd.String("target-start-date", "tomorrow", `forecast start date used to compute calendar dates (YYYY-MM-DD; or: yesterday, today, tomorrow, "-3 months"); default: tomorrow`)
 	var confidences intList
 	cmd.Var(&confidences, "confidence", "comma-separated confidence levels to output, e.g. 85 means \"85% chance of finishing within N days\" (default: 50,75,85,95)")
 	manifestFile := cmd.String("manifest", "", `write a run-provenance JSON manifest to this path ("-" for stdout)`)
@@ -241,7 +253,10 @@ func cmdSimDays(args []string) error {
 		SampleStart: startDate, SampleEnd: endDate,
 		DBPath: inputPath, ExclusionsPath: *sf.ExclusionsFile,
 		Exclusions: loaded.Exclusions, Pool: pool, Issues: loaded.Issues, Skipped: loaded.Skipped,
-		Extra: map[string]any{"effective_confidence_levels": []int(confidences)},
+		Extra: map[string]any{
+			"effective_confidence_levels": []int(confidences),
+			"target_start_date":           targetStartDate.Format("2006-01-02"),
+		},
 	}); err != nil {
 		return err
 	}
@@ -284,7 +299,7 @@ func cmdSimProbability(args []string) error {
 	sf := addSimFlags(cmd)
 	days := cmd.Int("days", 0, "number of days; mutually exclusive with -target-end-date, one must be given")
 	targetStartStr := cmd.String("target-start-date", "tomorrow", `start of the target window (YYYY-MM-DD; or: yesterday, today, tomorrow, "-3 months"); default: tomorrow`)
-	targetEndStr := cmd.String("target-end-date", "", `end of the target window (YYYY-MM-DD; or: now, yesterday, today, tomorrow, "-3 months"); mutually exclusive with -days, one must be given`)
+	targetEndStr := cmd.String("target-end-date", "", `end of the target window, inclusive (YYYY-MM-DD; or: now, yesterday, today, tomorrow, "-3 months"); mutually exclusive with -days, one must be given`)
 	items := cmd.Int("items", -1, "number of items to complete (omit to show full distribution)")
 	manifestFile := cmd.String("manifest", "", `write a run-provenance JSON manifest to this path ("-" for stdout)`)
 	configFile := addConfigFlag(cmd)
@@ -304,15 +319,6 @@ func cmdSimProbability(args []string) error {
 		return err
 	}
 
-	daysSet := isFlagSet(cmd, "days")
-	targetEndSet := isFlagSet(cmd, "target-end-date")
-	if daysSet && targetEndSet {
-		return fmt.Errorf("-days and -target-end-date are mutually exclusive")
-	}
-	if !daysSet && !targetEndSet {
-		return fmt.Errorf("one of -days or -target-end-date must be provided")
-	}
-
 	now := time.Now()
 	startDate, err := util.ParseFlexibleStartDate(*sf.SampleStart, now)
 	if err != nil {
@@ -323,21 +329,9 @@ func cmdSimProbability(args []string) error {
 		return fmt.Errorf("invalid -sample-end date: %w", err)
 	}
 
-	effectiveDays := *days
-	var targetStart, targetEnd time.Time
-	if targetEndSet {
-		targetStart, err = util.ParseFlexibleStartDate(*targetStartStr, now)
-		if err != nil {
-			return fmt.Errorf("invalid -target-start-date: %w", err)
-		}
-		targetEnd, err = util.ParseFlexibleDate(*targetEndStr, now)
-		if err != nil {
-			return fmt.Errorf("invalid -target-end-date: %w", err)
-		}
-		if !targetEnd.After(targetStart) {
-			return fmt.Errorf("-target-end-date must be after -target-start-date")
-		}
-		effectiveDays = util.DayIndex(targetEnd, targetStart) + 1
+	targetStart, targetEnd, effectiveDays, err := resolveTargetWindow(cmd, *days, *targetStartStr, *targetEndStr, now)
+	if err != nil {
+		return err
 	}
 
 	all, err := loadIssues(context.Background(), inputPath, *stdinFormat)
@@ -356,11 +350,10 @@ func cmdSimProbability(args []string) error {
 	}
 	seed := resolveSeed(cmd, *sf.RandomSeed, now)
 
-	manifestExtra := map[string]any{}
-	if targetEndSet {
-		manifestExtra["target_start_date"] = targetStart.Format("2006-01-02")
-		manifestExtra["target_end_date"] = targetEnd.Format("2006-01-02")
-		manifestExtra["effective_days"] = effectiveDays
+	manifestExtra := map[string]any{
+		"target_start_date": targetStart.Format("2006-01-02"),
+		"target_end_date":   targetEnd.Format("2006-01-02"),
+		"effective_days":    effectiveDays,
 	}
 	if err := writeManifest(*manifestFile, manifestInputs{
 		Subcommand: "sim probability", Cmd: cmd, Mode: mode, TypicalEngineers: sf.TypicalEngineers,
@@ -386,12 +379,7 @@ func cmdSimProbability(args []string) error {
 	})
 	modeDescription := simulate.ModeLabel(mode, sf.Engineers.Count(), sf.Engineers.Names())
 
-	var windowDescription string
-	if targetEndSet {
-		windowDescription = fmt.Sprintf("%s to %s (%d days)", targetStart.Format("2006-01-02"), targetEnd.Format("2006-01-02"), effectiveDays)
-	} else {
-		windowDescription = fmt.Sprintf("%d days", effectiveDays)
-	}
+	windowDescription := describeWindow(targetStart, targetEnd, effectiveDays)
 
 	if *items >= 0 {
 		p := simulate.ProbabilityAtLeast(dist, *items)

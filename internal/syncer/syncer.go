@@ -35,7 +35,7 @@ type Options struct {
 // deliberately avoided) so Run can be exercised against a stub instead of the
 // real Linear API. *linear.Client satisfies it.
 type client interface {
-	Fetch(ctx context.Context, updatedSince time.Time, teamKeys []string) ([]issues.Issue, error)
+	Fetch(ctx context.Context, updatedSince time.Time, teamKeys []string) ([]issues.Issue, []string, error)
 	ListTeams(ctx context.Context) ([]linear.Team, error)
 }
 
@@ -92,7 +92,7 @@ func Run(ctx context.Context, client client, store *sqlite.Store, opts Options) 
 			logx.Infof("incremental sync: team=%s since=%s", key, since.Format(time.RFC3339))
 		}
 
-		fetched, err := client.Fetch(ctx, since, []string{key})
+		fetched, trashed, err := client.Fetch(ctx, since, []string{key})
 		if err != nil {
 			return fmt.Errorf("fetch %s: %w", key, err)
 		}
@@ -101,7 +101,13 @@ func Run(ctx context.Context, client client, store *sqlite.Store, opts Options) 
 				return fmt.Errorf("upsert %s: %w", key, err)
 			}
 		}
-		logx.Infof("upserted: team=%s count=%d", key, len(fetched))
+		// An issue trashed after an earlier sync is still in the store; drop it.
+		if len(trashed) > 0 {
+			if err := store.Delete(ctx, trashed...); err != nil {
+				return fmt.Errorf("delete trashed %s: %w", key, err)
+			}
+		}
+		logx.Infof("upserted: team=%s count=%d trashed-skipped=%d", key, len(fetched), len(trashed))
 	}
 
 	return nil

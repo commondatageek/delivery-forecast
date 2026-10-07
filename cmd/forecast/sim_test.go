@@ -93,3 +93,22 @@ func TestCmdSimItems_DBFlagStillWorksDeprecated(t *testing.T) {
 		t.Errorf("expected a confidence table in output, got:\n%s", out)
 	}
 }
+
+func TestCmdSimItems_NamedEngineersLabel(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "issues.csv")
+	if err := os.WriteFile(path, []byte(simFixtureCSV), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	args := []string{
+		"-input", path, "-engineers", "alice,bob", "-sample-start", "2025-01-01", "-sample-end", "2025-02-01",
+		"-days", "30", "-simulations", "200", "-random-seed", "42",
+	}
+	out := captureStdout(t, func() {
+		if err := cmdSimItems(args); err != nil {
+			t.Fatalf("cmdSimItems(%v): %v", args, err)
+		}
+	})
+	if !strings.Contains(out, "2 equivalent engineers [alice, bob]") {
+		t.Errorf("header should show the named engineers, got:\n%s", out)
+	}
+}

@@ -13,6 +13,10 @@ behavior changes ship in minor releases, called out here.
 
 ### Added
 
+- **`-engineers` accepts names.** `-engineers 3` is still three anonymous
+  engineers; `-engineers alice,bob,carol` is three *named* ones, each still
+  drawing from the pooled history. Names exist so per-engineer exclusions can
+  attach to a slot; they need not appear in the data.
 - **Exclusion ranges and reasons.** Entries in `exclusions.json` may now be a
   single day (`"2025-12-25"`), an inclusive range (`"2025-12-22/2026-01-02"`),
   or an object with `date` (or `from`/`to`) and an optional `reason`. Existing
@@ -94,7 +98,9 @@ behavior changes ship in minor releases, called out here.
   series is ~90 mostly-zero samples, so drawing from one person's history is
   lumpy and makes the forecast hypersensitive to which names were typed; it
   also invited "what if Alice worked on it instead of Bob?" comparisons the
-  data can't support. Replaced in a following change by named `-engineers`.
+  data can't support. Use `-engineers alice,bob,carol` for named engineers (still
+  drawing from the pooled history), or `-typical-engineers`/`-whole-team` to
+  shape the pool.
 - **`sim items -percentile` (the always-erroring tombstone) and
   `sim days -percentile` (alias of `-confidence`).** Use `-confidence`. Note:
   `aging -percentile` is unrelated and unchanged.

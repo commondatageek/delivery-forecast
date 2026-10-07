@@ -56,6 +56,9 @@ type poolData struct {
 	Pool       *simulate.SamplePool
 	Issues     []issues.Issue
 	Exclusions simulate.Exclusions
+	// Assignees is the set of engineers with at least one completion in the
+	// sample window, i.e. the pool's per-engineer keys.
+	Assignees map[string]bool
 	// SampleCalendar is the exclusions calendar the pool was built with,
 	// anchored at the sample start.
 	SampleCalendar *simulate.Calendar
@@ -130,6 +133,39 @@ func loadExclusions(path string) (simulate.Exclusions, error) {
 	return simulate.ParseExclusions(data)
 }
 
+// unmatchedExclusionNames returns, sorted, the engineer names in exc that are
+// neither an assignee in the sample pool nor a named -engineers slot. A name
+// may legitimately match only one side (a new hire has no history; a departed
+// engineer has history but no slot), so this is only ever a warning.
+func unmatchedExclusionNames(exc simulate.Exclusions, assignees map[string]bool, slotNames []string) []string {
+	slots := make(map[string]bool, len(slotNames))
+	for _, n := range slotNames {
+		slots[n] = true
+	}
+	var out []string
+	for _, name := range exc.Scopes() {
+		if !assignees[name] && !slots[name] {
+			out = append(out, name)
+		}
+	}
+	return out
+}
+
+// warnExclusionMismatches logs the exclusions-file problems that are worth
+// flagging but not worth failing for: per-engineer entries that -whole-team
+// ignores, and engineer names that match neither the data nor -engineers.
+func warnExclusionMismatches(exc simulate.Exclusions, pd poolData, sf *simFlags) {
+	if *sf.WholeTeam {
+		if len(exc.Scopes()) > 0 {
+			logx.Warnf("exclusions: per-engineer entries are ignored in -whole-team mode")
+		}
+		return
+	}
+	for _, n := range unmatchedExclusionNames(exc, pd.Assignees, sf.Engineers.Names()) {
+		logx.Warnf("exclusions: engineer %q matches no assignee in the sample data and no -engineers name", n)
+	}
+}
+
 // loadPool builds a SamplePool from all, an already-loaded issue set (any
 // source — sim has no -teams flag, so every team is always pooled together,
 // same as before). See completedForPool for the filtering it applies.
@@ -157,6 +193,7 @@ func loadPool(all []issues.Issue, exclusionsFile string, typicalEngineers []stri
 		Pool:           simulate.BuildPool(records, cal, startDate, endDate, wholeTeam),
 		Issues:         completed,
 		Exclusions:     exc,
+		Assignees:      engineerSeen,
 		SampleCalendar: cal,
 		Skipped:        skipped,
 	}, nil
@@ -240,7 +277,7 @@ func addTeamsFlag(fs *flag.FlagSet, usage string) *linear.TeamKeyList {
 // -manifest differ per command and are declared there instead.
 type simFlags struct {
 	ExclusionsFile   *string
-	Engineers        *int
+	Engineers        engineerSpec
 	WholeTeam        *bool
 	Simulations      *int
 	Goroutines       *int
@@ -257,7 +294,7 @@ type simFlags struct {
 func addSimFlags(fs *flag.FlagSet) *simFlags {
 	sf := &simFlags{}
 	sf.ExclusionsFile = fs.String("exclusions", "", "path to an exclusions JSON file (holidays, PTO); applies to both the sample window and the forecast horizon; default: none")
-	sf.Engineers = fs.Int("engineers", 0, "number of (equivalent) engineers; one of -engineers or -whole-team is required")
+	fs.Var(&sf.Engineers, "engineers", "number of equivalent engineers (e.g. 3) or their names (e.g. alice,bob,carol) so per-engineer exclusions apply; one of -engineers or -whole-team is required")
 	sf.WholeTeam = fs.Bool("whole-team", false, "use whole-team daily throughput from historical data (ignores -engineers)")
 	sf.Simulations = fs.Int("simulations", 10_000, "number of Monte Carlo simulations to run")
 	sf.Goroutines = fs.Int("goroutines", runtime.NumCPU(), "number of parallel worker goroutines")

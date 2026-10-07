@@ -68,6 +68,7 @@ func cmdSimItems(args []string) error {
 	if err != nil {
 		return err
 	}
+	warnExclusionMismatches(loaded.Exclusions, loaded, sf)
 	pool := loaded.Pool
 	if err := simulate.ValidatePool(pool, mode, false); err != nil {
 		return err
@@ -76,7 +77,7 @@ func cmdSimItems(args []string) error {
 
 	if err := writeManifest(*manifestFile, manifestInputs{
 		Subcommand: "sim items", Cmd: cmd, Mode: mode, TypicalEngineers: sf.TypicalEngineers,
-		Engineers: *sf.Engineers, WholeTeam: *sf.WholeTeam, Seed: seed,
+		Engineers: sf.Engineers.Count(), EngineerNames: sf.Engineers.Names(), WholeTeam: *sf.WholeTeam, Seed: seed,
 		SampleStart: startDate, SampleEnd: endDate,
 		DBPath: inputPath, ExclusionsPath: *sf.ExclusionsFile,
 		Exclusions: loaded.Exclusions, Pool: pool, Issues: loaded.Issues, Skipped: loaded.Skipped,
@@ -87,15 +88,16 @@ func cmdSimItems(args []string) error {
 
 	bar := newProgressBar(*sf.Simulations)
 	dist := simulate.ItemsInDays(pool, simulate.Params{
-		Mode:        mode,
-		Engineers:   *sf.Engineers,
-		Days:        *days,
-		Simulations: *sf.Simulations,
-		Workers:     *sf.Goroutines,
-		Seed:        seed,
-		Progress:    bar.update,
+		Mode:          mode,
+		Engineers:     sf.Engineers.Count(),
+		EngineerNames: sf.Engineers.Names(),
+		Days:          *days,
+		Simulations:   *sf.Simulations,
+		Workers:       *sf.Goroutines,
+		Seed:          seed,
+		Progress:      bar.update,
 	})
-	fmt.Printf("%s, %d days -> how many items?\n\n", simulate.ModeLabel(mode, *sf.Engineers, nil), *days)
+	fmt.Printf("%s, %d days -> how many items?\n\n", simulate.ModeLabel(mode, sf.Engineers.Count(), sf.Engineers.Names()), *days)
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "Confidence\tItems")
@@ -111,7 +113,7 @@ func cmdSimItems(args []string) error {
 // -items g1,g2,...`: one row per group plus a Total row, with per-confidence
 // Days/Date columns. All thresholds are simulated with the same seed (see
 // simulate.ComputeTrajectoryTable) so the report's invariants hold.
-func printTrajectoryReport(pool *simulate.SamplePool, mode simulate.Mode, engineers int, seed int64, simulations, goroutines int, groups, confidences []int, targetStartDate time.Time) {
+func printTrajectoryReport(pool *simulate.SamplePool, base simulate.Params, groups, confidences []int, targetStartDate time.Time) {
 	cum := make([]int, len(groups))
 	total := 0
 	for g, n := range groups {
@@ -121,18 +123,13 @@ func printTrajectoryReport(pool *simulate.SamplePool, mode simulate.Mode, engine
 
 	dists := make([][]int, len(groups))
 	for g, threshold := range cum {
-		dists[g] = simulate.DaysToComplete(pool, simulate.Params{
-			Mode:        mode,
-			Engineers:   engineers,
-			Items:       threshold,
-			Simulations: simulations,
-			Workers:     goroutines,
-			Seed:        seed,
-		})
+		p := base
+		p.Items = threshold
+		dists[g] = simulate.DaysToComplete(pool, p)
 	}
 	cells, totals := simulate.ComputeTrajectoryTable(dists, confidences)
 
-	fmt.Printf("%s, starting %s -> grouped trajectory\n\n", simulate.ModeLabel(mode, engineers, nil), targetStartDate.Format("2006-01-02"))
+	fmt.Printf("%s, starting %s -> grouped trajectory\n\n", simulate.ModeLabel(base.Mode, base.Engineers, base.EngineerNames), targetStartDate.Format("2006-01-02"))
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	confRow := []string{"", ""}
@@ -222,6 +219,7 @@ func cmdSimDays(args []string) error {
 	if err != nil {
 		return err
 	}
+	warnExclusionMismatches(loaded.Exclusions, loaded, sf)
 	pool := loaded.Pool
 	if err := simulate.ValidatePool(pool, mode, true); err != nil {
 		return err
@@ -239,7 +237,7 @@ func cmdSimDays(args []string) error {
 
 	if err := writeManifest(*manifestFile, manifestInputs{
 		Subcommand: "sim days", Cmd: cmd, Mode: mode, TypicalEngineers: sf.TypicalEngineers,
-		Engineers: *sf.Engineers, WholeTeam: *sf.WholeTeam, Seed: seed,
+		Engineers: sf.Engineers.Count(), EngineerNames: sf.Engineers.Names(), WholeTeam: *sf.WholeTeam, Seed: seed,
 		SampleStart: startDate, SampleEnd: endDate,
 		DBPath: inputPath, ExclusionsPath: *sf.ExclusionsFile,
 		Exclusions: loaded.Exclusions, Pool: pool, Issues: loaded.Issues, Skipped: loaded.Skipped,
@@ -248,22 +246,24 @@ func cmdSimDays(args []string) error {
 		return err
 	}
 
+	params := simulate.Params{
+		Mode:          mode,
+		Engineers:     sf.Engineers.Count(),
+		EngineerNames: sf.Engineers.Names(),
+		Simulations:   *sf.Simulations,
+		Workers:       *sf.Goroutines,
+		Seed:          seed,
+	}
 	if len(items) > 1 {
-		printTrajectoryReport(pool, mode, *sf.Engineers, seed, *sf.Simulations, *sf.Goroutines, items, confidences, targetStartDate)
+		printTrajectoryReport(pool, params, items, confidences, targetStartDate)
 		return nil
 	}
 
 	bar := newProgressBar(*sf.Simulations)
-	dist := simulate.DaysToComplete(pool, simulate.Params{
-		Mode:        mode,
-		Engineers:   *sf.Engineers,
-		Items:       items[0],
-		Simulations: *sf.Simulations,
-		Workers:     *sf.Goroutines,
-		Seed:        seed,
-		Progress:    bar.update,
-	})
-	fmt.Printf("%s, %d items -> how many days?\n\n", simulate.ModeLabel(mode, *sf.Engineers, nil), items[0])
+	params.Items = items[0]
+	params.Progress = bar.update
+	dist := simulate.DaysToComplete(pool, params)
+	fmt.Printf("%s, %d items -> how many days?\n\n", simulate.ModeLabel(mode, sf.Engineers.Count(), sf.Engineers.Names()), items[0])
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "Confidence\tDays\tDate")
@@ -349,6 +349,7 @@ func cmdSimProbability(args []string) error {
 	if err != nil {
 		return err
 	}
+	warnExclusionMismatches(loaded.Exclusions, loaded, sf)
 	pool := loaded.Pool
 	if err := simulate.ValidatePool(pool, mode, false); err != nil {
 		return err
@@ -363,7 +364,7 @@ func cmdSimProbability(args []string) error {
 	}
 	if err := writeManifest(*manifestFile, manifestInputs{
 		Subcommand: "sim probability", Cmd: cmd, Mode: mode, TypicalEngineers: sf.TypicalEngineers,
-		Engineers: *sf.Engineers, WholeTeam: *sf.WholeTeam, Seed: seed,
+		Engineers: sf.Engineers.Count(), EngineerNames: sf.Engineers.Names(), WholeTeam: *sf.WholeTeam, Seed: seed,
 		SampleStart: startDate, SampleEnd: endDate,
 		DBPath: inputPath, ExclusionsPath: *sf.ExclusionsFile,
 		Exclusions: loaded.Exclusions, Pool: pool, Issues: loaded.Issues, Skipped: loaded.Skipped,
@@ -374,15 +375,16 @@ func cmdSimProbability(args []string) error {
 
 	bar := newProgressBar(*sf.Simulations)
 	dist := simulate.ItemsInDays(pool, simulate.Params{
-		Mode:        mode,
-		Engineers:   *sf.Engineers,
-		Days:        effectiveDays,
-		Simulations: *sf.Simulations,
-		Workers:     *sf.Goroutines,
-		Seed:        seed,
-		Progress:    bar.update,
+		Mode:          mode,
+		Engineers:     sf.Engineers.Count(),
+		EngineerNames: sf.Engineers.Names(),
+		Days:          effectiveDays,
+		Simulations:   *sf.Simulations,
+		Workers:       *sf.Goroutines,
+		Seed:          seed,
+		Progress:      bar.update,
 	})
-	modeDescription := simulate.ModeLabel(mode, *sf.Engineers, nil)
+	modeDescription := simulate.ModeLabel(mode, sf.Engineers.Count(), sf.Engineers.Names())
 
 	var windowDescription string
 	if targetEndSet {

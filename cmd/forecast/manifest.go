@@ -60,6 +60,7 @@ type Resolved struct {
 	Mode             string         `json:"mode"`
 	ModeLabel        string         `json:"mode_label"`
 	Engineers        int            `json:"engineers"`
+	EngineerNames    []string       `json:"engineer_names,omitempty"`
 	TypicalEngineers []string       `json:"typical_engineers"`
 	WholeTeam        bool           `json:"whole_team"`
 	Seed             int64          `json:"seed"`
@@ -196,6 +197,7 @@ type manifestInputs struct {
 	Mode             simulate.Mode
 	TypicalEngineers []string
 	Engineers        int
+	EngineerNames    []string
 	WholeTeam        bool
 	Seed             int64
 	SampleStart      time.Time
@@ -267,8 +269,9 @@ func newManifest(in manifestInputs) *Manifest {
 		Flags:         flags,
 		Resolved: Resolved{
 			Mode:             modeName(in.Mode),
-			ModeLabel:        simulate.ModeLabel(in.Mode, in.Engineers, nil),
+			ModeLabel:        simulate.ModeLabel(in.Mode, in.Engineers, in.EngineerNames),
 			Engineers:        in.Engineers,
+			EngineerNames:    in.EngineerNames,
 			TypicalEngineers: in.TypicalEngineers,
 			WholeTeam:        in.WholeTeam,
 			Seed:             in.Seed,

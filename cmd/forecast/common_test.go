@@ -3,8 +3,11 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/commondatageek/delivery-forecast/simulate"
 )
 
 func TestLoadExclusions_EmptyPathIsNone(t *testing.T) {
@@ -54,5 +57,32 @@ func TestLoadExclusions_BadFileErrors(t *testing.T) {
 	}
 	if _, err := loadExclusions(path); err == nil {
 		t.Fatal("loadExclusions of a malformed file = nil error")
+	}
+}
+
+func TestUnmatchedExclusionNames(t *testing.T) {
+	exc, err := simulate.ParseExclusions([]byte(`{
+		"global": ["2025-12-25"],
+		"engineers": {
+			"alice": ["2026-01-02"],
+			"bob": ["2026-01-02"],
+			"carol": ["2026-01-02"],
+			"zed": ["2026-01-02"],
+			"yan": ["2026-01-02"],
+			"empty": []
+		}
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	assignees := map[string]bool{"alice": true}
+	got := unmatchedExclusionNames(exc, assignees, []string{"bob", "dave"})
+	want := []string{"carol", "yan", "zed"} // sorted; alice (data) and bob (slot) match; "empty" has no entries
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("unmatched = %v, want %v", got, want)
+	}
+
+	if got := unmatchedExclusionNames(simulate.Exclusions{}, assignees, nil); got != nil {
+		t.Errorf("no exclusions: got %v, want nil", got)
 	}
 }

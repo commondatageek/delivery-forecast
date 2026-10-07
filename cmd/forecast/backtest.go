@@ -113,6 +113,7 @@ func cmdSimBacktest(args []string) error {
 	if err != nil {
 		return err
 	}
+	warnExclusionMismatches(pd.Exclusions, pd, sf)
 	if err := simulate.ValidatePool(pd.Pool, mode, false); err != nil {
 		return err
 	}
@@ -149,11 +150,12 @@ func cmdSimBacktest(args []string) error {
 	}
 
 	rows := simulate.RunBacktest(pd.Pool, btItems, startDate, targetDate, simulate.Params{
-		Mode:        mode,
-		Engineers:   *sf.Engineers,
-		Simulations: *sf.Simulations,
-		Workers:     *sf.Goroutines,
-		Seed:        seed,
+		Mode:          mode,
+		Engineers:     sf.Engineers.Count(),
+		EngineerNames: sf.Engineers.Names(),
+		Simulations:   *sf.Simulations,
+		Workers:       *sf.Goroutines,
+		Seed:          seed,
 	})
 
 	today := util.LocalDay(now)
@@ -162,7 +164,7 @@ func cmdSimBacktest(args []string) error {
 	case "csv":
 		return printBacktestCSV(rows, today)
 	default:
-		label := simulate.ModeLabel(mode, *sf.Engineers, nil)
+		label := simulate.ModeLabel(mode, sf.Engineers.Count(), sf.Engineers.Names())
 		scope := *project
 		if *milestone != "" {
 			scope += " / " + *milestone

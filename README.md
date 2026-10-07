@@ -315,9 +315,25 @@ before you rely on them.
 
 Pick **exactly one** of these; there is no default.
 
-- `-engineers N` — pool everyone's history and draw for N interchangeable engineers.
-- `-whole-team` — sum everyone's completions into one daily series (ignores
-  individual variance).
+| Flag | Slots | Each slot draws from | Per-engineer exclusions |
+|---|---|---|---|
+| `-engineers 3` | 3 anonymous | everyone's pooled history | `global` only |
+| `-engineers alice,bob,carol` | 3 named | everyone's pooled history | yes |
+| `-whole-team` | 1 | the summed whole-team series | `global` only |
+
+`-engineers` takes a count or a list of names. Names change nothing about the
+statistics (every engineer is still an interchangeable draw from the pool), but
+they let [per-engineer exclusions](#exclusionsjson--holidays-and-time-off) attach
+to a specific person. A name doesn't have to appear in your data, so a new hire
+with no history is fine. `-typical-engineers` independently decides whose
+history forms the pool.
+
+There is deliberately no mode that draws each person from their own history.
+Over a typical 3-month window one engineer's series is about 90 mostly-zero
+samples, which makes the forecast lumpy and hypersensitive to who you typed, and
+invites "what if Alice took this instead of Bob?" comparisons the data can't
+support. To model a team that really differs from the whole, narrow the pool
+with `-typical-engineers`, or use `-whole-team`.
 
 (`sim` pools every team; `-teams`, the issue-tracker team filter, is a separate
 flag on other commands.)

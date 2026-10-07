@@ -57,7 +57,10 @@ type poolData struct {
 	Pool       *simulate.SamplePool
 	Issues     []issues.Issue
 	Exclusions simulate.Exclusions
-	Skipped    int
+	// SampleCalendar is the exclusions calendar the pool was built with,
+	// anchored at the sample start.
+	SampleCalendar *simulate.Calendar
+	Skipped        int
 }
 
 // issuesToCompletions converts issues.Issue records to simulate.Completion.
@@ -149,11 +152,13 @@ func loadPool(all []issues.Issue, exclusionsFile string, typicalEngineers []stri
 		logx.Warnf("skipped %d completed issue(s) with no assignee or completion date", skipped)
 	}
 
+	cal := simulate.NewCalendar(exc, startDate)
 	return poolData{
-		Pool:       simulate.BuildPool(records, exc, startDate, endDate, wholeTeam),
-		Issues:     completed,
-		Exclusions: exc,
-		Skipped:    skipped,
+		Pool:           simulate.BuildPool(records, cal, startDate, endDate, wholeTeam),
+		Issues:         completed,
+		Exclusions:     exc,
+		SampleCalendar: cal,
+		Skipped:        skipped,
 	}, nil
 }
 

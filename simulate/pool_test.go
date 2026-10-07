@@ -2,6 +2,7 @@ package simulate
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 )
@@ -64,7 +65,7 @@ func TestBuildPool_PreservesZeroDays(t *testing.T) {
 		at("alice", 2025, 1, 1), // idx 0
 		at("alice", 2025, 1, 6), // idx 5
 	}
-	pool := BuildPool(records, Exclusions{}, start, end, false)
+	pool := BuildPool(records, nil, start, end, false)
 
 	got := pool.PerEngineer["alice"]
 	want := []int{2, 0, 0, 0, 0, 1, 0, 0, 0, 0}
@@ -85,7 +86,7 @@ func TestBuildPool_PartialNowEndDayCountsToday(t *testing.T) {
 		at("alice", 2025, 1, 5), // idx 4 == totalDays-1, the partial "today"
 		at("alice", 2025, 1, 6), // idx 5, past the window -> dropped
 	}
-	pool := BuildPool(records, Exclusions{}, start, now, false)
+	pool := BuildPool(records, nil, start, now, false)
 
 	got := pool.PerEngineer["alice"]
 	want := []int{1, 0, 0, 0, 1} // 5 slots; today (idx 4) counted, 1/6 dropped
@@ -101,7 +102,7 @@ func TestBuildPool_DropsOutOfRangeCompletions(t *testing.T) {
 		at("alice", 2025, 1, 1),   // idx 0
 		at("alice", 2025, 1, 15),  // after window -> dropped
 	}
-	pool := BuildPool(records, Exclusions{}, start, end, false)
+	pool := BuildPool(records, nil, start, end, false)
 	got := pool.PerEngineer["alice"]
 	if len(got) != 10 {
 		t.Fatalf("len = %d, want 10", len(got))
@@ -123,7 +124,7 @@ func TestBuildPool_GlobalExclusionRemovesSlot(t *testing.T) {
 		at("alice", 2025, 1, 6), // idx 5
 	}
 	exc := mustParseExclusions(t, `{"global": ["2025-01-02"]}`) // removes idx 1
-	pool := BuildPool(records, exc, start, end, false)
+	pool := BuildPool(records, NewCalendar(exc, start), start, end, false)
 	got := pool.PerEngineer["alice"]
 	want := []int{2, 0, 0, 0, 1, 0, 0, 0, 0} // length 9, idx1 dropped, the 1 shifts left
 	if !reflect.DeepEqual(got, want) {
@@ -139,7 +140,7 @@ func TestBuildPool_PerEngineerExclusion(t *testing.T) {
 		at("alice", 2025, 1, 6), // idx 5
 	}
 	exc := mustParseExclusions(t, `{"engineers": {"alice": ["2025-01-06"]}}`) // removes idx 5
-	pool := BuildPool(records, exc, start, end, false)
+	pool := BuildPool(records, NewCalendar(exc, start), start, end, false)
 	got := pool.PerEngineer["alice"]
 	want := []int{2, 0, 0, 0, 0, 0, 0, 0, 0} // length 9, the lone "1" removed
 	if !reflect.DeepEqual(got, want) {
@@ -153,7 +154,7 @@ func TestBuildPool_EngineerSetFromInWindowCompletions(t *testing.T) {
 		at("alice", 2025, 1, 2), // in window
 		at("bob", 2024, 12, 20), // bob's only completion is BEFORE the window
 	}
-	pool := BuildPool(records, Exclusions{}, start, end, false)
+	pool := BuildPool(records, nil, start, end, false)
 
 	if _, ok := pool.PerEngineer["alice"]; !ok {
 		t.Fatal("alice should be in the pool (has an in-window completion)")
@@ -176,7 +177,7 @@ func TestBuildPool_WholeTeamSumsAndIgnoresPerEngineerExclusions(t *testing.T) {
 	}
 	// Per-engineer exclusions must be ignored in whole-team mode.
 	exc := mustParseExclusions(t, `{"engineers": {"bob": ["2025-01-06"]}}`)
-	pool := BuildPool(records, exc, start, end, true)
+	pool := BuildPool(records, NewCalendar(exc, start), start, end, true)
 
 	if len(pool.PerEngineer) != 1 {
 		t.Fatalf("whole-team pool should have exactly one series, got %d", len(pool.PerEngineer))
@@ -218,4 +219,20 @@ func TestDaysBetween(t *testing.T) {
 			t.Errorf("%s: DaysBetween = %d, want %d", c.name, got, c.want)
 		}
 	}
+}
+
+func TestBuildPool_PanicsOnMismatchedAnchor(t *testing.T) {
+	start, end := day(2025, 1, 1), day(2025, 1, 11)
+	cal := NewCalendar(Exclusions{}, day(2025, 1, 2)) // off by one day
+
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("BuildPool did not panic on a calendar anchored at a different date")
+		}
+		if msg, _ := r.(string); !strings.Contains(msg, "anchored at 2025-01-02") {
+			t.Errorf("panic = %v, want it to name the calendar's anchor", r)
+		}
+	}()
+	BuildPool(nil, cal, start, end, false)
 }

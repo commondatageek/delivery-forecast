@@ -1,6 +1,7 @@
 package simulate
 
 import (
+	"fmt"
 	"sort"
 	"time"
 
@@ -85,8 +86,11 @@ func DaysBetween(start, end time.Time) int {
 }
 
 // BuildPool bins completions into per-engineer daily completion counts over the
-// half-open window [startDate, endDate), applies exclusions, and returns the
-// resulting SamplePool. It is pure (no file/DB/clock access).
+// half-open window [startDate, endDate), drops the days cal marks as
+// non-working, and returns the resulting SamplePool. It is pure (no
+// file/DB/clock access). cal must be anchored at startDate (or be nil, meaning
+// every day works); a mismatch is a programming error and panics, since a
+// shifted calendar would silently drop the wrong days.
 //
 // The pool deliberately preserves zero-completion days: each engineer's slice
 // has one slot per non-excluded day in the window, so a day with no completions
@@ -96,15 +100,13 @@ func DaysBetween(start, end time.Time) int {
 // pool only if they have at least one completion inside the window. Completions
 // outside the window are ignored entirely (neither counted nor do they create
 // an engineer). In whole-team mode all engineers are summed into a single
-// WholeTeamKey series.
-func BuildPool(records []Completion, exc Exclusions, startDate, endDate time.Time, wholeTeam bool) *SamplePool {
-	totalDays := DaysBetween(startDate, endDate)
-
-	// Build the global excluded day-index set.
-	globalExcluded := make(map[int]bool)
-	for _, t := range exc.Days("") {
-		globalExcluded[util.DayIndex(t, startDate)] = true
+// WholeTeamKey series, which honors only the calendar's global rules.
+func BuildPool(records []Completion, cal *Calendar, startDate, endDate time.Time, wholeTeam bool) *SamplePool {
+	if cal != nil && !cal.Anchor().Equal(util.LocalDay(startDate)) {
+		panic(fmt.Sprintf("simulate.BuildPool: calendar anchored at %s but startDate is %s",
+			cal.Anchor().Format("2006-01-02"), util.LocalDay(startDate).Format("2006-01-02")))
 	}
+	totalDays := DaysBetween(startDate, endDate)
 
 	type engData struct {
 		counts []int
@@ -135,23 +137,16 @@ func BuildPool(records []Completion, exc Exclusions, startDate, endDate time.Tim
 		}
 		var teamSamples []int
 		for i, count := range teamCounts {
-			if !globalExcluded[i] {
+			if cal.Working("", i) {
 				teamSamples = append(teamSamples, count)
 			}
 		}
 		perEngineer[WholeTeamKey] = teamSamples
 	} else {
 		for name, eng := range engineers {
-			excluded := make(map[int]bool, len(globalExcluded))
-			for k := range globalExcluded {
-				excluded[k] = true
-			}
-			for _, t := range exc.Days(name) {
-				excluded[util.DayIndex(t, startDate)] = true
-			}
 			var engineerSamples []int
 			for i, count := range eng.counts {
-				if !excluded[i] {
+				if cal.Working(name, i) {
 					engineerSamples = append(engineerSamples, count)
 				}
 			}

@@ -81,13 +81,14 @@ func cmdSimItems(args []string) error {
 		return err
 	}
 	seed := resolveSeed(cmd, *sf.RandomSeed, now)
+	horizon := simulate.NewCalendar(loaded.Exclusions, targetStart)
 
 	if err := writeManifest(*manifestFile, manifestInputs{
 		Subcommand: "sim items", Cmd: cmd, Mode: mode, TypicalEngineers: sf.TypicalEngineers,
 		Engineers: sf.Engineers.Count(), EngineerNames: sf.Engineers.Names(), WholeTeam: *sf.WholeTeam, Seed: seed,
 		SampleStart: startDate, SampleEnd: endDate,
 		DBPath: inputPath, ExclusionsPath: *sf.ExclusionsFile,
-		Exclusions: loaded.Exclusions, Pool: pool, Issues: loaded.Issues, Skipped: loaded.Skipped,
+		Exclusions: loaded.Exclusions, SampleCalendar: loaded.SampleCalendar, HorizonCalendar: horizon, Pool: pool, Issues: loaded.Issues, Skipped: loaded.Skipped,
 		Extra: map[string]any{
 			"effective_confidence_levels": []int(confidences),
 			"target_start_date":           targetStart.Format("2006-01-02"),
@@ -103,6 +104,7 @@ func cmdSimItems(args []string) error {
 		Mode:          mode,
 		Engineers:     sf.Engineers.Count(),
 		EngineerNames: sf.Engineers.Names(),
+		Calendar:      horizon,
 		Days:          effectiveDays,
 		Simulations:   *sf.Simulations,
 		Workers:       *sf.Goroutines,
@@ -242,6 +244,7 @@ func cmdSimDays(args []string) error {
 	if err != nil {
 		return fmt.Errorf("invalid -target-start-date: %w", err)
 	}
+	horizon := simulate.NewCalendar(loaded.Exclusions, targetStartDate)
 
 	if len(confidences) == 0 {
 		confidences = intList{50, 75, 85, 95}
@@ -252,7 +255,7 @@ func cmdSimDays(args []string) error {
 		Engineers: sf.Engineers.Count(), EngineerNames: sf.Engineers.Names(), WholeTeam: *sf.WholeTeam, Seed: seed,
 		SampleStart: startDate, SampleEnd: endDate,
 		DBPath: inputPath, ExclusionsPath: *sf.ExclusionsFile,
-		Exclusions: loaded.Exclusions, Pool: pool, Issues: loaded.Issues, Skipped: loaded.Skipped,
+		Exclusions: loaded.Exclusions, SampleCalendar: loaded.SampleCalendar, HorizonCalendar: horizon, Pool: pool, Issues: loaded.Issues, Skipped: loaded.Skipped,
 		Extra: map[string]any{
 			"effective_confidence_levels": []int(confidences),
 			"target_start_date":           targetStartDate.Format("2006-01-02"),
@@ -265,6 +268,7 @@ func cmdSimDays(args []string) error {
 		Mode:          mode,
 		Engineers:     sf.Engineers.Count(),
 		EngineerNames: sf.Engineers.Names(),
+		Calendar:      horizon,
 		Simulations:   *sf.Simulations,
 		Workers:       *sf.Goroutines,
 		Seed:          seed,
@@ -349,6 +353,7 @@ func cmdSimProbability(args []string) error {
 		return err
 	}
 	seed := resolveSeed(cmd, *sf.RandomSeed, now)
+	horizon := simulate.NewCalendar(loaded.Exclusions, targetStart)
 
 	manifestExtra := map[string]any{
 		"target_start_date": targetStart.Format("2006-01-02"),
@@ -360,7 +365,7 @@ func cmdSimProbability(args []string) error {
 		Engineers: sf.Engineers.Count(), EngineerNames: sf.Engineers.Names(), WholeTeam: *sf.WholeTeam, Seed: seed,
 		SampleStart: startDate, SampleEnd: endDate,
 		DBPath: inputPath, ExclusionsPath: *sf.ExclusionsFile,
-		Exclusions: loaded.Exclusions, Pool: pool, Issues: loaded.Issues, Skipped: loaded.Skipped,
+		Exclusions: loaded.Exclusions, SampleCalendar: loaded.SampleCalendar, HorizonCalendar: horizon, Pool: pool, Issues: loaded.Issues, Skipped: loaded.Skipped,
 		Extra: manifestExtra,
 	}); err != nil {
 		return err
@@ -371,6 +376,7 @@ func cmdSimProbability(args []string) error {
 		Mode:          mode,
 		Engineers:     sf.Engineers.Count(),
 		EngineerNames: sf.Engineers.Names(),
+		Calendar:      horizon,
 		Days:          effectiveDays,
 		Simulations:   *sf.Simulations,
 		Workers:       *sf.Goroutines,

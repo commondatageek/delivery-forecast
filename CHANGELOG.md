@@ -13,6 +13,16 @@ behavior changes ship in minor releases, called out here.
 
 ### Added
 
+- **Exclusions now apply to the forecast horizon.** One `exclusions.json` is a
+  calendar of non-working days for everyone (`global`) or a named engineer
+  (`engineers`, via `-engineers alice,bob`), and each date takes effect on
+  whichever side it falls: inside the sample window it is dropped from the
+  throughput history, inside the forecast window the simulation contributes
+  nothing for that day. The day still counts as a calendar day, so `-days 30`
+  is still 30 days and `sim days` still reports calendar days. `sim backtest`
+  applies exclusions per replayed day. `-whole-team` honors only `global`
+  entries and warns about per-engineer ones; names matching neither the data
+  nor `-engineers` are warned about.
 - **`sim items -target-start-date` / `-target-end-date`**, with the same rules
   as `probability`: exactly one of `-days` or `-target-end-date`, end inclusive.
   The report header now shows the dated window.
@@ -55,6 +65,10 @@ behavior changes ship in minor releases, called out here.
 
 ### Changed
 
+- **Manifest `schema_version` is 2.** `data.exclusions` replaces
+  `data.exclusions_path`/`data.exclusions_applied` and records both the source
+  entries and the resolved dates dropped from the sample and zeroed in the
+  horizon.
 - **`sim days` dates shift one day later.** The default `-target-start-date` is
   now `tomorrow` (was `today`), matching `probability`; today's completions are
   already in the sample via `-sample-end now`. Pass `-target-start-date today`

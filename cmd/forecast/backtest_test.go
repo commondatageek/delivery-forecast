@@ -87,3 +87,52 @@ func TestCmdSimBacktest_ExcludesCanceledIssues(t *testing.T) {
 		t.Errorf("remaining includes the canceled issue: %s", lines[1])
 	}
 }
+
+func TestCmdSimBacktest_AcceptsExclusions(t *testing.T) {
+	dir := t.TempDir()
+	csvPath := filepath.Join(dir, "issues.csv")
+	if err := os.WriteFile(csvPath, []byte(backtestFixtureCSV), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	excPath := filepath.Join(dir, "exclusions.json")
+	// From Jan 10 through the Jan 15 deadline nobody works, so any replay day
+	// from Jan 10 on has an entirely dead horizon.
+	if err := os.WriteFile(excPath, []byte(`{"global":["2025-01-10/2025-01-15"]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// deadProbs returns the probability column of rows dated Jan 10 or later
+	// that still have work remaining.
+	deadProbs := func(out string) []string {
+		var probs []string
+		for _, line := range strings.Split(strings.TrimSpace(out), "\n")[1:] {
+			f := strings.Split(line, ",")
+			if f[0] >= "2025-01-10" && f[2] != "0" {
+				probs = append(probs, f[3])
+			}
+		}
+		return probs
+	}
+
+	with := deadProbs(runSimBacktest(t, "-input", csvPath, "-exclusions", excPath))
+	if len(with) == 0 {
+		t.Fatal("no replay rows on/after Jan 10 with remaining work")
+	}
+	for _, p := range with {
+		if p != "0.00" {
+			t.Errorf("with a dead horizon, probability = %s, want 0.00 (%v)", p, with)
+		}
+	}
+
+	// Sensitivity guard: without the file the same rows are not all zero.
+	without := deadProbs(runSimBacktest(t, "-input", csvPath))
+	allZero := true
+	for _, p := range without {
+		if p != "0.00" {
+			allZero = false
+		}
+	}
+	if allZero {
+		t.Errorf("without exclusions the Jan 10+ rows are all 0.00 too, so this test proves nothing: %v", without)
+	}
+}

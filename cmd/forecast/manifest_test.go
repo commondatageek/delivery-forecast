@@ -1,9 +1,12 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"os"
 	"path/filepath"
+	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/commondatageek/delivery-forecast/issues"
@@ -68,23 +71,54 @@ func TestNewManifest_Assembly(t *testing.T) {
 		{Identifier: "ENG-2", Assignee: "bob", CompletedAt: day(2025, 1, 6)},
 	}
 
+	exc, err := simulate.ParseExclusions([]byte(`{
+		"global": [{"date": "2025-01-03", "reason": "offsite"}, "2025-03-10/2025-03-11"],
+		"engineers": {"alice": ["2025-01-20", "2025-03-12"]}
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	m := newManifest(manifestInputs{
-		Subcommand:  "sim items",
-		Cmd:         cmd,
-		Mode:        simulate.ModeAnonymous,
-		Engineers:   3,
-		Seed:        42,
-		SampleStart: day(2025, 1, 1),
-		SampleEnd:   day(2025, 2, 1),
-		DBPath:      *dbFile,
-		Pool:        pool,
-		Issues:      testIssues,
-		Skipped:     1,
-		Extra:       map[string]any{"effective_confidence_levels": []int{50, 75, 85}},
+		Subcommand:      "sim items",
+		Cmd:             cmd,
+		Mode:            simulate.ModeAnonymous,
+		Engineers:       3,
+		Seed:            42,
+		SampleStart:     day(2025, 1, 1),
+		SampleEnd:       day(2025, 2, 1),
+		DBPath:          *dbFile,
+		ExclusionsPath:  "cal.json",
+		Exclusions:      exc,
+		SampleCalendar:  simulate.NewCalendar(exc, day(2025, 1, 1)),
+		HorizonCalendar: simulate.NewCalendar(exc, day(2025, 3, 1)),
+		Pool:            pool,
+		Issues:          testIssues,
+		Skipped:         1,
+		Extra:           map[string]any{"effective_confidence_levels": []int{50, 75, 85}},
 	})
 
-	if m.SchemaVersion != 1 {
-		t.Fatalf("SchemaVersion = %d, want 1", m.SchemaVersion)
+	if m.SchemaVersion != 2 {
+		t.Fatalf("SchemaVersion = %d, want 2", m.SchemaVersion)
+	}
+
+	ex := m.Data.Exclusions
+	if ex.Path != "cal.json" {
+		t.Errorf("Exclusions.Path = %q", ex.Path)
+	}
+	// Sample window is [2025-01-01, 2025-02-01): only January dates count.
+	if want := []string{"2025-01-03"}; !reflect.DeepEqual(ex.SampleDaysDropped.Global, want) {
+		t.Errorf("SampleDaysDropped.Global = %v, want %v", ex.SampleDaysDropped.Global, want)
+	}
+	if want := []string{"2025-01-03", "2025-01-20"}; !reflect.DeepEqual(ex.SampleDaysDropped.Engineers["alice"], want) {
+		t.Errorf("SampleDaysDropped.Engineers[alice] = %v, want %v", ex.SampleDaysDropped.Engineers["alice"], want)
+	}
+	// Horizon anchored 2025-03-01: only dates at/after it.
+	if want := []string{"2025-03-10", "2025-03-11"}; !reflect.DeepEqual(ex.HorizonDaysOff.Global, want) {
+		t.Errorf("HorizonDaysOff.Global = %v, want %v", ex.HorizonDaysOff.Global, want)
+	}
+	if want := []string{"2025-03-10", "2025-03-11", "2025-03-12"}; !reflect.DeepEqual(ex.HorizonDaysOff.Engineers["alice"], want) {
+		t.Errorf("HorizonDaysOff.Engineers[alice] = %v, want %v", ex.HorizonDaysOff.Engineers["alice"], want)
 	}
 	if m.Invocation.Subcommand != "sim items" {
 		t.Fatalf("Subcommand = %q, want %q", m.Invocation.Subcommand, "sim items")
@@ -132,5 +166,23 @@ func TestNewManifest_Assembly(t *testing.T) {
 	}
 	if m.Issues.Records[0].Identifier != "ENG-1" || m.Issues.Records[0].Assignee != "alice" {
 		t.Fatalf("Records[0] = %+v, want Identifier=ENG-1 Assignee=alice", m.Issues.Records[0])
+	}
+}
+
+func TestNewManifest_NoExclusionsMarshalsEmptyLists(t *testing.T) {
+	cmd := flag.NewFlagSet("sim items", flag.ContinueOnError)
+	m := newManifest(manifestInputs{
+		Subcommand: "sim items", Cmd: cmd, Mode: simulate.ModeFullTeam,
+		SampleStart: day(2025, 1, 1), SampleEnd: day(2025, 2, 1),
+		Pool: simulate.NewSamplePool(map[string][]int{simulate.WholeTeamKey: {1}}),
+	})
+	b, err := json.Marshal(m.Data.Exclusions)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{`"path":""`, `"sample_days_dropped":{"global":[]}`, `"horizon_days_off":{"global":[]}`} {
+		if !strings.Contains(string(b), want) {
+			t.Errorf("exclusions JSON %s missing %s", b, want)
+		}
 	}
 }

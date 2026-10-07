@@ -153,6 +153,7 @@ func cmdSimBacktest(args []string) error {
 		Mode:          mode,
 		Engineers:     sf.Engineers.Count(),
 		EngineerNames: sf.Engineers.Names(),
+		Calendar:      simulate.NewCalendar(pd.Exclusions, startDate),
 		Simulations:   *sf.Simulations,
 		Workers:       *sf.Goroutines,
 		Seed:          seed,

@@ -71,9 +71,25 @@ type Resolved struct {
 }
 
 type DataSection struct {
-	DB                DataFile            `json:"db"`
-	ExclusionsPath    string              `json:"exclusions_path"`
-	ExclusionsApplied simulate.Exclusions `json:"exclusions_applied"`
+	DB         DataFile          `json:"db"`
+	Exclusions ExclusionsSection `json:"exclusions"`
+}
+
+// ExclusionsSection records both what the exclusions file said and what it
+// resolved to on each side of the forecast, so two runs that disagree can be
+// told apart without re-reading the file.
+type ExclusionsSection struct {
+	Path              string              `json:"path"`                // "" when none
+	Source            simulate.Exclusions `json:"source"`              // entries marshal as {"from","to","reason"}
+	SampleDaysDropped DaysByScope         `json:"sample_days_dropped"` // within [sample-start, sample-end)
+	HorizonDaysOff    DaysByScope         `json:"horizon_days_off"`    // every excluded date at/after target start
+}
+
+// DaysByScope lists resolved dates (YYYY-MM-DD) per scope. Engineer lists
+// include the global dates, since that is when the engineer is actually off.
+type DaysByScope struct {
+	Global    []string            `json:"global"`
+	Engineers map[string][]string `json:"engineers,omitempty"`
 }
 
 type DataFile struct {
@@ -205,10 +221,41 @@ type manifestInputs struct {
 	DBPath           string
 	ExclusionsPath   string
 	Exclusions       simulate.Exclusions
-	Pool             *simulate.SamplePool
-	Issues           []issues.Issue
-	Skipped          int
-	Extra            map[string]any
+	// SampleCalendar is anchored at SampleStart. HorizonCalendar is anchored at
+	// the target start; nil for commands with no single horizon (backtest).
+	SampleCalendar  *simulate.Calendar
+	HorizonCalendar *simulate.Calendar
+	Pool            *simulate.SamplePool
+	Issues          []issues.Issue
+	Skipped         int
+	Extra           map[string]any
+}
+
+// resolveDays lists, per scope in exc, the dates cal marks non-working in
+// [from, to) (to < 0: every explicit date from `from` on). Per-engineer scopes
+// are skipped in whole-team mode, which ignores them on both sides.
+func resolveDays(cal *simulate.Calendar, exc simulate.Exclusions, wholeTeam bool, from, to int) DaysByScope {
+	out := DaysByScope{Global: formatDays(cal.OffDays("", from, to))}
+	if wholeTeam {
+		return out
+	}
+	for _, name := range exc.Scopes() {
+		if out.Engineers == nil {
+			out.Engineers = make(map[string][]string)
+		}
+		out.Engineers[name] = formatDays(cal.OffDays(name, from, to))
+	}
+	return out
+}
+
+// formatDays renders dates as YYYY-MM-DD, as a non-nil slice so an empty list
+// marshals as [] rather than null.
+func formatDays(days []time.Time) []string {
+	out := make([]string, len(days))
+	for i, d := range days {
+		out[i] = d.Format("2006-01-02")
+	}
+	return out
 }
 
 // newManifest assembles a Manifest from manifestInputs. It is pure (no file
@@ -262,7 +309,7 @@ func newManifest(in manifestInputs) *Manifest {
 	wd, _ := os.Getwd()
 
 	return &Manifest{
-		SchemaVersion: 1,
+		SchemaVersion: 2,
 		GeneratedAt:   time.Now().UTC().Format(time.RFC3339),
 		Binary:        buildInfo(),
 		Invocation:    Invocation{Subcommand: in.Subcommand, Args: os.Args, WorkingDir: wd},
@@ -281,9 +328,13 @@ func newManifest(in manifestInputs) *Manifest {
 			Extra:            in.Extra,
 		},
 		Data: DataSection{
-			DB:                dbFingerprint(in.DBPath),
-			ExclusionsPath:    in.ExclusionsPath,
-			ExclusionsApplied: in.Exclusions,
+			DB: dbFingerprint(in.DBPath),
+			Exclusions: ExclusionsSection{
+				Path:              in.ExclusionsPath,
+				Source:            in.Exclusions,
+				SampleDaysDropped: resolveDays(in.SampleCalendar, in.Exclusions, in.WholeTeam, 0, simulate.DaysBetween(in.SampleStart, in.SampleEnd)),
+				HorizonDaysOff:    resolveDays(in.HorizonCalendar, in.Exclusions, in.WholeTeam, 0, -1),
+			},
 		},
 		Pool: PoolSection{
 			EngineerCount:          len(in.Pool.PerEngineer),

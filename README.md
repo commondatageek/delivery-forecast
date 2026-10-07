@@ -1,23 +1,33 @@
 # delivery-forecast
 
-A delivery-forecasting toolkit: Monte Carlo forecasts, cycle-time/flow
-reports, and per-day flow metrics, all from a single `forecast` binary.
-Issues can come from [Linear](https://linear.app) (`linear sync` into a
-local SQLite database) or from a plain CSV/JSON file you already have — see
-[Bring your own data](#bring-your-own-data) below.
+Answer "when will we be done?" and "how healthy is our flow?" from your
+issue tracker's history. `forecast` is a single command-line tool that turns a
+list of issues (with created / started / completed timestamps) into:
 
-```
-linear.Client  --Fetch-->  issues.Issue  --Upsert-->  sqlite.Store (linear.db)  --+
-                                                                                    |
-                                       issues.ReadFile (CSV/JSON, no Linear)  ------+
-                                                                                    |
-                                                             loadIssues (-input)
-                                                                                    |
-                    +----------------------+-----------------------+---------------+
-                    |                      |                       |
-             forecast sim          forecast aging/cfd/count   forecast history
-       (Monte Carlo forecasts)  (cycle-time / WIP-age / CFD)  (per-day flow metrics)
-```
+- **Forecasts** — Monte Carlo simulations of how many items you'll finish, how
+  long a batch will take, or how likely a plan is to land.
+- **Flow reports** — cumulative flow diagrams, cycle-time and WIP-age reports,
+  outstanding-work counts, and per-day flow metrics.
+
+Issues can come straight from [Linear](https://linear.app), or from a plain
+CSV/JSON file exported from any tracker. No Linear account is required.
+
+## What do you want to know?
+
+| Question | Command |
+|---|---|
+| Is my data good enough to use? | [`forecast check`](#check--is-my-data-usable) |
+| How has work flowed over time, day by day? | [`forecast history`](#history--per-day-flow-metrics) |
+| Where is work piling up? Is WIP stable? | [`forecast cfd`](#cfd--cumulative-flow-diagram) |
+| Which in-progress items are stuck or unusually old? | [`forecast aging`](#aging--which-in-progress-items-are-old) |
+| How much open work is there, per project? | [`forecast count`](#count--outstanding-work) |
+| How many items can we finish in D days? | [`forecast sim items`](#sim-items--how-many-items-in-d-days) |
+| How many days will I items take? | [`forecast sim days`](#sim-days--how-many-days-for-i-items) |
+| How likely is "I items in D days"? | [`forecast sim probability`](#sim-probability--how-likely-is-this-plan) |
+| Would past forecasts have been right? | [`forecast sim backtest`](#sim-backtest--would-past-forecasts-have-held-up) |
+
+Run `forecast` with no arguments for the command list, and
+`forecast <command> -help` for every flag of a command.
 
 ## Install
 
@@ -31,66 +41,91 @@ curl -fsSL https://raw.githubusercontent.com/commondatageek/delivery-forecast/ma
 irm https://raw.githubusercontent.com/commondatageek/delivery-forecast/main/install.ps1 | iex
 ```
 
-Both scripts download the release asset matching your OS/arch, verify its
-SHA256 checksum, and install `forecast` to `~/.forecast/bin`
-(`%USERPROFILE%\.forecast\bin` on Windows), adding it to your `PATH` unless
-opted out.
+Both scripts download the release for your OS/arch, verify its SHA256
+checksum, install `forecast` to `~/.forecast/bin` (`%USERPROFILE%\.forecast\bin`
+on Windows), and add it to your `PATH`. Prefer to do it by hand? Grab an
+archive from the
+[releases page](https://github.com/commondatageek/delivery-forecast/releases).
 
 | Env var | Default | Description |
 |---|---|---|
 | `FORECAST_INSTALL_DIR` | `~/.forecast/bin` | where to install the binary |
-| `FORECAST_VERSION` | latest release | pin a specific release tag, e.g. `v1.2.3` |
+| `FORECAST_VERSION` | latest release | pin a release tag, e.g. `v1.2.3` |
 | `FORECAST_NO_MODIFY_PATH` | unset | set to skip editing your shell profile / User `PATH` |
 
-To pin a version (or set any other env var above) with the piped `install.sh`
-one-liner, put the assignment **after** the pipe, on the `sh` side — not
-before `curl`. `curl` and `sh` are separate processes joined by a pipe, so a
-prefix like `FORECAST_VERSION=v1.2.3 curl ... | sh` only sets the variable
-for `curl` and `sh` never sees it, silently installing latest instead:
+With the piped `install.sh` one-liner, set variables on the `sh` side of the
+pipe (`... | FORECAST_VERSION=v1.2.3 sh`) or `export` them first. A prefix
+before `curl` never reaches `sh`, so you'd silently get the latest release.
+
+Later, `forecast update` upgrades in place (see [Maintenance](#maintenance)).
+Skim [CHANGELOG.md](https://github.com/commondatageek/delivery-forecast/blob/main/CHANGELOG.md) before upgrading — it records changes that
+move numbers you may already rely on.
+
+## Quick start
+
+Try it on the sample data in this repo, a CSV of 30 issues from early 2025:
 
 ```bash
-# correct — the env var reaches sh, which is what reads it
-curl -fsSL https://raw.githubusercontent.com/commondatageek/delivery-forecast/main/install.sh | FORECAST_VERSION=v1.2.3 sh
+curl -fsSLO https://raw.githubusercontent.com/commondatageek/delivery-forecast/main/testdata/sample-issues.csv
 
-# also correct
-export FORECAST_VERSION=v1.2.3
-curl -fsSL https://raw.githubusercontent.com/commondatageek/delivery-forecast/main/install.sh | sh
+forecast check -input sample-issues.csv
 ```
 
-(PowerShell's `irm | iex` doesn't have this issue — `$env:FORECAST_VERSION = "v1.2.3"` set beforehand works fine since both run in the same session.)
-
-Prefer to install manually? Grab the archive for your platform from the
-[releases page](https://github.com/commondatageek/delivery-forecast/releases)
-and extract the `forecast` binary onto your `PATH` yourself.
-
-Once installed, `forecast update` (below) handles future upgrades in place.
-Before upgrading, skim [CHANGELOG.md](CHANGELOG.md) — it records the changes
-that move numbers you may already be relying on.
-
-## Build & test
-
-Uses [Just](https://just.systems):
+```
+Read 30 issues from sample-issues.csv
+  history   ok
+  cfd       ok
+  aging     ok
+  count     ok
+  sim       ok
+```
 
 ```bash
-just build       # compiles bin/forecast
-just test        # go test ./...
+# Per-day flow metrics, as a table
+forecast history -input sample-issues.csv -format text -end 2025-03-15
+
+# A cumulative flow diagram you can open in a browser
+forecast cfd -input sample-issues.csv -start 2025-01-01 -end 2025-03-15 -out cfd.html
+
+# Open work, per project and milestone
+forecast count -input sample-issues.csv -updated-since 2025-01-01 -milestones
+
+# A forecast: how many items could the whole team finish in 14 days?
+forecast sim items -input sample-issues.csv -whole-team -days 14 \
+  -sample-start 2025-01-01 -sample-end 2025-03-15
 ```
 
-Or plain Go:
+```
+whole-team throughput, 14 days -> how many items?
 
-```bash
-go build -o bin/forecast ./cmd/forecast
-go test ./...
+Confidence  Items
+50%         at least 5
+75%         at least 3
+85%         at least 3
+95%         at least 2
 ```
 
-Run `forecast` with no arguments to see the full command list.
+Read that as: "we'd finish **at least 5** items half the time, and at least 3
+items 85% of the time."
 
-## Bring your own data
+Every command also logs a table of its effective flag values (and where each
+came from) to stderr. Results go to stdout, so redirects and pipes only see
+the report.
 
-Linear isn't required. Every command reads issues via `-input`, which accepts
-a SQLite database (what `linear sync` produces), a CSV file, or a JSON file —
-no sync step, no API key. The minimum a CSV needs is an identifier and
-whichever lifecycle timestamps the command you're running uses:
+> **Why the explicit dates?** Most commands default to "the last 3 months".
+> The sample data is from early 2025, so those defaults would find nothing.
+> With your own current data you can leave them off.
+
+When you're ready to use your own data, see [Getting your data in](#getting-your-data-in).
+
+## Getting your data in
+
+### From a CSV, JSON, or SQLite file
+
+Every command that reads issues takes `-input`, which accepts a CSV file, a
+JSON file (an array, or one object per line), or a SQLite database. There's
+no sync step and no API key. At minimum a CSV needs an `identifier` column
+plus whichever timestamps the command you're running uses:
 
 ```csv
 identifier,created_at,started_at,completed_at
@@ -100,371 +135,280 @@ ENG-3,2025-01-05,2025-01-06,2025-01-09
 ```
 
 ```bash
-forecast check -input issues.csv     # sanity-check the file before trusting it
-forecast history -input issues.csv -format text
+forecast check -input issues.csv                          # what will work with this file?
+cat issues.csv | forecast history -input - -stdin-format csv   # stdin works too
 ```
 
-A richer fixture — 30 issues spanning ~90 days, with completed, canceled,
-in-progress, and backlog work — is committed at
-[testdata/sample-issues.csv](testdata/sample-issues.csv), so you can run a
-real command against this repo in one step:
+Which columns does each command need?
 
-```bash
-forecast history -input testdata/sample-issues.csv -format text
-```
+| Command | Needs |
+|---|---|
+| `history`, `cfd` | `created_at` (issues without it are skipped); `started_at`, `completed_at`, `canceled_at` sharpen the picture |
+| `aging` | `started_at` and `completed_at` on completed issues; `started_at` on in-progress ones |
+| `count` | `updated_at`, `state_type` (or `completed_at`/`canceled_at`), and `project_name` for grouping. Projects with no recent `updated_at` are hidden. |
+| `sim *` | `completed_at` and a non-empty `assignee` on completed issues |
 
-See [DATA_REQUIREMENTS.md](DATA_REQUIREMENTS.md) for the accepted CSV/JSON
-column names and timestamp formats, and exactly which fields each command
-needs. `-db` still works as a deprecated alias for `-input` wherever a
-command used to require it (SQLite only; logs a warning).
+`forecast check` tests your file against this list and tells you how many
+issues each command will silently ignore. Run it first. The full column
+list and timestamp formats are in [DATA_REQUIREMENTS.md](https://github.com/commondatageek/delivery-forecast/blob/main/DATA_REQUIREMENTS.md).
 
-## Linear ingest
+### From Linear
 
-`forecast linear sync` and `forecast linear teams` require a
-`LINEAR_API_KEY` environment variable (a Linear personal API key).
+`forecast linear` syncs issues from Linear into a local SQLite database, which
+you then pass to other commands as `-input`. You need a Linear personal API
+key in `LINEAR_API_KEY`.
 
 ```bash
 export LINEAR_API_KEY=lin_api_...
-forecast linear teams
-forecast linear sync -db linear.db -all-teams
-```
+forecast linear teams                              # list the teams you can access
+forecast linear sync -db linear.db -all-teams      # first sync: pick teams
+forecast linear sync -db linear.db                 # later: incremental, per team
 
-A brand-new/empty database needs `-teams` or `-all-teams` to seed it; after
-that, `forecast linear sync -db linear.db` alone will incrementally sync
-every team already in the db, each against its own watermark.
+forecast history -input linear.db -teams ENG
+```
 
 | Flag | Default | Description |
 |---|---|---|
-| `-db` | *(required)* | path to SQLite database |
-| `-teams` | | comma-separated team keys, e.g. ENG,DESIGN; limits the candidate team set |
-| `-all-teams` | `false` | expand the candidate team set to every accessible Linear team; mutually exclusive with `-teams` |
-| `-full-reload` | `false` | ignore each team's stored watermark and do a full reload |
-| `-config` | | path to a YAML config file supplying flag values (CLI flags override) |
+| `-db` | *(required)* | SQLite database to write (created if missing) |
+| `-teams` | | comma-separated team keys, e.g. `ENG,DESIGN`; limits (or extends) the teams to sync |
+| `-all-teams` | `false` | sync every team you can access; mutually exclusive with `-teams` |
+| `-full-reload` | `false` | ignore each team's stored watermark and re-fetch everything |
+| `-config` | | YAML file of flag values (see [Config files](#config-files)) |
 
-`forecast linear teams` just lists accessible teams (key, name) and exits; it takes only `-config`.
+A brand-new database needs `-teams` or `-all-teams` to seed it. After that,
+`sync` with no team flags incrementally updates every team already in the
+database. `forecast linear teams` takes only `-config`.
 
-## `forecast sim` — Monte Carlo forecasting
+## Flags every analysis command shares
 
-Four subcommands, all sampling from the same historical daily-completion
-data (`-sample-start`/`-sample-end`) in one of three mutually-exclusive
-modes:
+These apply to `aging`, `cfd`, `check`, `count`, `history`, and all `sim`
+subcommands unless noted.
 
-One of the three is required — there is no implicit default mode:
+| Flag | Description |
+|---|---|
+| `-input` | **Required.** A SQLite database (`.db`/`.sqlite`/`.sqlite3`), CSV, or JSON file. `-` reads stdin. |
+| `-stdin-format` | `csv` or `json`. Required when `-input -`. |
+| `-teams` | Comma-separated team keys to include (e.g. `ENG,DATA`); default is all teams. Available on `aging`, `cfd`, `count`, `history`; `sim` has no team filter. |
+| `-config` | Path to a YAML file of flag values; see [Config files](#config-files). |
+| `-db` | Deprecated alias for `-input` (SQLite only, logs a warning) on `aging`, `cfd`, `count`, and `sim`. |
 
-- `-engineers N` — pool all engineers' history together and draw for N anonymous equivalent engineers.
+If you don't pass `-teams` and your data spans several teams, `aging`, `cfd`,
+`count`, and `history` log a warning that they're blending all of them. Every
+other flag is listed under its command below.
+
+**Dates.** Every date flag takes `YYYY-MM-DD`, the keywords `yesterday`,
+`today`, `tomorrow`, or a relative offset such as `-3 months`, `+2 weeks`, or
+`90 days ago` (units: day, week, month, year). End-type flags (`-end`,
+`-sample-end`, `-target-end-date`, `-updated-since`) also accept `now`; start-type flags
+(`-start`, `-sample-start`, `-target-start-date`, `-replay-start-date`) do not.
+A `-sample-end` is exclusive: `2025-03-15` stops at the start of that day.
+
+## Flow reports
+
+### `check` — is my data usable?
+
+Reads a source and reports, per command, whether the issues support it. Run it
+first against any new export; see the sample output in [Quick start](#quick-start).
+
+```bash
+forecast check -input issues.csv
+```
+
+Takes only the shared flags (`-input`, `-stdin-format`, `-config`).
+
+### `history` — per-day flow metrics
+
+One row per calendar day of a project's or team's life: total scope,
+completed / canceled / backlog / in-progress counts, throughput, lead- and
+cycle-time percentiles, WIP age, and a Little's Law cross-check. Output is CSV
+by default (handy for plotting), or JSON or a text table. It's the
+deterministic, non-Monte-Carlo counterpart to `sim backtest`; the two share one
+day-walk, so their daily counts always agree.
+
+```bash
+forecast history -input linear.db -teams ENG -project "Q3 Migration" -format text
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `-project` | all projects | exact project name to scope to |
+| `-milestone` | all milestones | exact milestone name within `-project` |
+| `-start` | earliest `created_at` in scope | first day emitted, inclusive |
+| `-end` | `today` | last day emitted, inclusive |
+| `-window` | `28` | trailing window in days for rolling metrics (throughput, scope growth, net flow) |
+| `-format` | `csv` | `csv`, `json`, or `text` |
+| `-out` | stdout | write output to this file |
+
+Without `-project` it emits one row per day across everything loaded, not one
+series per project.
+
+### `cfd` — cumulative flow diagram
+
+Builds a four-line, three-band CFD (Created, LeftBacklog, Departed, Completed)
+plus flow-health stats: throughput, average WIP, cycle time, a Little's Law
+cross-check, and per-band stability. The default output is an interactive
+HTML chart; `json` gives the daily series.
+
+```bash
+forecast cfd -input linear.db -teams ENG -start 2025-01-01 -end 2025-07-01 -out cfd.html
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `-start` | `-3 months` | start date, inclusive |
+| `-end` | `today` | end date, inclusive |
+| `-format` | `html` | `html` or `json` |
+| `-out` | stdout | write output to this file |
+
+### `aging` — which in-progress items are old?
+
+Builds the historical cycle-time distribution (`completed_at - started_at`)
+from recently completed issues, then ranks every in-progress issue against it.
+Each row gets a `PERCENTILE` (where its age falls in that distribution) and a
+`MULTIPLIER`: its age divided by the cycle time at `-percentile`. At the
+default 85, `1.34x` means "34% older than the 85th-percentile cycle time" and
+`0.80x` means "20% younger than it." Row colors in text/HTML output follow the multiplier, so
+a cell's color always matches the number printed in it.
+
+```bash
+forecast aging -input linear.db -format html > aging.html
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `-sample-start` | `-3 months` | start of the completed-issue window |
+| `-sample-end` | `today` | end of the window (exclusive, so today's completions are not included) |
+| `-percentile` | `85` | which percentile of the distribution to anchor `MULTIPLIER` to (1–100) |
+| `-min-cycle-time` | | drop completed issues faster than this, e.g. `5m`, `1h`, `1d` |
+| `-show-completed` | `false` | text/HTML: also list the completed issues that make up the distribution |
+| `-format` | `text` | `text`, `json`, or `html` (`json` only ever lists in-progress items) |
+
+### `count` — outstanding work
+
+Counts issues not in a terminal state (not `completed`/`canceled`/`duplicate`)
+and groups them by project, most recently updated first. When you don't pass
+`-teams` and your data spans several teams, a `TEAM` column is added.
+
+```bash
+forecast count -input linear.db -milestones
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `-milestones` | `false` | add a per-milestone breakdown under each project |
+| `-updated-since` | `-3 months` | hide projects whose most recently updated issue is older than this |
+
+## Forecasting with `sim`
+
+`forecast sim` resamples your team's real daily completion history to run
+thousands of simulated futures. There are four subcommands, all built on the
+same sampling setup.
+
+A forecast is only as good as its sample window. It assumes the future will
+look like that window (same team, same mix of work, roughly same-sized items)
+and counts only completed issues with an assignee. If the team or the work has
+changed, narrow `-sample-start`/`-sample-end` to a period that resembles what
+you're forecasting. Use `sim backtest` to see how well forecasts held up
+before you rely on them.
+
+### Choosing how to model the team
+
+Pick **exactly one** of these; there is no default.
+
+- `-engineers N` — pool everyone's history and draw for N interchangeable engineers.
 - `-team alice,bob` — each named engineer draws from their own history.
-- `-whole-team` — sum all engineers' daily counts into one series (ignores individual variance).
+- `-whole-team` — sum everyone's completions into one daily series (ignores
+  individual variance).
 
-**Confidence vs. probability vs. percentile** — three different jobs, don't
-conflate them:
-- **Confidence** is an input: a safety level you choose, always read toward
-  the conservative side of the distribution. `sim items -confidence 85` means
-  "give me a floor I'll hit or beat 85% of the time" (fewer items, since more
-  is optimistic). `sim days -confidence 85` means "give me a ceiling I'll
-  finish within 85% of the time" (more days, since fewer is optimistic) — same
-  85, opposite arithmetic, because items and days are conservative in opposite
-  directions.
-- **Probability** (`sim probability`) is the output computed for a plan you
-  already have — not a knob. It's the exact inverse of confidence: if
-  `sim items -confidence 85` says "at least 40 items", `sim probability -items
-  40` reports ~85%.
-- **Percentile** is a plain descriptive rank with no safe side, used where
-  there's nothing to commit to — e.g. `forecast aging`, where an in-progress
-  issue's percentile against historical cycle times is a *warning* (higher is
-  older/worse), not a floor.
+(`-team` here names *engineers*, and is unrelated to `-teams`, the issue-tracker
+team filter used by other commands. `sim` pools every team.)
+
+### Sampling flags (all four subcommands)
+
+| Flag | Default | Description |
+|---|---|---|
+| `-sample-start` | `-3 months` | start of the history to sample from |
+| `-sample-end` | `now` | end of the history (exclusive). `now` includes today's completions so far. |
+| `-simulations` | `10000` | Monte Carlo trials (for `backtest`: trials per backtested day) |
+| `-random-seed` | time-based | fix this to make a run reproducible |
+| `-typical-engineers` | all | restrict the sample pool to these engineers' history |
+| `-exclusions` | `exclusions.json` | [exclusions file](#exclusionsjson--holidays-and-time-off) |
+| `-goroutines` | CPU count | parallel workers |
+| `-manifest` | | write a run-provenance JSON file (`-` for stdout); on `items`, `days`, `probability` |
+
+### Confidence, probability, percentile
+
+Three different jobs; don't conflate them.
+
+| Term | Kind | Meaning |
+|---|---|---|
+| **Confidence** | an input you choose | A safety level, always read toward the conservative side. `sim items -confidence 85` → "a floor I'll hit or beat 85% of the time" (fewer items). `sim days -confidence 85` → "a ceiling I'll finish within 85% of the time" (more days). Same 85, opposite arithmetic. |
+| **Probability** | an output | What `sim probability` computes for a plan you already have. It's the exact inverse of confidence: if `sim items -confidence 85` says "at least 40", then `sim probability -items 40` reports about 85%. |
+| **Percentile** | a plain rank | Used where there's nothing to commit to, e.g. `aging`, where a higher percentile means "older" (a warning). |
 
 ### `sim items` — how many items in D days?
 
 ```bash
-forecast sim items -db linear.db -team alice,bob -days 30
+forecast sim items -input linear.db -team alice,bob -days 30
 ```
 
 | Flag | Default | Description |
 |---|---|---|
-| `-input` | *(required)* | path to a SQLite database (`.db`), CSV, or JSON file; `-` reads stdin — see [Bring your own data](#bring-your-own-data) |
-| `-stdin-format` | | format of `-input` when reading stdin: `csv` or `json` |
-| `-db` | | deprecated alias for `-input` (SQLite databases only); still works but logs a warning |
-| `-exclusions` | `exclusions.json` | path to exclusions JSON file |
-| `-engineers` | *(required unless `-team`/`-whole-team`)* | number of (equivalent) engineers |
-| `-days` | `30` | number of days |
-| `-whole-team` | `false` | use whole-team daily throughput from historical data (ignores `-engineers`) |
-| `-simulations` | `10000` | number of Monte Carlo simulations to run |
-| `-goroutines` | NumCPU | number of parallel worker goroutines |
-| `-sample-start` | 3 months ago | sample data start date (YYYY-MM-DD) |
-| `-sample-end` | now | sample data end date (YYYY-MM-DD) |
-| `-random-seed` | time-based | seed for the random number generator |
-| `-confidence` | `50,75,85,95` | comma-separated confidence levels to output; `-confidence 85` means "85% chance of completing at least N items" (`-percentile` is removed — see below) |
-| `-typical-engineers` | all | comma-separated list of the team's typical engineers to build the sample pool from |
-| `-team` | | comma-separated list of specific engineer names to model individually |
-| `-manifest` | | write a run-provenance JSON manifest to this path (`-` for stdout) |
-| `-config` | | path to a YAML config file supplying flag values (CLI flags override) |
+| `-days` | `30` | length of the forecast window |
+| `-confidence` | `50,75,85,95` | confidence levels to report |
 
-`-percentile` no longer exists on `sim items` — it always errors with a
-migration message. It wasn't renamed in place because its meaning was
-inverted: the old `-percentile 85` read "85% of trials landed at or below N",
-the opposite of "85% chance of at least N". The old `-percentile 85` is now
-`-confidence 15`.
+`sim items` formerly took `-percentile`, with the opposite meaning. It now
+always errors; see [CHANGELOG.md](https://github.com/commondatageek/delivery-forecast/blob/main/CHANGELOG.md) for how to migrate.
 
-### `sim days` — how many days to finish I items?
+### `sim days` — how many days for I items?
 
 ```bash
-forecast sim days -db linear.db -whole-team -items 50
-```
-
-Same flags as `sim items`, plus:
-
-| Flag | Default | Description |
-|---|---|---|
-| `-items` | *(required)* | number of items to complete; comma-separated for a grouped trajectory report (e.g. `13,12,9`) |
-| `-target-start-date` | `today` | forecast start date used to compute calendar dates (YYYY-MM-DD, or: today, tomorrow) |
-| `-confidence` | `50,75,85,95` | comma-separated confidence levels to output; `-confidence 85` means "85% chance of finishing within N days" (`-percentile` still works here as a deprecated alias — same meaning, since more days is already the conservative direction) |
-
-(no `-days` flag — that's `sim items`'s target quantity.)
-
-### `sim probability` — probability of completing I items in D days?
-
-```bash
-forecast sim probability -db linear.db -engineers 4 -days 30 -items 40
-```
-
-Same base flags as `sim items` (minus `-confidence`), plus:
-
-| Flag | Default | Description |
-|---|---|---|
-| `-days` | | number of days; mutually exclusive with `-target-end-date`, one must be given |
-| `-target-start-date` | `tomorrow` | start of the target window (YYYY-MM-DD, or: today, tomorrow) |
-| `-target-end-date` | | end of the target window (YYYY-MM-DD, or: today, tomorrow); mutually exclusive with `-days`, one must be given |
-| `-items` | `-1` | number of items to complete (omit, i.e. leave at -1, to show the full distribution) |
-
-### `sim backtest` — replay probability forecasts day-by-day
-
-Replays `sim probability`-style forecasts against a project/milestone's
-actual history, one row per day from the replay start date to a completion
-deadline.
-
-```bash
-forecast sim backtest -db linear.db -whole-team -project "Q3 Migration" -target-end-date 2025-09-30
-```
-
-Same base sampling flags as `sim items`, plus:
-
-| Flag | Default | Description |
-|---|---|---|
-| `-project` | *(required)* | project name to backtest |
-| `-milestone` | | milestone name within the project (optional) |
-| `-replay-start-date` | earliest `started_at` in the issue set | first day to replay from, inclusive (YYYY-MM-DD) |
-| `-target-end-date` | *(required)* | completion deadline to forecast against (YYYY-MM-DD) |
-| `-format` | `text` | output format: `text` or `csv` |
-
-Note: `-simulations` here means "simulations per backtested day" (same default, `10000`).
-
-## `forecast aging` — WIP-age / cycle-time report
-
-Computes the historical cycle-time distribution from completed issues, then
-ranks currently in-progress issues by percentile against that distribution.
-Every item also gets a `MULTIPLIER`: its age divided by the cycle time at
-`-percentile` (the "threshold"), so `1.34x` means 34% older than that
-anchor and `0.80x` means 20% younger. The `PERCENTILE` and `MULTIPLIER`
-columns answer related but different questions computed by different
-methods (cumulative rank vs. nearest rank), so on rare rows near a
-boundary they can disagree by a hair about which side of the anchor an
-item falls on — the color bands are keyed on the multiplier specifically
-so a cell's color always agrees with the number printed in it.
-
-```bash
-forecast aging -db linear.db -format html > aging.html
+forecast sim days -input linear.db -whole-team -items 50
 ```
 
 | Flag | Default | Description |
 |---|---|---|
-| `-input` | *(required)* | path to a SQLite database (`.db`), CSV, or JSON file; `-` reads stdin — see [Bring your own data](#bring-your-own-data) |
-| `-stdin-format` | | format of `-input` when reading stdin: `csv` or `json` |
-| `-db` | | deprecated alias for `-input` (SQLite databases only); still works but logs a warning |
-| `-sample-start` | today minus 3 months | start of completed-issue window (YYYY-MM-DD) |
-| `-sample-end` | today | end of completed-issue window (YYYY-MM-DD) |
-| `-format` | `text` | output format: `text`, `json`, `html` |
-| `-min-cycle-time` | | exclude completed issues with cycle time below this duration (e.g. `5m`, `1h`, `1d`) |
-| `-percentile` | `85` | percentile of the cycle-time distribution to anchor the report to; the `MULTIPLIER` column shows each item's age as a multiple of that threshold |
-| `-teams` | all teams | comma-separated team keys to filter by (e.g. DATA,PLT) |
-| `-config` | | path to a YAML config file supplying flag values (CLI flags override) |
+| `-items` | *(required)* | items to complete; comma-separated for a grouped trajectory (e.g. `13,12,9`) |
+| `-target-start-date` | `today` | start date used to turn day counts into calendar dates |
+| `-confidence` | `50,75,85,95` | confidence levels to report (`-percentile` is an alias here) |
 
-## `forecast cfd` — Cumulative Flow Diagram
-
-Builds a 4-line / 3-band CFD (Created, LeftBacklog, Departed, Completed)
-and flow-health stats (throughput, avg WIP, cycle time, Little's Law
-cross-check). Renders an interactive Plotly HTML chart by default, or a
-daily-series JSON.
+### `sim probability` — how likely is this plan?
 
 ```bash
-forecast cfd -db linear.db -start 2025-01-01 -end 2025-07-01 -out cfd.html
+forecast sim probability -input linear.db -engineers 4 -days 30 -items 40
 ```
 
 | Flag | Default | Description |
 |---|---|---|
-| `-input` | *(required)* | path to a SQLite database (`.db`), CSV, or JSON file; `-` reads stdin — see [Bring your own data](#bring-your-own-data) |
-| `-stdin-format` | | format of `-input` when reading stdin: `csv` or `json` |
-| `-db` | | deprecated alias for `-input` (SQLite databases only); still works but logs a warning |
-| `-teams` | all teams | comma-separated team keys to filter by (e.g. ENG,DATA) |
-| `-start` | today minus 3 months | start date, inclusive (YYYY-MM-DD) |
-| `-end` | today | end date, inclusive (YYYY-MM-DD) |
-| `-format` | `html` | output format: `html`, `json` |
-| `-out` | stdout | write output to this file instead of stdout |
-| `-config` | | path to a YAML config file supplying flag values (CLI flags override) |
+| `-days` | | length of the window; give this **or** `-target-end-date` |
+| `-target-start-date` | `tomorrow` | start of the target window |
+| `-target-end-date` | | end of the target window; give this **or** `-days` |
+| `-items` | all | items to complete; leave off to see the full distribution |
 
-## `forecast check` — validate a source before trusting it
+### `sim backtest` — would past forecasts have held up?
 
-Reads a source (SQLite db, CSV, or JSON) and reports, per command, whether
-the loaded issues support it — e.g. how many completed issues are missing an
-assignee and will be silently excluded from `sim`'s sample pool. Run this
-first against a new export instead of guessing which columns matter; see
-[DATA_REQUIREMENTS.md](DATA_REQUIREMENTS.md) for the full per-command
-requirements this checks against.
+Replays `sim probability`-style forecasts against a project's actual history,
+one row per day from the replay start to your deadline, so you can see how the
+forecast evolved and whether it was calibrated. Rows after today are
+projections that assume no further completions, marked by a divider in `text`
+output and a `projected` column in `csv`.
 
 ```bash
-forecast check -input testdata/sample-issues.csv
-```
-
-```
-Read 30 issues from testdata/sample-issues.csv
-  history   ok
-  cfd       ok
-  aging     ok
-  count     ok
-  sim       ok
+forecast sim backtest -input linear.db -whole-team -project "Q3 Migration" -target-end-date 2025-09-30
 ```
 
 | Flag | Default | Description |
 |---|---|---|
-| `-input` | *(required)* | path to a SQLite database (`.db`), CSV, or JSON file; `-` reads stdin (requires `-stdin-format`) |
-| `-stdin-format` | | format of `-input` when reading stdin: `csv` or `json` |
-| `-config` | | path to a YAML config file supplying flag values (CLI flags override) |
+| `-project` | *(required)* | project to backtest |
+| `-milestone` | | milestone within the project |
+| `-replay-start-date` | earliest `started_at` in the issue set | first day to replay, inclusive |
+| `-target-end-date` | *(required)* | completion deadline to forecast against |
+| `-format` | `text` | `text` or `csv` |
 
-## `forecast count` — outstanding-work report
+### `exclusions.json` — holidays and time off
 
-Counts non-terminal issues (not `completed`/`canceled`/`duplicate`), grouped
-by project (and optionally milestone). Read-only.
-
-```bash
-forecast count -db linear.db -milestones
-```
-
-| Flag | Default | Description |
-|---|---|---|
-| `-input` | *(required)* | path to a SQLite database (`.db`), CSV, or JSON file; `-` reads stdin — see [Bring your own data](#bring-your-own-data) |
-| `-stdin-format` | | format of `-input` when reading stdin: `csv` or `json` |
-| `-db` | | deprecated alias for `-input` (SQLite databases only); still works but logs a warning |
-| `-milestones` | `false` | add a per-milestone breakdown under each project |
-| `-updated-since` | today minus 3 months | only include projects with an issue updated on/after this date (YYYY-MM-DD) |
-| `-teams` | all teams | comma-separated team keys to filter by (e.g. ENG,DESIGN) |
-| `-config` | | path to a YAML config file supplying flag values (CLI flags override) |
-
-## `forecast history` — per-day flow metrics
-
-Emits one row per calendar day of a project's or team's life — total scope,
-completed/canceled/backlog/in-progress counts, throughput, lead/cycle-time
-percentiles, WIP age, and a Little's Law cross-check — the deterministic,
-non-Monte-Carlo counterpart to `sim backtest`.
-
-```bash
-forecast history -input testdata/sample-issues.csv -format text
-```
-
-| Flag | Default | Description |
-|---|---|---|
-| `-input` | *(required)* | path to a SQLite database (`.db`), CSV, or JSON file; `-` reads stdin (requires `-stdin-format`) |
-| `-stdin-format` | | format of `-input` when reading stdin: `csv` or `json` |
-| `-project` | all projects | exact project name to scope to |
-| `-milestone` | all milestones | exact milestone name within `-project` |
-| `-teams` | all teams | comma-separated team keys to filter by (e.g. ENG,DATA) |
-| `-start` | earliest `created_at` in scope | first day emitted, inclusive (YYYY-MM-DD; or: yesterday, today, tomorrow, `-3 months`) |
-| `-end` | today | last day emitted, inclusive |
-| `-window` | `28` | trailing window in days for rolling metrics (throughput, scope growth, net flow) |
-| `-format` | `csv` | output format: `csv`, `json`, `text` |
-| `-out` | stdout | write output to this file instead of stdout |
-| `-config` | | path to a YAML config file supplying flag values (CLI flags override) |
-
-Note: `history` day-truncates and clamps timestamps before counting (a
-completion can land a calendar day earlier than raw-timestamp comparisons
-would put it). `sim backtest` now walks the same day-walk internally, so its
-day-by-day counts match `history`'s exactly — this is a deliberate behavior
-change from `sim backtest`'s pre-`history` implementation, which compared raw
-timestamps instead.
-
-## `forecast version` — print version and build info
-
-```bash
-forecast version
-```
-
-Prints the build-time version (set via `-ldflags "-X main.version=..."` for
-released binaries, `(dev)` for local builds) plus VCS-stamped build info:
-git SHA, git time, dirty flag, Go version, module.
-
-## `forecast update` — self-update
-
-Checks the latest GitHub release, compares it against the running binary's
-version, and — after confirmation — downloads, checksum-verifies, and
-installs the release asset matching this OS/arch, replacing the running
-executable in place.
-
-```bash
-forecast update -check   # report current vs. latest, install nothing
-forecast update -yes     # download, verify, and install without prompting
-```
-
-| Flag | Default | Description |
-|---|---|---|
-| `-check` | `false` | report current vs. latest version and exit without installing anything |
-| `-yes` | `false` | skip the interactive confirmation prompt |
-| `-force` | `false` | proceed even if already on the latest version, or the current version is unknown (a dev build) |
-| `-timeout` | `60s` | overall HTTP timeout |
-
-## Config files (`-config`)
-
-Every subcommand accepts `-config <file.yaml>` to supply flag values from a
-YAML file, applied immediately after flag parsing. Precedence is **CLI flag
-> config file > built-in default**.
-
-- Keys equal flag names exactly as passed on the command line (e.g.
-  `-sample-end` → `sample-end`).
-- List flags (`-teams`, `-team`, `-typical-engineers`, `-confidence`, `-items`) take a
-  YAML sequence, joined into the same comma-separated string the flag
-  itself accepts: `teams: [ENG, DATA]` behaves identically to
-  `-teams ENG,DATA`. A plain string (`teams: "ENG,DATA"`) also works.
-- Presence-sensitive flags behave as if passed on the CLI: a `sample-end` or
-  `random-seed` set only in a config file still counts as "explicitly set"
-  — e.g. `random-seed: 42` in a config pins the seed exactly like
-  `-random-seed 42` would, rather than falling back to the time-based
-  default.
-- The `config` key itself is reserved/ignored inside the file.
-- One config file's keys are shared by exactly one command's flags — there's
-  no per-command sectioning (a `sim items` config and a `count` config are
-  separate files).
-
-Example for `forecast sim items` (`sim-items.yaml`) — `input:` is the
-current key; `db:` still works as a deprecated alias wherever a command
-accepts `-db`:
-
-```yaml
-input: linear.db
-engineers: 4
-days: 30
-sample-start: "2025-01-01"
-sample-end: "2025-07-01"
-random-seed: 42
-confidence: [50, 75, 85, 95]
-team: [alice, bob]
-```
-
-```bash
-forecast sim items -config sim-items.yaml            # uses every value above
-forecast sim items -config sim-items.yaml -days 60   # CLI -days wins over the file's 30
-```
-
-## `exclusions.json`
-
-Optional input to `forecast sim` (e.g. for holidays), pointed at via
-`-exclusions` (default: `exclusions.json` in the working directory):
+`sim` reads `exclusions.json` from the working directory (override with
+`-exclusions`) to drop days from the sample history. A missing file is fine.
 
 ```json
 {
@@ -473,32 +417,80 @@ Optional input to `forecast sim` (e.g. for holidays), pointed at via
 }
 ```
 
-`global` dates are excluded for every engineer; `engineers` dates are
-excluded only for the named engineer.
+`global` dates are excluded for every engineer; `engineers` dates only for the
+named engineer.
 
-## Using as a library
+## Config files
 
-The `simulate`, `aging`, `cfd`, `counts`, and `history` packages are pure,
-IO-free, and independent of Linear/SQLite, so they're importable on their
-own — `github.com/commondatageek/delivery-forecast/simulate`, etc. — by
-anyone who wants the same Monte Carlo forecasting, cycle-time/CFD/count
-analysis, or per-day flow metrics over data from another source. The
-`issues` package (also root-level) provides the shared `Issue` record plus
-`ReadCSV`/`ReadJSON`/`ReadFile` if you want file parsing without going
-through `cmd/forecast` at all. See [DATA_REQUIREMENTS.md](DATA_REQUIREMENTS.md)
-for what each package needs from your data and a short library-usage example.
+Every command except `version` and `update` accepts `-config <file.yaml>`. Keys are flag names; precedence is **CLI flag > config
+file > built-in default**. This is useful for a forecast you re-run weekly.
 
-## Conventions worth knowing
+```yaml
+# sim-items.yaml
+input: linear.db
+engineers: 4
+days: 30
+sample-start: "2025-01-01"
+random-seed: 42
+confidence: [50, 75, 85, 95]
+```
 
-- `-sample-end`: if explicitly set, it's a calendar date (midnight, that day
-  excluded). If omitted, it defaults to *now*, so today's already-completed
-  work counts.
-- `-random-seed`: time-based (non-deterministic) unless explicitly passed —
-  either on the CLI or via `-config`.
+```bash
+forecast sim items -config sim-items.yaml              # uses every value above
+forecast sim items -config sim-items.yaml -days 60     # the CLI's -days wins
+```
+
+- List flags (`-teams`, `-team`, `-typical-engineers`, `-confidence`,
+  `-items`) take a YAML list or a plain comma-separated string.
+- Config values count as explicitly set, so `random-seed: 42` pins the seed
+  exactly as `-random-seed 42` would.
+- One config file serves one command; there's no per-command sectioning.
+- The `config` key itself is ignored inside the file.
+- In config files, prefer `input:` over the deprecated `db:`.
+
+## Maintenance
+
+**`forecast version`** prints the version (`(dev)` for local builds) plus git
+SHA, build time, dirty flag, Go version, and module.
+
+**`forecast update`** checks the latest GitHub release and, after confirming,
+downloads it, verifies its checksum, and replaces the running binary.
+
+```bash
+forecast update -check   # report current vs. latest; install nothing
+forecast update -yes     # install without prompting
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `-check` | `false` | report current vs. latest and exit |
+| `-yes` | `false` | skip the confirmation prompt |
+| `-force` | `false` | proceed even if already current, or the running build is a dev build |
+| `-timeout` | `60s` | overall HTTP timeout |
+
+## Using as a Go library
+
+The `simulate`, `aging`, `cfd`, `counts`, and `history` packages are pure and
+independent of Linear and SQLite, so you can import them on their own, e.g.
+`github.com/commondatageek/delivery-forecast/simulate`. The `issues` package
+provides the shared `Issue` record plus `ReadCSV` / `ReadJSON` / `ReadFile`.
+[DATA_REQUIREMENTS.md](https://github.com/commondatageek/delivery-forecast/blob/main/DATA_REQUIREMENTS.md) describes what each package needs
+and includes a short usage example.
+
+## Building from source
+
+Uses [Just](https://just.systems), or plain Go:
+
+```bash
+just build       # compiles bin/forecast
+just test        # go test ./...
+
+go build -o bin/forecast ./cmd/forecast
+```
 
 ## License
 
 Copyright 2026 Aaron Johnson.
 
-Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for the
+Licensed under the Apache License, Version 2.0. See [LICENSE](https://github.com/commondatageek/delivery-forecast/blob/main/LICENSE) for the
 full text.

@@ -30,10 +30,13 @@ func checkResults(items []issues.Issue) []checkResult {
 		}
 	}
 
-	var noCreatedAt, noStartedAtCompleted, noAssigneeCompleted int
+	var noCreatedAt, noUpdatedAt, noStartedAtCompleted, noAssigneeCompleted int
 	for _, it := range items {
 		if it.CreatedAt.IsZero() {
 			noCreatedAt++
+		}
+		if it.UpdatedAt.IsZero() {
+			noUpdatedAt++
 		}
 		if !it.IsCompleted() {
 			continue
@@ -50,7 +53,7 @@ func checkResults(items []issues.Issue) []checkResult {
 		{"history", excludedStatus(noCreatedAt, "issue", "no created_at and will be excluded")},
 		{"cfd", excludedStatus(noCreatedAt, "issue", "no created_at and will be excluded")},
 		{"aging", excludedStatus(noStartedAtCompleted, "completed issue", "no started_at and will be excluded from the cycle-time distribution")},
-		{"count", "ok"},
+		{"count", excludedStatus(noUpdatedAt, "issue", "no updated_at; a project is hidden unless one of its issues was updated since -updated-since")},
 		{"sim", excludedStatus(noAssigneeCompleted, "completed issue", "no assignee and will be excluded")},
 	}
 }

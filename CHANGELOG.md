@@ -21,7 +21,8 @@ behavior changes ship in minor releases, called out here.
   into a plotting script.
 - **`forecast check`** — validates a source file or database and reports, per
   command, whether the data supports it (e.g. how many completed issues have no
-  assignee and will be excluded from `sim`'s pool). Run it first against an
+  assignee and will be excluded from `sim`'s pool, or how many issues have no
+  `updated_at` for `count`'s recency filter). Run it first against an
   unfamiliar export.
 - **Bring your own data.** Every command now accepts `-input <path>`, which
   reads a SQLite database, a CSV file, or a JSON file (array or JSON Lines).
@@ -81,3 +82,21 @@ behavior changes ship in minor releases, called out here.
   `InProgress`, `NotCompletedCounts`, `ProjectLastUpdated`, `CFDIssues`,
   `ProjectMilestoneIssues` — superseded by `AllIssues` plus in-memory
   filtering, which is what makes every source behave identically.
+
+## v0.131.0
+
+### Changed
+
+- **`forecast sim items -percentile` replaced by `-confidence`, with the
+  meaning inverted.** The old `-percentile 85` read "85% of trials landed at or
+  below N" (a 15%-confidence floor); `-confidence 85` reads "85% chance of
+  completing *at least* N items" (`simulate.ItemsAtConfidence`). It wasn't
+  renamed in place because the flip would have silently changed the numbers
+  behind any existing script or config file. `-percentile` still exists on
+  `sim items` but always errors with a migration message. To get the old
+  numbers, translate: the old `-percentile 85` is now `-confidence 15`.
+  `sim days` keeps `-percentile` as a working alias of `-confidence`, since for
+  days the conservative direction was already "larger" and nothing inverted.
+  `sim probability` is the exact inverse of `-confidence`: if
+  `sim items -confidence 85` says "at least 40", `sim probability -items 40`
+  reports ~85%.

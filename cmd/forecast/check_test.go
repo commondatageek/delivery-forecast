@@ -23,8 +23,8 @@ func TestCheckResults_EmptyInput(t *testing.T) {
 
 func TestCheckResults_AllClean(t *testing.T) {
 	items := []issues.Issue{
-		{Identifier: "E-1", Assignee: "alice", StateType: "completed", CreatedAt: day(2025, 1, 1), StartedAt: day(2025, 1, 2), CompletedAt: day(2025, 1, 5)},
-		{Identifier: "E-2", Assignee: "bob", StateType: "started", CreatedAt: day(2025, 1, 3), StartedAt: day(2025, 1, 4)},
+		{Identifier: "E-1", Assignee: "alice", StateType: "completed", CreatedAt: day(2025, 1, 1), StartedAt: day(2025, 1, 2), CompletedAt: day(2025, 1, 5), UpdatedAt: day(2025, 1, 5)},
+		{Identifier: "E-2", Assignee: "bob", StateType: "started", CreatedAt: day(2025, 1, 3), StartedAt: day(2025, 1, 4), UpdatedAt: day(2025, 1, 4)},
 	}
 	for _, r := range checkResults(items) {
 		if r.Status != "ok" {
@@ -36,20 +36,22 @@ func TestCheckResults_AllClean(t *testing.T) {
 func TestCheckResults_FlagsEachGap(t *testing.T) {
 	items := []issues.Issue{
 		// Clean, complete issue.
-		{Identifier: "E-1", Assignee: "alice", StateType: "completed", CreatedAt: day(2025, 1, 1), StartedAt: day(2025, 1, 2), CompletedAt: day(2025, 1, 5)},
+		{Identifier: "E-1", Assignee: "alice", StateType: "completed", CreatedAt: day(2025, 1, 1), StartedAt: day(2025, 1, 2), CompletedAt: day(2025, 1, 5), UpdatedAt: day(2025, 1, 5)},
 		// Completed but unassigned: hits sim only.
-		{Identifier: "E-2", StateType: "completed", CreatedAt: day(2025, 1, 1), StartedAt: day(2025, 1, 2), CompletedAt: day(2025, 1, 6)},
+		{Identifier: "E-2", StateType: "completed", CreatedAt: day(2025, 1, 1), StartedAt: day(2025, 1, 2), CompletedAt: day(2025, 1, 6), UpdatedAt: day(2025, 1, 6)},
 		// Completed but never started: hits aging only.
-		{Identifier: "E-3", Assignee: "bob", StateType: "completed", CreatedAt: day(2025, 1, 1), CompletedAt: day(2025, 1, 7)},
+		{Identifier: "E-3", Assignee: "bob", StateType: "completed", CreatedAt: day(2025, 1, 1), CompletedAt: day(2025, 1, 7), UpdatedAt: day(2025, 1, 7)},
 		// No created_at, and in progress (not completed, so aging/sim untouched): hits history/cfd only.
-		{Identifier: "E-4", Assignee: "carol", StateType: "started", StartedAt: day(2025, 1, 4)},
+		{Identifier: "E-4", Assignee: "carol", StateType: "started", StartedAt: day(2025, 1, 4), UpdatedAt: day(2025, 1, 4)},
+		// No updated_at, otherwise clean: hits count only.
+		{Identifier: "E-5", Assignee: "dave", StateType: "backlog", CreatedAt: day(2025, 1, 1)},
 	}
 
 	want := map[string]string{
 		"history": "1 issue has no created_at and will be excluded",
 		"cfd":     "1 issue has no created_at and will be excluded",
 		"aging":   "1 completed issue has no started_at and will be excluded from the cycle-time distribution",
-		"count":   "ok",
+		"count":   "1 issue has no updated_at; a project is hidden unless one of its issues was updated since -updated-since",
 		"sim":     "1 completed issue has no assignee and will be excluded",
 	}
 	for _, r := range checkResults(items) {
@@ -71,11 +73,11 @@ func TestExcludedStatus_Pluralization(t *testing.T) {
 	}
 }
 
-const checkFixtureCSV = `identifier,team_key,assignee,state_type,created_at,started_at,completed_at
-E-1,ENG,alice,completed,2025-01-01,2025-01-02,2025-01-05
-E-2,ENG,,completed,2025-01-01,2025-01-02,2025-01-06
-E-3,ENG,bob,completed,2025-01-01,,2025-01-07
-E-4,ENG,carol,started,,2025-01-04,
+const checkFixtureCSV = `identifier,team_key,assignee,state_type,created_at,started_at,completed_at,updated_at
+E-1,ENG,alice,completed,2025-01-01,2025-01-02,2025-01-05,2025-01-05
+E-2,ENG,,completed,2025-01-01,2025-01-02,2025-01-06,2025-01-06
+E-3,ENG,bob,completed,2025-01-01,,2025-01-07,2025-01-07
+E-4,ENG,carol,started,,2025-01-04,,
 `
 
 func TestCmdCheck_ReportsPerCommandGaps(t *testing.T) {
@@ -98,7 +100,7 @@ func TestCmdCheck_ReportsPerCommandGaps(t *testing.T) {
 		"  history   1 issue has no created_at and will be excluded\n",
 		"  cfd       1 issue has no created_at and will be excluded\n",
 		"  aging     1 completed issue has no started_at and will be excluded from the cycle-time distribution\n",
-		"  count     ok\n",
+		"  count     1 issue has no updated_at; a project is hidden unless one of its issues was updated since -updated-since\n",
 		"  sim       1 completed issue has no assignee and will be excluded\n",
 	} {
 		if !strings.Contains(out, want) {

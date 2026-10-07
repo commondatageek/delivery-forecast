@@ -95,3 +95,36 @@ func TestCmdCount_MilestonesFlag(t *testing.T) {
 		t.Errorf("expected the M1 milestone breakdown in grouped output:\n%s", out)
 	}
 }
+
+// A file with completed_at/canceled_at but no state_type column must still
+// treat those issues as terminal, like every other command does.
+func TestCmdCount_TerminalFromTimestampsWithoutStateType(t *testing.T) {
+	const noStateTypeCSV = `identifier,team_key,project_name,completed_at,canceled_at,updated_at
+E-1,ENG,Foo,,,2025-01-05
+E-2,ENG,Foo,2025-01-06,,2025-01-06
+E-3,ENG,Foo,,2025-01-07,2025-01-07
+`
+	dir := t.TempDir()
+	csvPath := filepath.Join(dir, "issues.csv")
+	if err := os.WriteFile(csvPath, []byte(noStateTypeCSV), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	out := runCount(t, "-input", csvPath)
+	if !strings.Contains(out, "TOTAL    1") {
+		t.Errorf("want TOTAL 1 (only E-1 is outstanding):\n%s", out)
+	}
+}
+
+func TestToCountsIssues_KeepsExplicitTerminalStateType(t *testing.T) {
+	got := toCountsIssues([]issues.Issue{
+		{Identifier: "E-1", StateType: "duplicate", CanceledAt: day(2025, 1, 1)},
+		{Identifier: "E-2", StateType: "started", CompletedAt: day(2025, 1, 2)},
+		{Identifier: "E-3", StateType: "backlog"},
+	})
+	for i, want := range []string{"duplicate", "completed", "backlog"} {
+		if got[i].StateType != want {
+			t.Errorf("item %d: StateType = %q, want %q", i, got[i].StateType, want)
+		}
+	}
+}

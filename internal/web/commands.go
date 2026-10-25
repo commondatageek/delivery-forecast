@@ -20,8 +20,7 @@ type commandDef struct {
 	prepare  func(rc *runContext, bundle any) (*runner, error)
 }
 
-// registry is the navigation order. linear-sync and linear-teams are added in
-// Phase 9.
+// registry is the navigation order.
 var registry = []*commandDef{
 	{ID: "sim-days", Name: "sim days", Summary: "How many days for N engineers to complete I items?", Group: "forecast", Title: "When will it be done?", Exports: []string{"text", "json", "manifest"}, Stream: true, newFlags: newSimDaysFlags, prepare: prepareSimDays},
 	{ID: "sim-items", Name: "sim items", Summary: "How many items can N engineers complete in D days?", Group: "forecast", Title: "How much can we finish?", Exports: []string{"text", "json", "manifest"}, Stream: true, newFlags: newSimItemsFlags, prepare: prepareSimItems},
@@ -32,6 +31,8 @@ var registry = []*commandDef{
 	{ID: "aging", Name: "aging", Summary: "WIP-age and cycle-time report.", Group: "flow", Title: "What's aging in progress?", Exports: []string{"text", "html", "json"}, newFlags: newAgingFlags, prepare: prepareAging},
 	{ID: "count", Name: "count", Summary: "Count of non-terminal issues, grouped by project.", Group: "flow", Title: "What's still open?", Exports: []string{"text", "json"}, newFlags: newCountFlags, prepare: prepareCount},
 	{ID: "check", Name: "check", Summary: "Validate a source file/db and report per-command data readiness.", Group: "data", Title: "Check my data", Exports: []string{"text", "json"}, newFlags: newCheckFlags, prepare: prepareCheck},
+	{ID: "linear-sync", Name: "linear sync", Summary: "Sync issues from Linear into the database.", Group: "data", Title: "Sync from Linear", Stream: true, newFlags: newLinearSyncFlags, prepare: prepareLinearSync},
+	{ID: "linear-teams", Name: "linear teams", Summary: "List accessible Linear teams.", Group: "data", Title: "Linear teams", Exports: []string{"json"}, newFlags: newLinearTeamsFlags, prepare: prepareLinearTeams},
 }
 
 func commandByID(id string) *commandDef {

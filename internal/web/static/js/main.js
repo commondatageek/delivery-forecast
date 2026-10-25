@@ -2,7 +2,8 @@ import { apiGet } from './api.js';
 import { createDataBar } from './databar.js';
 import { renderForm } from './form.js';
 import { createRunner } from './result.js';
-import { onRoute, parseHash, navigate } from './router.js';
+import { onRoute, parseHash, navigate, takeFlash } from './router.js';
+import { attachConfigButtons, createPasteDialog } from './configio.js';
 import { el, clear } from './util.js';
 
 const GROUPS = [['forecast', 'Forecast'], ['flow', 'Flow'], ['data', 'Data']];
@@ -30,6 +31,7 @@ async function boot() {
   }
   nav.append(select);
 
+  document.getElementById('header-actions').append(createPasteDialog());
   const databar = createDataBar(document.getElementById('databar'), defaults);
   let current = null; // {command, formApi, submit, resultEl}
 
@@ -44,9 +46,11 @@ async function boot() {
     select.value = route.id;
     if (route.params.input) databar.setInput(route.params.input);
 
-    const formEl = el('div');
+    const formEl = el('div', { id: 'form-slot' });
     const resultEl = el('div', { id: 'result' });
+    const note = takeFlash();
     main.append(el('h1', { text: command.title }), el('p', { class: 'summary', text: command.summary }), formEl, resultEl);
+    if (note?.length) main.insertBefore(el('div', { class: 'note' }, note.map((l) => el('div', { text: l }))), formEl);
 
     const build = (params) => {
       const formApi = renderForm(formEl, command, params, {
@@ -56,6 +60,7 @@ async function boot() {
       const submit = createRunner(command, formApi, resultEl, {});
       formApi.form.addEventListener('submit', (e) => { e.preventDefault(); submit(); });
       formApi.resetBtn.addEventListener('click', () => navigate(command.id, {}));
+      attachConfigButtons(formApi, command);
       current = { command, formApi, submit };
       return formApi;
     };
@@ -69,15 +74,16 @@ async function boot() {
     if (!current || !byId[current.command.id]) return;
     const keep = current.formApi.read();
     delete keep.input;
-    const formEl = main.children[2];
+    const formEl = main.querySelector('#form-slot');
+    const resultEl = main.querySelector('#result');
     if (!formEl) return;
-    const resultEl = main.children[3];
     const formApi = renderForm(formEl, current.command, keep, {
       summary: databar.getSummary(), defaults, getInput: databar.getInput, markInputInvalid: databar.markInvalid,
     });
     const submit = createRunner(current.command, formApi, resultEl, {});
     formApi.form.addEventListener('submit', (e) => { e.preventDefault(); submit(); });
     formApi.resetBtn.addEventListener('click', () => navigate(current.command.id, {}));
+    attachConfigButtons(formApi, current.command);
     current = { command: current.command, formApi, submit };
   });
 

@@ -327,3 +327,22 @@ func TestApplyConfig(t *testing.T) {
 		}
 	})
 }
+
+func TestParseConfig(t *testing.T) {
+	got, err := ParseConfig([]byte("engineers: 4\nwhole-team: true\nteams: [ENG, DATA]\nsample-start: \"-6 months\"\nconfidence: \"50,85\"\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{"engineers": "4", "whole-team": "true", "teams": "ENG,DATA", "sample-start": "-6 months", "confidence": "50,85"}
+	if len(got) != len(want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	for k, v := range want {
+		if got[k] != v {
+			t.Errorf("%s = %q, want %q", k, got[k], v)
+		}
+	}
+	if _, err := ParseConfig([]byte("a: [unclosed")); err == nil {
+		t.Error("expected a parse error")
+	}
+}

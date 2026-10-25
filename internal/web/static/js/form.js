@@ -113,6 +113,15 @@ export function renderForm(container, command, params, ctx) {
           input = el('input', { type: 'text', id, placeholder, value: initial });
           extra = el('div', {}, input, toggleChips(input, summary?.teams ?? []));
           break;
+        case 'string':
+          input = el('input', { type: 'text', id, placeholder, value: initial });
+          if (command.id === 'linear-sync' && f.name === 'teams') {
+            const slot = el('div', { class: 'chips' });
+            extra = el('div', {}, input, slot);
+            apiGet('/api/linear/teams').then((r) => slot.replaceWith(toggleChips(input, r.teams.map((t) => t.key))))
+              .catch((e) => slot.replaceWith(el('small', { text: e.message })));
+          }
+          break;
         case 'assignee-list':
           input = el('input', { type: 'text', id, placeholder, value: initial });
           extra = el('div', {}, input, toggleChips(input, summary?.assignees ?? []));

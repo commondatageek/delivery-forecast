@@ -8,6 +8,7 @@ import (
 
 	"github.com/commondatageek/delivery-forecast/internal/linear"
 	"github.com/commondatageek/delivery-forecast/internal/params"
+	"github.com/commondatageek/delivery-forecast/internal/report"
 	"github.com/commondatageek/delivery-forecast/internal/sqlite"
 	"github.com/commondatageek/delivery-forecast/internal/syncer"
 	"github.com/commondatageek/delivery-forecast/internal/util"
@@ -64,9 +65,6 @@ func cmdLinearTeams(args []string) error {
 		return err
 	}
 
-	fmt.Fprintf(os.Stdout, "accessible teams (%d):\n", len(teams))
-	for _, t := range teams {
-		fmt.Fprintf(os.Stdout, "  %-12s %s\n", t.Key, t.Name)
-	}
+	report.LinearTeams(os.Stdout, teams)
 	return nil
 }

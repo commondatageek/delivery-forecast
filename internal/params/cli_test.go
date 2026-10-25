@@ -62,3 +62,32 @@ func TestConfigYAML_RoundTrip(t *testing.T) {
 		}
 	})
 }
+
+func TestSplitCommandLine(t *testing.T) {
+	cases := []struct {
+		in      string
+		want    []string
+		wantErr bool
+	}{
+		{`forecast sim items -days 30`, []string{"forecast", "sim", "items", "-days", "30"}, false},
+		{`-project "Search Revamp" -x 'it'\''s'`, []string{"-project", "Search Revamp", "-x", "it's"}, false},
+		{`a\ b "c \"d\" e" 'f \g'`, []string{"a b", `c "d" e`, `f \g`}, false},
+		{`  spaced   out  `, []string{"spaced", "out"}, false},
+		{`empty '' arg`, []string{"empty", "", "arg"}, false},
+		{`-sample-start "-3 months"`, []string{"-sample-start", "-3 months"}, false},
+		{`"unterminated`, nil, true},
+		{`'unterminated`, nil, true},
+		{`trailing\`, nil, true},
+		{``, nil, false},
+	}
+	for _, c := range cases {
+		got, err := SplitCommandLine(c.in)
+		if (err != nil) != c.wantErr {
+			t.Errorf("%q: err = %v", c.in, err)
+			continue
+		}
+		if !c.wantErr && !reflect.DeepEqual(got, c.want) {
+			t.Errorf("%q: got %q, want %q", c.in, got, c.want)
+		}
+	}
+}

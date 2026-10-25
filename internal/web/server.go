@@ -89,6 +89,10 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/commands", s.handleCommands)
 	s.mux.HandleFunc("POST /api/run/{id}", s.handleRun)
 	s.mux.HandleFunc("GET /api/runs/{run_id}/export/{format}", s.handleExport)
+	s.mux.HandleFunc("GET /api/linear/teams", s.handleLinearTeams)
+	s.mux.HandleFunc("POST /api/config/parse", s.handleConfigParse)
+	s.mux.HandleFunc("POST /api/config/render", s.handleConfigRender)
+	s.mux.HandleFunc("POST /api/cli/parse", s.handleCLIParse)
 	s.mux.Handle("/", staticHandler())
 }
 

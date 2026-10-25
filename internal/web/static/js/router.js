@@ -31,3 +31,15 @@ export function navigate(id, params, { replace = false, run = false } = {}) {
 export function onRoute(cb) {
   window.addEventListener('hashchange', () => cb(parseHash()));
 }
+
+let flash = null;
+
+/** setFlash stores a one-shot note shown on the next page render. */
+export function setFlash(lines) { flash = lines; }
+
+/** takeFlash returns and clears the pending note. */
+export function takeFlash() {
+  const f = flash;
+  flash = null;
+  return f;
+}

@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -304,6 +305,9 @@ func TestRun_Concurrent(t *testing.T) {
 	var wg sync.WaitGroup
 	errs := make(chan string, 100)
 	for _, d := range registry {
+		if strings.HasPrefix(d.ID, "linear-") {
+			continue // needs the Linear API; only its prepare error path is tested
+		}
 		p, ok := params[d.ID]
 		if !ok {
 			t.Fatalf("no concurrent params for %s", d.ID)
@@ -429,5 +433,91 @@ func TestDTO_Aging(t *testing.T) {
 	json.Unmarshal(evs[len(evs)-1].Result, &d2)
 	if d2.Completed != nil {
 		t.Errorf("completed = %v, want null", d2.Completed)
+	}
+}
+
+func TestLinear_MissingAPIKey(t *testing.T) {
+	t.Setenv("LINEAR_API_KEY", "")
+	s := fixedServer(t)
+	for _, id := range []string{"linear-sync", "linear-teams"} {
+		p := map[string]string{}
+		if id == "linear-sync" {
+			p["db"] = filepath.Join(t.TempDir(), "x.db")
+			p["teams"] = "ENG"
+		}
+		code, evs := post(t, s, id, p)
+		if code != 400 || evs[0].Error.Message != "LINEAR_API_KEY environment variable is not set" {
+			t.Errorf("%s: %d %+v", id, code, evs[0].Error)
+		}
+	}
+	if rec := do(s, "GET", "/api/linear/teams", nil, nil); rec.Code != 400 {
+		t.Errorf("/api/linear/teams: %d", rec.Code)
+	}
+	code, evs := post(t, s, "linear-sync", map[string]string{})
+	if code != 400 || evs[0].Error.Message != "-db is required" || len(evs[0].Error.Fields) != 1 || evs[0].Error.Fields[0] != "db" {
+		t.Errorf("missing db: %d %+v", code, evs[0].Error)
+	}
+}
+
+func TestConfigAndCLIEndpoints(t *testing.T) {
+	s := fixedServer(t)
+	hdr := map[string]string{"X-Forecast-Client": "web"}
+	postJSON := func(path string, v any) *httptest.ResponseRecorder {
+		b, _ := json.Marshal(v)
+		return do(s, "POST", path, b, hdr)
+	}
+
+	// config/parse: unknown and hidden keys are reported, input is kept.
+	rec := postJSON("/api/config/parse", map[string]any{"command": "sim-items", "yaml": "input: x.csv\nengineers: 4\nbogus: 1\ndb: old.db\nconfidence: [50, 85]\nconfig: other.yaml\n"})
+	var parsed struct {
+		Params  map[string]string `json:"params"`
+		Unknown []string          `json:"unknown"`
+		Ignored []string          `json:"ignored"`
+	}
+	decode(t, rec, &parsed)
+	if parsed.Params["engineers"] != "4" || parsed.Params["confidence"] != "50,85" || parsed.Params["input"] != "x.csv" {
+		t.Errorf("params = %v", parsed.Params)
+	}
+	if strings.Join(parsed.Unknown, ",") != "bogus" || strings.Join(parsed.Ignored, ",") != "db" {
+		t.Errorf("unknown = %v ignored = %v", parsed.Unknown, parsed.Ignored)
+	}
+
+	// config/render round trip.
+	rec = postJSON("/api/config/render", map[string]any{"command": "sim-items", "params": map[string]string{"input": sampleCSV, "engineers": "alice,bob", "days": "30", "whole-team": "false"}})
+	var rendered struct{ YAML, CLI string }
+	decode(t, rec, &rendered)
+	if !strings.HasPrefix(rendered.CLI, "forecast sim items") || !strings.Contains(rendered.CLI, "-engineers alice,bob") {
+		t.Errorf("cli = %q", rendered.CLI)
+	}
+	rec = postJSON("/api/config/parse", map[string]any{"command": "sim-items", "yaml": rendered.YAML})
+	decode(t, rec, &parsed)
+	if parsed.Params["engineers"] != "alice,bob" || parsed.Params["whole-team"] != "false" || parsed.Params["days"] != "30" {
+		t.Errorf("round trip params = %v", parsed.Params)
+	}
+	if rec := postJSON("/api/config/render", map[string]any{"command": "sim-items", "params": map[string]string{"days": "abc"}}); rec.Code != 400 {
+		t.Errorf("bad render params: %d", rec.Code)
+	}
+
+	// cli/parse.
+	rec = postJSON("/api/cli/parse", map[string]any{"line": `forecast sim items -input x.csv -engineers 3 -days 30 -manifest m.json -sample-start "-6 months"`})
+	var cli struct {
+		Command string            `json:"command"`
+		Params  map[string]string `json:"params"`
+		Ignored []string          `json:"ignored"`
+	}
+	decode(t, rec, &cli)
+	if cli.Command != "sim-items" || cli.Params["input"] != "x.csv" || cli.Params["sample-start"] != "-6 months" || strings.Join(cli.Ignored, ",") != "manifest" {
+		t.Errorf("cli parse = %+v", cli)
+	}
+	if rec := postJSON("/api/cli/parse", map[string]any{"line": "forecast frobnicate -x 1"}); rec.Code != 400 {
+		t.Errorf("unknown command: %d", rec.Code)
+	}
+	if rec := postJSON("/api/cli/parse", map[string]any{"line": `forecast count "unterminated`}); rec.Code != 400 {
+		t.Errorf("unterminated quote: %d", rec.Code)
+	}
+	rec = postJSON("/api/cli/parse", map[string]any{"line": "/usr/local/bin/forecast history -input x.csv"})
+	decode(t, rec, &cli)
+	if cli.Command != "history" {
+		t.Errorf("path-prefixed binary: %+v", cli)
 	}
 }

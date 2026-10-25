@@ -239,7 +239,7 @@ func (s *Server) handleRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if first := def.Exports[0]; first != "html" {
+	if first := firstExport(def); out.Text == "" && first != "" && first != "html" {
 		var buf bytes.Buffer
 		if err := out.Exports[first].Write(&buf); err == nil {
 			out.Text = buf.String()
@@ -273,6 +273,15 @@ func (s *Server) handleRun(w http.ResponseWriter, r *http.Request) {
 		"config":   cfgYAML,
 		"flags":    flags,
 	})
+}
+
+// firstExport names the export whose output is shown as "Text output", or ""
+// for a command with no exports.
+func firstExport(def *commandDef) string {
+	if len(def.Exports) == 0 {
+		return ""
+	}
+	return def.Exports[0]
 }
 
 func nonNil(s []string) []string {

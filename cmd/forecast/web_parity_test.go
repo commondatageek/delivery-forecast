@@ -183,6 +183,9 @@ func TestWebSummariesMatchCLI(t *testing.T) {
 	for _, c := range simCommands {
 		cli["sim "+c.Name] = c.Summary
 	}
+	for _, c := range linearCommands {
+		cli["linear "+c.Name] = c.Summary
+	}
 	for name, summary := range web.CommandSummaries() {
 		if cli[name] != summary {
 			t.Errorf("%s: web summary %q, CLI summary %q", name, summary, cli[name])

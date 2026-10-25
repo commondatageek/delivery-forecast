@@ -63,6 +63,21 @@ func loadConfig(path string) (map[string]any, error) {
 	return raw, nil
 }
 
+// ParseConfig parses YAML config data into flag name → string value, using the
+// same stringification ApplyConfig applies (sequences join with commas). The
+// reserved "config" key is returned like any other; callers drop it.
+func ParseConfig(data []byte) (map[string]string, error) {
+	var raw map[string]any
+	if err := yaml.Unmarshal(data, &raw); err != nil {
+		return nil, fmt.Errorf("parsing config: %w", err)
+	}
+	out := make(map[string]string, len(raw))
+	for k, v := range raw {
+		out[k] = stringify(v)
+	}
+	return out, nil
+}
+
 // applyConfig applies each config value to fs for any flag not already set on
 // the command line (per cliSet, snapshotted by the caller before any config
 // value is applied, so a config value can never override an explicit

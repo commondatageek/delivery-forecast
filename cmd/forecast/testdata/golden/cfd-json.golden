@@ -1,0 +1,845 @@
+==== stdout
+{
+  "series": [
+    {
+      "date": "2025-01-01",
+      "created": 0,
+      "left_backlog": 0,
+      "departed": 0,
+      "completed": 0,
+      "backlog": 0,
+      "in_progress": 0,
+      "canceled": 0,
+      "done": 0
+    },
+    {
+      "date": "2025-01-02",
+      "created": 1,
+      "left_backlog": 0,
+      "departed": 0,
+      "completed": 0,
+      "backlog": 1,
+      "in_progress": 0,
+      "canceled": 0,
+      "done": 0
+    },
+    {
+      "date": "2025-01-03",
+      "created": 2,
+      "left_backlog": 1,
+      "departed": 0,
+      "completed": 0,
+      "backlog": 1,
+      "in_progress": 1,
+      "canceled": 0,
+      "done": 0
+    },
+    {
+      "date": "2025-01-04",
+      "created": 2,
+      "left_backlog": 2,
+      "departed": 0,
+      "completed": 0,
+      "backlog": 0,
+      "in_progress": 2,
+      "canceled": 0,
+      "done": 0
+    },
+    {
+      "date": "2025-01-05",
+      "created": 3,
+      "left_backlog": 2,
+      "departed": 0,
+      "completed": 0,
+      "backlog": 1,
+      "in_progress": 2,
+      "canceled": 0,
+      "done": 0
+    },
+    {
+      "date": "2025-01-06",
+      "created": 4,
+      "left_backlog": 3,
+      "departed": 0,
+      "completed": 0,
+      "backlog": 1,
+      "in_progress": 3,
+      "canceled": 0,
+      "done": 0
+    },
+    {
+      "date": "2025-01-07",
+      "created": 4,
+      "left_backlog": 4,
+      "departed": 0,
+      "completed": 0,
+      "backlog": 0,
+      "in_progress": 4,
+      "canceled": 0,
+      "done": 0
+    },
+    {
+      "date": "2025-01-08",
+      "created": 5,
+      "left_backlog": 4,
+      "departed": 1,
+      "completed": 1,
+      "backlog": 1,
+      "in_progress": 3,
+      "canceled": 0,
+      "done": 1
+    },
+    {
+      "date": "2025-01-09",
+      "created": 5,
+      "left_backlog": 5,
+      "departed": 2,
+      "completed": 2,
+      "backlog": 0,
+      "in_progress": 3,
+      "canceled": 0,
+      "done": 2
+    },
+    {
+      "date": "2025-01-10",
+      "created": 6,
+      "left_backlog": 5,
+      "departed": 3,
+      "completed": 3,
+      "backlog": 1,
+      "in_progress": 2,
+      "canceled": 0,
+      "done": 3
+    },
+    {
+      "date": "2025-01-11",
+      "created": 6,
+      "left_backlog": 5,
+      "departed": 3,
+      "completed": 3,
+      "backlog": 1,
+      "in_progress": 2,
+      "canceled": 0,
+      "done": 3
+    },
+    {
+      "date": "2025-01-12",
+      "created": 7,
+      "left_backlog": 6,
+      "departed": 3,
+      "completed": 3,
+      "backlog": 1,
+      "in_progress": 3,
+      "canceled": 0,
+      "done": 3
+    },
+    {
+      "date": "2025-01-13",
+      "created": 8,
+      "left_backlog": 7,
+      "departed": 3,
+      "completed": 3,
+      "backlog": 1,
+      "in_progress": 4,
+      "canceled": 0,
+      "done": 3
+    },
+    {
+      "date": "2025-01-14",
+      "created": 8,
+      "left_backlog": 8,
+      "departed": 4,
+      "completed": 4,
+      "backlog": 0,
+      "in_progress": 4,
+      "canceled": 0,
+      "done": 4
+    },
+    {
+      "date": "2025-01-15",
+      "created": 9,
+      "left_backlog": 8,
+      "departed": 5,
+      "completed": 5,
+      "backlog": 1,
+      "in_progress": 3,
+      "canceled": 0,
+      "done": 5
+    },
+    {
+      "date": "2025-01-16",
+      "created": 9,
+      "left_backlog": 9,
+      "departed": 6,
+      "completed": 5,
+      "backlog": 0,
+      "in_progress": 3,
+      "canceled": 1,
+      "done": 5
+    },
+    {
+      "date": "2025-01-17",
+      "created": 10,
+      "left_backlog": 9,
+      "departed": 6,
+      "completed": 5,
+      "backlog": 1,
+      "in_progress": 3,
+      "canceled": 1,
+      "done": 5
+    },
+    {
+      "date": "2025-01-18",
+      "created": 10,
+      "left_backlog": 10,
+      "departed": 7,
+      "completed": 6,
+      "backlog": 0,
+      "in_progress": 3,
+      "canceled": 1,
+      "done": 6
+    },
+    {
+      "date": "2025-01-19",
+      "created": 10,
+      "left_backlog": 10,
+      "departed": 7,
+      "completed": 6,
+      "backlog": 0,
+      "in_progress": 3,
+      "canceled": 1,
+      "done": 6
+    },
+    {
+      "date": "2025-01-20",
+      "created": 11,
+      "left_backlog": 10,
+      "departed": 8,
+      "completed": 7,
+      "backlog": 1,
+      "in_progress": 2,
+      "canceled": 1,
+      "done": 7
+    },
+    {
+      "date": "2025-01-21",
+      "created": 11,
+      "left_backlog": 11,
+      "departed": 8,
+      "completed": 7,
+      "backlog": 0,
+      "in_progress": 3,
+      "canceled": 1,
+      "done": 7
+    },
+    {
+      "date": "2025-01-22",
+      "created": 12,
+      "left_backlog": 11,
+      "departed": 9,
+      "completed": 8,
+      "backlog": 1,
+      "in_progress": 2,
+      "canceled": 1,
+      "done": 8
+    },
+    {
+      "date": "2025-01-23",
+      "created": 12,
+      "left_backlog": 12,
+      "departed": 9,
+      "completed": 8,
+      "backlog": 0,
+      "in_progress": 3,
+      "canceled": 1,
+      "done": 8
+    },
+    {
+      "date": "2025-01-24",
+      "created": 12,
+      "left_backlog": 12,
+      "departed": 9,
+      "completed": 8,
+      "backlog": 0,
+      "in_progress": 3,
+      "canceled": 1,
+      "done": 8
+    },
+    {
+      "date": "2025-01-25",
+      "created": 13,
+      "left_backlog": 12,
+      "departed": 10,
+      "completed": 9,
+      "backlog": 1,
+      "in_progress": 2,
+      "canceled": 1,
+      "done": 9
+    },
+    {
+      "date": "2025-01-26",
+      "created": 13,
+      "left_backlog": 12,
+      "departed": 10,
+      "completed": 9,
+      "backlog": 1,
+      "in_progress": 2,
+      "canceled": 1,
+      "done": 9
+    },
+    {
+      "date": "2025-01-27",
+      "created": 13,
+      "left_backlog": 13,
+      "departed": 10,
+      "completed": 9,
+      "backlog": 0,
+      "in_progress": 3,
+      "canceled": 1,
+      "done": 9
+    },
+    {
+      "date": "2025-01-28",
+      "created": 14,
+      "left_backlog": 13,
+      "departed": 11,
+      "completed": 10,
+      "backlog": 1,
+      "in_progress": 2,
+      "canceled": 1,
+      "done": 10
+    },
+    {
+      "date": "2025-01-29",
+      "created": 14,
+      "left_backlog": 14,
+      "departed": 11,
+      "completed": 10,
+      "backlog": 0,
+      "in_progress": 3,
+      "canceled": 1,
+      "done": 10
+    },
+    {
+      "date": "2025-01-30",
+      "created": 15,
+      "left_backlog": 14,
+      "departed": 12,
+      "completed": 11,
+      "backlog": 1,
+      "in_progress": 2,
+      "canceled": 1,
+      "done": 11
+    },
+    {
+      "date": "2025-01-31",
+      "created": 15,
+      "left_backlog": 14,
+      "departed": 12,
+      "completed": 11,
+      "backlog": 1,
+      "in_progress": 2,
+      "canceled": 1,
+      "done": 11
+    },
+    {
+      "date": "2025-02-01",
+      "created": 16,
+      "left_backlog": 14,
+      "departed": 12,
+      "completed": 11,
+      "backlog": 2,
+      "in_progress": 2,
+      "canceled": 1,
+      "done": 11
+    },
+    {
+      "date": "2025-02-02",
+      "created": 16,
+      "left_backlog": 16,
+      "departed": 13,
+      "completed": 11,
+      "backlog": 0,
+      "in_progress": 3,
+      "canceled": 2,
+      "done": 11
+    },
+    {
+      "date": "2025-02-03",
+      "created": 17,
+      "left_backlog": 16,
+      "departed": 14,
+      "completed": 12,
+      "backlog": 1,
+      "in_progress": 2,
+      "canceled": 2,
+      "done": 12
+    },
+    {
+      "date": "2025-02-04",
+      "created": 17,
+      "left_backlog": 17,
+      "departed": 14,
+      "completed": 12,
+      "backlog": 0,
+      "in_progress": 3,
+      "canceled": 2,
+      "done": 12
+    },
+    {
+      "date": "2025-02-05",
+      "created": 18,
+      "left_backlog": 17,
+      "departed": 15,
+      "completed": 13,
+      "backlog": 1,
+      "in_progress": 2,
+      "canceled": 2,
+      "done": 13
+    },
+    {
+      "date": "2025-02-06",
+      "created": 18,
+      "left_backlog": 18,
+      "departed": 15,
+      "completed": 13,
+      "backlog": 0,
+      "in_progress": 3,
+      "canceled": 2,
+      "done": 13
+    },
+    {
+      "date": "2025-02-07",
+      "created": 18,
+      "left_backlog": 18,
+      "departed": 15,
+      "completed": 13,
+      "backlog": 0,
+      "in_progress": 3,
+      "canceled": 2,
+      "done": 13
+    },
+    {
+      "date": "2025-02-08",
+      "created": 19,
+      "left_backlog": 18,
+      "departed": 16,
+      "completed": 14,
+      "backlog": 1,
+      "in_progress": 2,
+      "canceled": 2,
+      "done": 14
+    },
+    {
+      "date": "2025-02-09",
+      "created": 19,
+      "left_backlog": 19,
+      "departed": 16,
+      "completed": 14,
+      "backlog": 0,
+      "in_progress": 3,
+      "canceled": 2,
+      "done": 14
+    },
+    {
+      "date": "2025-02-10",
+      "created": 20,
+      "left_backlog": 19,
+      "departed": 17,
+      "completed": 15,
+      "backlog": 1,
+      "in_progress": 2,
+      "canceled": 2,
+      "done": 15
+    },
+    {
+      "date": "2025-02-11",
+      "created": 20,
+      "left_backlog": 20,
+      "departed": 17,
+      "completed": 15,
+      "backlog": 0,
+      "in_progress": 3,
+      "canceled": 2,
+      "done": 15
+    },
+    {
+      "date": "2025-02-12",
+      "created": 21,
+      "left_backlog": 20,
+      "departed": 18,
+      "completed": 16,
+      "backlog": 1,
+      "in_progress": 2,
+      "canceled": 2,
+      "done": 16
+    },
+    {
+      "date": "2025-02-13",
+      "created": 21,
+      "left_backlog": 21,
+      "departed": 18,
+      "completed": 16,
+      "backlog": 0,
+      "in_progress": 3,
+      "canceled": 2,
+      "done": 16
+    },
+    {
+      "date": "2025-02-14",
+      "created": 21,
+      "left_backlog": 21,
+      "departed": 18,
+      "completed": 16,
+      "backlog": 0,
+      "in_progress": 3,
+      "canceled": 2,
+      "done": 16
+    },
+    {
+      "date": "2025-02-15",
+      "created": 22,
+      "left_backlog": 21,
+      "departed": 18,
+      "completed": 16,
+      "backlog": 1,
+      "in_progress": 3,
+      "canceled": 2,
+      "done": 16
+    },
+    {
+      "date": "2025-02-16",
+      "created": 22,
+      "left_backlog": 22,
+      "departed": 19,
+      "completed": 17,
+      "backlog": 0,
+      "in_progress": 3,
+      "canceled": 2,
+      "done": 17
+    },
+    {
+      "date": "2025-02-17",
+      "created": 22,
+      "left_backlog": 22,
+      "departed": 19,
+      "completed": 17,
+      "backlog": 0,
+      "in_progress": 3,
+      "canceled": 2,
+      "done": 17
+    },
+    {
+      "date": "2025-02-18",
+      "created": 23,
+      "left_backlog": 22,
+      "departed": 20,
+      "completed": 18,
+      "backlog": 1,
+      "in_progress": 2,
+      "canceled": 2,
+      "done": 18
+    },
+    {
+      "date": "2025-02-19",
+      "created": 23,
+      "left_backlog": 23,
+      "departed": 20,
+      "completed": 18,
+      "backlog": 0,
+      "in_progress": 3,
+      "canceled": 2,
+      "done": 18
+    },
+    {
+      "date": "2025-02-20",
+      "created": 24,
+      "left_backlog": 23,
+      "departed": 20,
+      "completed": 18,
+      "backlog": 1,
+      "in_progress": 3,
+      "canceled": 2,
+      "done": 18
+    },
+    {
+      "date": "2025-02-21",
+      "created": 24,
+      "left_backlog": 24,
+      "departed": 21,
+      "completed": 19,
+      "backlog": 0,
+      "in_progress": 3,
+      "canceled": 2,
+      "done": 19
+    },
+    {
+      "date": "2025-02-22",
+      "created": 25,
+      "left_backlog": 24,
+      "departed": 21,
+      "completed": 19,
+      "backlog": 1,
+      "in_progress": 3,
+      "canceled": 2,
+      "done": 19
+    },
+    {
+      "date": "2025-02-23",
+      "created": 25,
+      "left_backlog": 24,
+      "departed": 21,
+      "completed": 19,
+      "backlog": 1,
+      "in_progress": 3,
+      "canceled": 2,
+      "done": 19
+    },
+    {
+      "date": "2025-02-24",
+      "created": 25,
+      "left_backlog": 25,
+      "departed": 22,
+      "completed": 20,
+      "backlog": 0,
+      "in_progress": 3,
+      "canceled": 2,
+      "done": 20
+    },
+    {
+      "date": "2025-02-25",
+      "created": 26,
+      "left_backlog": 25,
+      "departed": 22,
+      "completed": 20,
+      "backlog": 1,
+      "in_progress": 3,
+      "canceled": 2,
+      "done": 20
+    },
+    {
+      "date": "2025-02-26",
+      "created": 26,
+      "left_backlog": 26,
+      "departed": 22,
+      "completed": 20,
+      "backlog": 0,
+      "in_progress": 4,
+      "canceled": 2,
+      "done": 20
+    },
+    {
+      "date": "2025-02-27",
+      "created": 26,
+      "left_backlog": 26,
+      "departed": 23,
+      "completed": 21,
+      "backlog": 0,
+      "in_progress": 3,
+      "canceled": 2,
+      "done": 21
+    },
+    {
+      "date": "2025-02-28",
+      "created": 27,
+      "left_backlog": 26,
+      "departed": 23,
+      "completed": 21,
+      "backlog": 1,
+      "in_progress": 3,
+      "canceled": 2,
+      "done": 21
+    },
+    {
+      "date": "2025-03-01",
+      "created": 27,
+      "left_backlog": 26,
+      "departed": 24,
+      "completed": 22,
+      "backlog": 1,
+      "in_progress": 2,
+      "canceled": 2,
+      "done": 22
+    },
+    {
+      "date": "2025-03-02",
+      "created": 28,
+      "left_backlog": 27,
+      "departed": 24,
+      "completed": 22,
+      "backlog": 1,
+      "in_progress": 3,
+      "canceled": 2,
+      "done": 22
+    },
+    {
+      "date": "2025-03-03",
+      "created": 28,
+      "left_backlog": 27,
+      "departed": 24,
+      "completed": 22,
+      "backlog": 1,
+      "in_progress": 3,
+      "canceled": 2,
+      "done": 22
+    },
+    {
+      "date": "2025-03-04",
+      "created": 28,
+      "left_backlog": 28,
+      "departed": 24,
+      "completed": 22,
+      "backlog": 0,
+      "in_progress": 4,
+      "canceled": 2,
+      "done": 22
+    },
+    {
+      "date": "2025-03-05",
+      "created": 29,
+      "left_backlog": 28,
+      "departed": 25,
+      "completed": 23,
+      "backlog": 1,
+      "in_progress": 3,
+      "canceled": 2,
+      "done": 23
+    },
+    {
+      "date": "2025-03-06",
+      "created": 29,
+      "left_backlog": 28,
+      "departed": 25,
+      "completed": 23,
+      "backlog": 1,
+      "in_progress": 3,
+      "canceled": 2,
+      "done": 23
+    },
+    {
+      "date": "2025-03-07",
+      "created": 29,
+      "left_backlog": 28,
+      "departed": 25,
+      "completed": 23,
+      "backlog": 1,
+      "in_progress": 3,
+      "canceled": 2,
+      "done": 23
+    },
+    {
+      "date": "2025-03-08",
+      "created": 29,
+      "left_backlog": 28,
+      "departed": 26,
+      "completed": 24,
+      "backlog": 1,
+      "in_progress": 2,
+      "canceled": 2,
+      "done": 24
+    },
+    {
+      "date": "2025-03-09",
+      "created": 29,
+      "left_backlog": 28,
+      "departed": 26,
+      "completed": 24,
+      "backlog": 1,
+      "in_progress": 2,
+      "canceled": 2,
+      "done": 24
+    },
+    {
+      "date": "2025-03-10",
+      "created": 30,
+      "left_backlog": 28,
+      "departed": 26,
+      "completed": 24,
+      "backlog": 2,
+      "in_progress": 2,
+      "canceled": 2,
+      "done": 24
+    },
+    {
+      "date": "2025-03-11",
+      "created": 30,
+      "left_backlog": 28,
+      "departed": 26,
+      "completed": 24,
+      "backlog": 2,
+      "in_progress": 2,
+      "canceled": 2,
+      "done": 24
+    },
+    {
+      "date": "2025-03-12",
+      "created": 30,
+      "left_backlog": 28,
+      "departed": 26,
+      "completed": 24,
+      "backlog": 2,
+      "in_progress": 2,
+      "canceled": 2,
+      "done": 24
+    },
+    {
+      "date": "2025-03-13",
+      "created": 30,
+      "left_backlog": 28,
+      "departed": 26,
+      "completed": 24,
+      "backlog": 2,
+      "in_progress": 2,
+      "canceled": 2,
+      "done": 24
+    },
+    {
+      "date": "2025-03-14",
+      "created": 30,
+      "left_backlog": 28,
+      "departed": 26,
+      "completed": 24,
+      "backlog": 2,
+      "in_progress": 2,
+      "canceled": 2,
+      "done": 24
+    },
+    {
+      "date": "2025-03-15",
+      "created": 30,
+      "left_backlog": 28,
+      "departed": 26,
+      "completed": 24,
+      "backlog": 2,
+      "in_progress": 2,
+      "canceled": 2,
+      "done": 24
+    }
+  ],
+  "flow_health": {
+    "throughput_per_day": 0.367,
+    "departure_per_day": 0.4,
+    "avg_wip_backlog": 0.7,
+    "avg_wip_in_progress": 2.6,
+    "avg_wip_canceled": 1.4,
+    "avg_cycle_time_days": 8,
+    "littles_law_ct_days": 7.1,
+    "stability_backlog_slope": 0.01,
+    "stability_in_progress_slope": 0.005,
+    "stability_canceled_slope": 0.033
+  }
+}
+==== stderr
+INFO  effective flag values for this run:
+INFO  FLAG          VALUE                             SOURCE
+INFO  config                                          default
+INFO  db                                              default
+INFO  end           2025-03-15                        CLI flag
+INFO  format        json                              CLI flag
+INFO  input         ../../testdata/sample-issues.csv  CLI flag
+INFO  out                                             default
+INFO  start         2025-01-01                        CLI flag
+INFO  stdin-format                                    default
+INFO  teams                                           default
+==== error
+<nil>

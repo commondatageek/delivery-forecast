@@ -1,0 +1,31 @@
+==== stdout
+2 equivalent engineers, starting 2025-03-16 -> grouped trajectory
+
+                50%                     85%   
+Group    Items  Days  Date              Days  Date
+Group 1  5      21    2025-04-06 (Sun)  33    2025-04-18 (Fri)
+Group 2  4      19    2025-04-25 (Fri)  21    2025-05-09 (Fri)
+Group 3  3      13    2025-05-08 (Thu)  17    2025-05-26 (Mon)
+Total    12     53    2025-05-08 (Thu)  71    2025-05-26 (Mon)
+==== stderr
+INFO  effective flag values for this run:
+INFO  FLAG               VALUE                             SOURCE
+INFO  confidence         50,85                             CLI flag
+INFO  config                                               default
+INFO  db                                                   default
+INFO  engineers          2                                 CLI flag
+INFO  exclusions                                           default
+INFO  goroutines         4                                 CLI flag
+INFO  input              ../../testdata/sample-issues.csv  CLI flag
+INFO  items              5,4,3                             CLI flag
+INFO  manifest                                             default
+INFO  random-seed        42                                CLI flag
+INFO  sample-end         2025-03-15                        CLI flag
+INFO  sample-start       2025-01-01                        CLI flag
+INFO  simulations        2000                              CLI flag
+INFO  stdin-format                                         default
+INFO  target-start-date  2025-03-16                        CLI flag
+INFO  typical-engineers                                    default
+INFO  whole-team         false                             default
+==== error
+<nil>

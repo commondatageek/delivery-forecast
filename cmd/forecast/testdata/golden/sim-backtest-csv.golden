@@ -1,0 +1,30 @@
+==== stdout
+date,completed,remaining,probability,projected
+2025-02-01,11,2,100.00,false
+2025-02-02,11,2,100.00,false
+2025-02-03,12,1,100.00,false
+2025-02-04,12,1,100.00,false
+2025-02-05,13,0,100.00,false
+==== stderr
+INFO  effective flag values for this run:
+INFO  FLAG               VALUE                             SOURCE
+INFO  config                                               default
+INFO  db                                                   default
+INFO  engineers          3                                 CLI flag
+INFO  exclusions                                           default
+INFO  format             csv                               CLI flag
+INFO  goroutines         4                                 CLI flag
+INFO  input              ../../testdata/sample-issues.csv  CLI flag
+INFO  milestone          Indexing                          CLI flag
+INFO  project            Search Revamp                     CLI flag
+INFO  random-seed        42                                CLI flag
+INFO  replay-start-date  2025-02-01                        CLI flag
+INFO  sample-end         2025-03-15                        CLI flag
+INFO  sample-start       2025-01-01                        CLI flag
+INFO  simulations        2000                              CLI flag
+INFO  stdin-format                                         default
+INFO  target-end-date    2025-03-31                        CLI flag
+INFO  typical-engineers                                    default
+INFO  whole-team         false                             default
+==== error
+<nil>

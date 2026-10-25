@@ -81,7 +81,7 @@ func cmdSimBacktest(args []string) error {
 		return fmt.Errorf(`-format must be "text" or "csv"`)
 	}
 
-	now := time.Now()
+	now := nowFunc()
 	targetDate, err := util.ParseFlexibleDate(*targetEndStr, now)
 	if err != nil {
 		return fmt.Errorf("invalid -target-end-date: %w", err)

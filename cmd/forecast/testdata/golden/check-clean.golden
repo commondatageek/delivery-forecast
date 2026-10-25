@@ -1,0 +1,16 @@
+==== stdout
+Read 30 issues from ../../testdata/sample-issues.csv
+  history   ok
+  cfd       ok
+  aging     ok
+  count     ok
+  sim       ok
+==== stderr
+INFO  effective flag values for this run:
+INFO  FLAG          VALUE                             SOURCE
+INFO  config                                          default
+INFO  exclusions                                      default
+INFO  input         ../../testdata/sample-issues.csv  CLI flag
+INFO  stdin-format                                    default
+==== error
+<nil>

@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/commondatageek/delivery-forecast/cfd"
 	"github.com/commondatageek/delivery-forecast/internal/logx"
@@ -50,7 +49,7 @@ func cmdCFD(args []string) error {
 		return err
 	}
 
-	now := time.Now()
+	now := nowFunc()
 
 	windowEnd, err := util.ParseFlexibleDate(*endStr, now)
 	if err != nil {

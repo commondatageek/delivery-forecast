@@ -310,7 +310,7 @@ func newManifest(in manifestInputs) *Manifest {
 
 	return &Manifest{
 		SchemaVersion: 2,
-		GeneratedAt:   time.Now().UTC().Format(time.RFC3339),
+		GeneratedAt:   nowFunc().UTC().Format(time.RFC3339),
 		Binary:        buildInfo(),
 		Invocation:    Invocation{Subcommand: in.Subcommand, Args: os.Args, WorkingDir: wd},
 		Flags:         flags,

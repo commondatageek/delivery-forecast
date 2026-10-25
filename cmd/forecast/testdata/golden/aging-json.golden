@@ -1,0 +1,41 @@
+==== stdout
+[
+  {
+    "identifier": "ENG-27",
+    "title": "",
+    "assignee": "carol",
+    "project_name": "Search Revamp",
+    "state_type": "started",
+    "started_at": "2025-03-02",
+    "age_days": 13,
+    "percentile": 100,
+    "multiplier": 1.63
+  },
+  {
+    "identifier": "ENG-28",
+    "title": "",
+    "assignee": "alice",
+    "project_name": "Search Revamp",
+    "state_type": "started",
+    "started_at": "2025-03-04",
+    "age_days": 11,
+    "percentile": 100,
+    "multiplier": 1.38
+  }
+]
+==== stderr
+INFO  effective flag values for this run:
+INFO  FLAG            VALUE                             SOURCE
+INFO  config                                            default
+INFO  db                                                default
+INFO  format          json                              CLI flag
+INFO  input           ../../testdata/sample-issues.csv  CLI flag
+INFO  min-cycle-time                                    default
+INFO  percentile      85                                default
+INFO  sample-end      2025-03-15                        CLI flag
+INFO  sample-start    2025-01-01                        CLI flag
+INFO  show-completed  false                             default
+INFO  stdin-format                                      default
+INFO  teams                                             default
+==== error
+<nil>

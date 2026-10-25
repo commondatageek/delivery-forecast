@@ -42,7 +42,7 @@ func cmdSimItems(args []string) error {
 		return err
 	}
 
-	now := time.Now()
+	now := nowFunc()
 	startDate, err := util.ParseFlexibleStartDate(*sf.SampleStart, now)
 	if err != nil {
 		return fmt.Errorf("invalid -sample-start date: %w", err)
@@ -205,7 +205,7 @@ func cmdSimDays(args []string) error {
 		return err
 	}
 
-	now := time.Now()
+	now := nowFunc()
 	startDate, err := util.ParseFlexibleStartDate(*sf.SampleStart, now)
 	if err != nil {
 		return fmt.Errorf("invalid -sample-start date: %w", err)
@@ -323,7 +323,7 @@ func cmdSimProbability(args []string) error {
 		return err
 	}
 
-	now := time.Now()
+	now := nowFunc()
 	startDate, err := util.ParseFlexibleStartDate(*sf.SampleStart, now)
 	if err != nil {
 		return fmt.Errorf("invalid -sample-start date: %w", err)

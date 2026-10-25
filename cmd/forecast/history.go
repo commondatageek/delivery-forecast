@@ -79,7 +79,7 @@ func cmdHistory(args []string) error {
 		logx.Warnf("%s", msg)
 	}
 
-	now := time.Now()
+	now := nowFunc()
 	endDate, err := util.ParseFlexibleDate(*endStr, now)
 	if err != nil {
 		return fmt.Errorf("invalid -end %q: %w", *endStr, err)

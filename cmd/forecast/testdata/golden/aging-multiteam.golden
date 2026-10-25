@@ -1,0 +1,23 @@
+==== stdout
+Cycle time distribution: 7 completed issues (2025-01-01 to 2025-03-15)  ·  P85: 13.0 days
+
+IDENTIFIER  TITLE  DAYS  PERCENTILE  MULTIPLIER  STATE    START DATE  ASSIGNEE
+ENG-4              40.0  100th       3.08x       started  Mon 2/3     alice
+DATA-4             36.0  100th       2.77x       started  Fri 2/7     erin
+==== stderr
+INFO  effective flag values for this run:
+INFO  FLAG            VALUE                          SOURCE
+INFO  config                                         default
+INFO  db                                             default
+INFO  format          text                           default
+INFO  input           testdata/golden/multiteam.csv  CLI flag
+INFO  min-cycle-time                                 default
+INFO  percentile      85                             default
+INFO  sample-end      2025-03-15                     CLI flag
+INFO  sample-start    2025-01-01                     CLI flag
+INFO  show-completed  false                          default
+INFO  stdin-format                                   default
+INFO  teams                                          default
+WARN  no -teams filter given; blending data across all 2 teams (DATA, ENG)
+==== error
+<nil>

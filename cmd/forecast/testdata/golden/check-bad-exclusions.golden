@@ -1,0 +1,18 @@
+==== stdout
+Read 30 issues from ../../testdata/sample-issues.csv
+  history   ok
+  cfd       ok
+  aging     ok
+  count     ok
+  sim       ok
+Exclusions: testdata/golden/bad-exclusions.json
+  invalid   exclusions: global[0]: "not-a-date": invalid date "not-a-date" (want YYYY-MM-DD)
+==== stderr
+INFO  effective flag values for this run:
+INFO  FLAG          VALUE                                SOURCE
+INFO  config                                             default
+INFO  exclusions    testdata/golden/bad-exclusions.json  CLI flag
+INFO  input         ../../testdata/sample-issues.csv     CLI flag
+INFO  stdin-format                                       default
+==== error
+<nil>

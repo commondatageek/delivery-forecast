@@ -348,3 +348,7 @@ func addSimFlags(fs *flag.FlagSet) *simFlags {
 	fs.Var(&sf.TypicalEngineers, "typical-engineers", "comma-separated list of the team's typical engineers to build the sample pool from (default: all)")
 	return sf
 }
+
+// nowFunc is the CLI's clock. Tests replace it to make date defaults
+// ("now", "today", "-3 months") and aging/backtest "today" deterministic.
+var nowFunc = time.Now

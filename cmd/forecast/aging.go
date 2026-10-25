@@ -109,7 +109,7 @@ func cmdAging(args []string) error {
 		minCycleTime = d
 	}
 
-	now := time.Now()
+	now := nowFunc()
 	today := util.LocalDay(now)
 
 	sampleEnd, err := util.ParseFlexibleDate(*sampleEndStr, now)

@@ -1,0 +1,22 @@
+==== stdout
+Cycle time distribution: 24 completed issues (2024-12-15 to 2025-03-15)  ·  P85: 8.0 days
+
+IDENTIFIER  TITLE  DAYS  PERCENTILE  MULTIPLIER  STATE    START DATE  ASSIGNEE
+ENG-27             13.0  100th       1.62x       started  Sun 3/2     carol
+ENG-28             11.0  100th       1.38x       started  Tue 3/4     alice
+==== stderr
+INFO  effective flag values for this run:
+INFO  FLAG            VALUE                             SOURCE
+INFO  config                                            default
+INFO  db                                                default
+INFO  format          text                              default
+INFO  input           ../../testdata/sample-issues.csv  CLI flag
+INFO  min-cycle-time                                    default
+INFO  percentile      85                                default
+INFO  sample-end      today                             default
+INFO  sample-start    -3 months                         default
+INFO  show-completed  false                             default
+INFO  stdin-format                                      default
+INFO  teams                                             default
+==== error
+<nil>

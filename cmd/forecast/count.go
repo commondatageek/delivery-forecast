@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/commondatageek/delivery-forecast/counts"
 	"github.com/commondatageek/delivery-forecast/internal/logx"
@@ -45,7 +44,7 @@ func toCountsIssues(items []issues.Issue) []counts.Issue {
 }
 
 func cmdCount(args []string) error {
-	defaultSince := time.Now().AddDate(0, -3, 0).Format("2006-01-02")
+	defaultSince := nowFunc().AddDate(0, -3, 0).Format("2006-01-02")
 
 	cmd := flag.NewFlagSet("count", flag.ExitOnError)
 	dbFile := addDBFlag(cmd)
@@ -66,7 +65,7 @@ func cmdCount(args []string) error {
 		return err
 	}
 
-	since, err := util.ParseFlexibleDate(*updatedSince, time.Now())
+	since, err := util.ParseFlexibleDate(*updatedSince, nowFunc())
 	if err != nil {
 		return fmt.Errorf("invalid -updated-since %q: %w", *updatedSince, err)
 	}

@@ -176,7 +176,7 @@ func cmdCheck(args []string) error {
 			}
 		}
 		fmt.Fprintf(os.Stdout, "Exclusions: %s\n", *exclusions)
-		for _, line := range checkExclusions(exc, err, assignees, util.LocalDay(time.Now())) {
+		for _, line := range checkExclusions(exc, err, assignees, util.LocalDay(nowFunc())) {
 			fmt.Fprintf(os.Stdout, "  %s\n", line)
 		}
 	}

@@ -10,3 +10,5 @@ scratch
 *.db-wal
 .venv
 .claude
+
+!cmd/forecast/testdata/**

@@ -102,3 +102,13 @@ func SimItems(req ItemsRequest) (*ItemsResult, error) {
 	res.Distribution = dist
 	return res, nil
 }
+
+// ManifestExtra returns the sim items-specific manifest fields.
+func (r *ItemsResult) ManifestExtra() map[string]any {
+	return map[string]any{
+		"effective_confidence_levels": r.Confidences,
+		"target_start_date":           r.TargetStart.Format("2006-01-02"),
+		"target_end_date":             r.TargetEnd.Format("2006-01-02"),
+		"effective_days":              r.EffectiveDays,
+	}
+}

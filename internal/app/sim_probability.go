@@ -96,3 +96,12 @@ func SimProbability(req ProbabilityRequest) (*ProbabilityResult, error) {
 	res.Distribution = dist
 	return res, nil
 }
+
+// ManifestExtra returns the sim probability-specific manifest fields.
+func (r *ProbabilityResult) ManifestExtra() map[string]any {
+	return map[string]any{
+		"target_start_date": r.TargetStart.Format("2006-01-02"),
+		"target_end_date":   r.TargetEnd.Format("2006-01-02"),
+		"effective_days":    r.EffectiveDays,
+	}
+}

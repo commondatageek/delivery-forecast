@@ -1,4 +1,4 @@
-package main
+package params
 
 import (
 	"flag"
@@ -33,7 +33,7 @@ func TestParseTargetWindowFlags(t *testing.T) {
 			if err := fs.Parse(c.args); err != nil {
 				t.Fatal(err)
 			}
-			start, gotDays, end, err := parseTargetWindowFlags(fs, *days, *startStr, *endStr, now)
+			start, gotDays, end, err := parseTargetWindow(fs, *days, *startStr, *endStr, now)
 			if c.wantErr != "" {
 				if err == nil || !strings.Contains(err.Error(), c.wantErr) {
 					t.Fatalf("error = %v, want one containing %q", err, c.wantErr)
@@ -41,7 +41,7 @@ func TestParseTargetWindowFlags(t *testing.T) {
 				return
 			}
 			if err != nil {
-				t.Fatalf("parseTargetWindowFlags: %v", err)
+				t.Fatalf("parseTargetWindow: %v", err)
 			}
 			if got := start.Format("2006-01-02"); got != "2025-03-02" {
 				t.Errorf("start = %s, want 2025-03-02", got)

@@ -164,3 +164,11 @@ func SimDays(req DaysRequest) (*DaysResult, error) {
 	res.Distribution = dist
 	return res, nil
 }
+
+// ManifestExtra returns the sim days-specific manifest fields.
+func (r *DaysResult) ManifestExtra() map[string]any {
+	return map[string]any{
+		"effective_confidence_levels": r.Confidences,
+		"target_start_date":           r.TargetStart.Format("2006-01-02"),
+	}
+}

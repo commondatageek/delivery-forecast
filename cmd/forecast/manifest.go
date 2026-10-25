@@ -9,6 +9,7 @@ import (
 	"runtime/debug"
 
 	"github.com/commondatageek/delivery-forecast/internal/app"
+	"github.com/commondatageek/delivery-forecast/internal/params"
 )
 
 // version is an optional build-time override: go build -ldflags "-X main.version=...".
@@ -40,21 +41,8 @@ func buildInfo() app.BinaryInfo {
 	return bi
 }
 
-// flagRecords snapshots every flag in fs — the command-unique ones too
-// (-days, -items, -percentile, -manifest) — with its default, current value
-// and whether it was explicitly set (on the command line or via -config).
-func flagRecords(fs *flag.FlagSet) []app.FlagRecord {
-	var flags []app.FlagRecord
-	fs.VisitAll(func(f *flag.Flag) {
-		flags = append(flags, app.FlagRecord{
-			Name:    f.Name,
-			Value:   f.Value.String(),
-			Default: f.DefValue,
-			Set:     isFlagSet(fs, f.Name),
-		})
-	})
-	return flags
-}
+// flagRecords snapshots every flag in fs; see params.FlagRecords.
+func flagRecords(fs *flag.FlagSet) []app.FlagRecord { return params.FlagRecords(fs) }
 
 // writeManifest builds and writes a run manifest to path ("-" for stdout). It
 // is a no-op when path is empty, so the flag is opt-in and free when unset.

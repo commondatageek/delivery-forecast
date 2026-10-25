@@ -1,6 +1,26 @@
 # Implementation plan: `forecast serve`, a web UI with full CLI parity
 
-Status: **Phase 0 done** (this document is committed on the `web-ui` bookmark). Phases 1–10 not started.
+Status: **done.** Phases 0–10 are implemented, one `jj` commit each on the
+`web-ui` bookmark. `TestGolden` passes unchanged and `TestWebParity` replays
+every golden case through the HTTP API byte-for-byte.
+
+Deviations from the plan as written:
+
+- **jj snapshot size limit.** The vendored 4.3 MB Plotly bundle exceeds jj's
+  default 1 MiB new-file limit, so `snapshot.max-new-file-size` was raised
+  repo-locally (`jj config set --repo`). Not committed config.
+- **`seed` is a JSON string** in the sim DTOs (`run.seed`): a time-based seed
+  (`UnixNano`) exceeds JavaScript's exact integer range.
+- **`linear-sync` opens the SQLite store inside `run`,** not `prepare`, so an
+  abandoned queued run never leaks an open store (a store-open failure
+  therefore arrives as an `error` event rather than a 400).
+- `resolvePath`'d paths are used for the dataset cache key, but data-load
+  error text substitutes the path the user typed so messages match the CLI.
+- The `gofmt -l .` gate in §1 can't print nothing: three files that predate
+  this plan (`aging/aging_test.go`, `internal/selfupdate/selfupdate_test.go`,
+  `internal/util/date_test.go`) were already unformatted and were left alone.
+- Not run here: the manual checklists' offline test (network off) and the
+  10,000-simulation progress-bar check; see the final report.
 
 ## Why this exists
 

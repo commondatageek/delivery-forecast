@@ -189,7 +189,10 @@ func formatStartDate(t time.Time) string {
 	return t.Local().Format("Mon 1/2")
 }
 
-func formatState(name, typ string) string {
+// FormatState renders an issue's workflow state for display, e.g.
+// "In Review (started)": the state name with its type in parentheses, or
+// whichever of the two is present.
+func FormatState(name, typ string) string {
 	switch {
 	case name != "" && typ != "":
 		return fmt.Sprintf("%s (%s)", name, typ)
@@ -208,7 +211,7 @@ func truncateTitle(title string) string {
 	return title[:maxLen] + "..."
 }
 
-// ageClass buckets an item for display by how its age compares to the
+// AgeClass buckets an item for display by how its age compares to the
 // report's percentile threshold: at or past the threshold is "high",
 // within 15% of it is "medium". Keying this on the multiplier rather than
 // on the percentile rank keeps a cell's color and the number printed in it
@@ -216,7 +219,7 @@ func truncateTitle(title string) string {
 // (cumulative rank vs. nearest rank) and contradict each other on roughly
 // half a percent of rows, more on small distributions. With no usable
 // threshold there is nothing to compare against, so nothing is colored.
-func ageClass(mult float64, hasThreshold bool) string {
+func AgeClass(mult float64, hasThreshold bool) string {
 	switch {
 	case !hasThreshold:
 		return "normal"
@@ -248,10 +251,10 @@ var textDivider = func() string {
 	return strings.Join(dashes, "\t")
 }()
 
-// formatMultiplier renders an item's age as a multiple of the report's
+// FormatMultiplier renders an item's age as a multiple of the report's
 // percentile threshold, e.g. "1.34x". An em dash stands in when the
 // distribution has no usable threshold to divide by.
-func formatMultiplier(m float64, meta Meta) string {
+func FormatMultiplier(m float64, meta Meta) string {
 	if !meta.HasThreshold() {
 		return "—"
 	}
@@ -265,8 +268,8 @@ func writeItemRow(tw *tabwriter.Writer, item Item, meta Meta) {
 		truncateTitle(item.Title),
 		item.AgeDays,
 		pct, util.OrdinalSuffix(pct),
-		formatMultiplier(item.Multiplier, meta),
-		formatState(item.StateName, item.StateType),
+		FormatMultiplier(item.Multiplier, meta),
+		FormatState(item.StateName, item.StateType),
 		formatStartDate(item.StartedAt),
 		item.Assignee,
 	)
@@ -454,9 +457,9 @@ func toHTMLItems(items []Item, meta Meta) []htmlItemData {
 			AgeDays:    item.AgeDays,
 			Percentile: item.Percentile,
 			Suffix:     util.OrdinalSuffix(item.Percentile),
-			Multiplier: formatMultiplier(item.Multiplier, meta),
-			AgeClass:   ageClass(item.Multiplier, meta.HasThreshold()),
-			State:      formatState(item.StateName, item.StateType),
+			Multiplier: FormatMultiplier(item.Multiplier, meta),
+			AgeClass:   AgeClass(item.Multiplier, meta.HasThreshold()),
+			State:      FormatState(item.StateName, item.StateType),
 			StartDate:  formatStartDate(item.StartedAt),
 			Assignee:   item.Assignee,
 		})

@@ -41,7 +41,16 @@ export function renderResult(container, command, result, params) {
     : hasHTML ? reportFrame(result) : el('p', { class: 'muted', text: 'No output.' });
 
   const view = views[command.id];
-  panels.push({ key: 'result', label: 'Result', node: view ? view(result, command) : outputBody });
+  let viewNode = outputBody;
+  if (view) {
+    try {
+      viewNode = view(result, command);
+    } catch (e) {
+      console.error(e);
+      viewNode = el('div', { class: 'error-banner', text: `Could not draw this view (${e.message}); see the Output tab.` });
+    }
+  }
+  panels.push({ key: 'result', label: 'Result', node: viewNode });
   if (view) panels.push({ key: 'output', label: 'Output', node: outputBody });
   if (hasHTML && view) panels.push({ key: 'report', label: 'Report', node: reportFrame(result) });
   else if (hasHTML && result.text) panels.push({ key: 'report', label: 'Report', node: reportFrame(result) });

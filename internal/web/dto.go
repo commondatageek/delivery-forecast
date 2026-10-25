@@ -8,7 +8,9 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/commondatageek/delivery-forecast/aging"
 	"github.com/commondatageek/delivery-forecast/internal/app"
+	"github.com/commondatageek/delivery-forecast/internal/util"
 )
 
 // DTO rules: dates are "YYYY-MM-DD" strings, names are snake_case, NaN is
@@ -206,6 +208,78 @@ func newBacktestDTO(r *app.BacktestResult, today time.Time) backtestDTO {
 	}
 	for _, row := range r.Rows {
 		d.Rows = append(d.Rows, backtestRowDTO{date(row.Date), row.Completed, row.Remaining, num(row.Prob), row.Projected})
+	}
+	return d
+}
+
+type agingMetaDTO struct {
+	Label          string  `json:"label"`
+	Percentile     int     `json:"percentile"`
+	Threshold      float64 `json:"threshold"`
+	HasThreshold   bool    `json:"has_threshold"`
+	CompletedCount int     `json:"completed_count"`
+	SampleStart    string  `json:"sample_start"`
+	SampleEnd      string  `json:"sample_end"`
+}
+
+type agingItemDTO struct {
+	Identifier      string   `json:"identifier"`
+	Title           string   `json:"title"`
+	Assignee        string   `json:"assignee"`
+	ProjectName     string   `json:"project_name"`
+	State           string   `json:"state"`
+	StartedAt       string   `json:"started_at"`
+	AgeDays         float64  `json:"age_days"`
+	Percentile      int      `json:"percentile"`
+	PercentileLabel string   `json:"percentile_label"`
+	Multiplier      *float64 `json:"multiplier"`
+	MultiplierLabel string   `json:"multiplier_label"`
+	AgeClass        string   `json:"age_class"`
+}
+
+type agingDTO struct {
+	Report     json.RawMessage `json:"report"`
+	Meta       agingMetaDTO    `json:"meta"`
+	InProgress []agingItemDTO  `json:"in_progress"`
+	Completed  []agingItemDTO  `json:"completed"`
+	CycleTimes []float64       `json:"cycle_times"`
+}
+
+func newAgingItems(items []aging.Item, meta aging.Meta) []agingItemDTO {
+	out := make([]agingItemDTO, 0, len(items))
+	for _, it := range items {
+		d := agingItemDTO{
+			Identifier: it.Identifier, Title: it.Title, Assignee: it.Assignee, ProjectName: it.ProjectName,
+			State: aging.FormatState(it.StateName, it.StateType), StartedAt: date(it.StartedAt.Local()),
+			AgeDays: it.AgeDays, Percentile: it.Percentile,
+			PercentileLabel: strconv.Itoa(it.Percentile) + util.OrdinalSuffix(it.Percentile),
+			MultiplierLabel: aging.FormatMultiplier(it.Multiplier, meta),
+			AgeClass:        aging.AgeClass(it.Multiplier, meta.HasThreshold()),
+		}
+		if meta.HasThreshold() {
+			d.Multiplier = num(it.Multiplier)
+		}
+		out = append(out, d)
+	}
+	return out
+}
+
+func newAgingDTO(raw json.RawMessage, res *app.AgingResult, showCompleted bool) agingDTO {
+	m := res.Meta
+	d := agingDTO{
+		Report: raw,
+		Meta: agingMetaDTO{
+			Label: m.Label(), Percentile: m.Percentile, Threshold: m.Threshold, HasThreshold: m.HasThreshold(),
+			CompletedCount: m.CompletedCount, SampleStart: date(m.SampleStart), SampleEnd: date(m.SampleEnd),
+		},
+		InProgress: newAgingItems(res.InProgress, m),
+		CycleTimes: res.CycleTimes,
+	}
+	if d.CycleTimes == nil {
+		d.CycleTimes = []float64{}
+	}
+	if showCompleted {
+		d.Completed = newAgingItems(res.Completed, m)
 	}
 	return d
 }

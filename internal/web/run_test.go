@@ -368,3 +368,66 @@ func TestInlineHTML_UsesVendoredPlotly(t *testing.T) {
 		t.Error("the plain download should keep the CDN script tag")
 	}
 }
+
+func TestDTO_Aging(t *testing.T) {
+	s := fixedServer(t)
+	p := concurrentParams()["aging"]
+	p["percentile"] = "70"
+	_, evs := post(t, s, "aging", p)
+	res := evs[len(evs)-1]
+	if res.Type != "result" {
+		t.Fatalf("run failed: %+v", res.Error)
+	}
+	var dto struct {
+		Meta struct {
+			HasThreshold bool   `json:"has_threshold"`
+			Label        string `json:"label"`
+		} `json:"meta"`
+		InProgress []struct {
+			AgeClass        string   `json:"age_class"`
+			Multiplier      *float64 `json:"multiplier"`
+			MultiplierLabel string   `json:"multiplier_label"`
+			PercentileLabel string   `json:"percentile_label"`
+		} `json:"in_progress"`
+		Completed []struct {
+			AgeClass string `json:"age_class"`
+		} `json:"completed"`
+		CycleTimes []float64 `json:"cycle_times"`
+	}
+	if err := json.Unmarshal(res.Result, &dto); err != nil {
+		t.Fatal(err)
+	}
+	if len(dto.InProgress) == 0 || len(dto.Completed) == 0 || len(dto.CycleTimes) == 0 || dto.Meta.Label != "P70" {
+		t.Fatalf("dto = %+v", dto)
+	}
+	for _, it := range dto.InProgress {
+		switch it.AgeClass {
+		case "high", "medium", "normal":
+		default:
+			t.Errorf("age_class = %q", it.AgeClass)
+		}
+		want := "—"
+		if dto.Meta.HasThreshold && it.Multiplier != nil {
+			want = fmt.Sprintf("%.2fx", *it.Multiplier)
+		}
+		if it.MultiplierLabel != want {
+			t.Errorf("multiplier_label = %q, want %q", it.MultiplierLabel, want)
+		}
+		if !strings.HasSuffix(it.PercentileLabel, "th") && !strings.HasSuffix(it.PercentileLabel, "st") &&
+			!strings.HasSuffix(it.PercentileLabel, "nd") && !strings.HasSuffix(it.PercentileLabel, "rd") {
+			t.Errorf("percentile_label = %q", it.PercentileLabel)
+		}
+	}
+
+	// Without -show-completed, completed is null.
+	p2 := concurrentParams()["aging"]
+	delete(p2, "show-completed")
+	_, evs = post(t, s, "aging", p2)
+	var d2 struct {
+		Completed []any `json:"completed"`
+	}
+	json.Unmarshal(evs[len(evs)-1].Result, &d2)
+	if d2.Completed != nil {
+		t.Errorf("completed = %v, want null", d2.Completed)
+	}
+}

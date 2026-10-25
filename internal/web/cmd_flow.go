@@ -42,7 +42,7 @@ func prepareAging(rc *runContext, b any) (*runner, error) {
 		if err != nil {
 			return out, err
 		}
-		out.Result = reportDTO{Report: raw}
+		out.Result = newAgingDTO(raw, res, req.ShowCompleted)
 		out.Exports = map[string]export{
 			"text": textExport(func(w io.Writer) error {
 				return aging.RenderText(w, res.InProgress, res.Completed, req.ShowCompleted, res.Meta)

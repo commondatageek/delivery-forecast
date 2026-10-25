@@ -157,9 +157,9 @@ func TestAgeClassFromMultiplier(t *testing.T) {
 		{1.50, false, "normal"},
 	}
 	for _, tt := range tests {
-		got := ageClass(tt.mult, tt.hasThreshold)
+		got := AgeClass(tt.mult, tt.hasThreshold)
 		if got != tt.want {
-			t.Errorf("ageClass(%v, %v) = %q, want %q", tt.mult, tt.hasThreshold, got, tt.want)
+			t.Errorf("AgeClass(%v, %v) = %q, want %q", tt.mult, tt.hasThreshold, got, tt.want)
 		}
 	}
 }

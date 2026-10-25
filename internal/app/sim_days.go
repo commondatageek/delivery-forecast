@@ -60,6 +60,12 @@ func (r DaysRequest) Validate() error {
 	if _, err := r.mode(); err != nil {
 		return err
 	}
+	if err := r.validateWindow(); err != nil {
+		return err
+	}
+	if r.TargetStart.IsZero() {
+		return &FieldError{Fields: []string{"target-start-date"}, Msg: "target start date must be set"}
+	}
 	if len(r.Items) == 0 {
 		return &FieldError{Fields: []string{"items"}, Msg: "-items is required"}
 	}
@@ -78,7 +84,10 @@ func SimDays(req DaysRequest) (*DaysResult, error) {
 	if err := req.Validate(); err != nil {
 		return res, err
 	}
-	mode, _ := req.mode()
+	mode, err := req.mode()
+	if err != nil {
+		return res, err
+	}
 	confidences := req.Confidences
 	if len(confidences) == 0 {
 		confidences = DefaultConfidences()
@@ -86,7 +95,7 @@ func SimDays(req DaysRequest) (*DaysResult, error) {
 	res.TargetStart, res.Confidences = req.TargetStart, confidences
 
 	run, warns, err := preparePool(req.SimBase, mode, true)
-	res.Warnings = warns
+	res.Warnings, res.Run = warns, run
 	if err != nil {
 		return res, err
 	}
@@ -101,7 +110,6 @@ func SimDays(req DaysRequest) (*DaysResult, error) {
 		Workers:       req.Workers,
 		Seed:          req.Seed,
 	}
-	res.Run = run
 
 	if len(req.Items) > 1 {
 		cum := make([]int, len(req.Items))

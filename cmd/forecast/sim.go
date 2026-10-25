@@ -63,6 +63,7 @@ func cmdSimItems(args []string) error {
 	if err := loadSimInputs(&req.SimBase, inputPath, *stdinFormat, *sf.ExclusionsFile); err != nil {
 		return err
 	}
+	dataFile := fingerprintForManifest(*manifestFile, inputPath)
 	bar := newProgressBar(*sf.Simulations)
 	req.Progress = bar.update
 
@@ -72,7 +73,7 @@ func cmdSimItems(args []string) error {
 		return err
 	}
 
-	if err := writeSimManifest(*manifestFile, "sim items", cmd, sf, inputPath, res.Run, map[string]any{
+	if err := writeSimManifest(*manifestFile, "sim items", cmd, sf, dataFile, res.Run, map[string]any{
 		"effective_confidence_levels": res.Confidences,
 		"target_start_date":           res.TargetStart.Format("2006-01-02"),
 		"target_end_date":             res.TargetEnd.Format("2006-01-02"),
@@ -178,6 +179,7 @@ func cmdSimDays(args []string) error {
 	}
 	// Only the single-value path reports progress; the grouped trajectory runs
 	// several simulations back to back and leaves the bar off.
+	dataFile := fingerprintForManifest(*manifestFile, inputPath)
 	if len(items) == 1 {
 		bar := newProgressBar(*sf.Simulations)
 		req.Progress = bar.update
@@ -189,7 +191,7 @@ func cmdSimDays(args []string) error {
 		return err
 	}
 
-	if err := writeSimManifest(*manifestFile, "sim days", cmd, sf, inputPath, res.Run, map[string]any{
+	if err := writeSimManifest(*manifestFile, "sim days", cmd, sf, dataFile, res.Run, map[string]any{
 		"effective_confidence_levels": res.Confidences,
 		"target_start_date":           res.TargetStart.Format("2006-01-02"),
 	}); err != nil {
@@ -263,6 +265,7 @@ func cmdSimProbability(args []string) error {
 	if err := loadSimInputs(&req.SimBase, inputPath, *stdinFormat, *sf.ExclusionsFile); err != nil {
 		return err
 	}
+	dataFile := fingerprintForManifest(*manifestFile, inputPath)
 	bar := newProgressBar(*sf.Simulations)
 	req.Progress = bar.update
 
@@ -272,7 +275,7 @@ func cmdSimProbability(args []string) error {
 		return err
 	}
 
-	if err := writeSimManifest(*manifestFile, "sim probability", cmd, sf, inputPath, res.Run, map[string]any{
+	if err := writeSimManifest(*manifestFile, "sim probability", cmd, sf, dataFile, res.Run, map[string]any{
 		"target_start_date": res.TargetStart.Format("2006-01-02"),
 		"target_end_date":   res.TargetEnd.Format("2006-01-02"),
 		"effective_days":    res.EffectiveDays,

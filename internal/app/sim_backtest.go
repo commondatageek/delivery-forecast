@@ -66,8 +66,16 @@ func (r BacktestRequest) Validate() error {
 	if r.TargetEnd.IsZero() {
 		return &FieldError{Fields: []string{"target-end-date"}, Msg: "-target-end-date is required"}
 	}
-	_, err := r.mode()
-	return err
+	if _, err := r.mode(); err != nil {
+		return err
+	}
+	if err := r.validateWindow(); err != nil {
+		return err
+	}
+	if r.Today.IsZero() {
+		return &FieldError{Fields: []string{"today"}, Msg: "today must be set"}
+	}
+	return nil
 }
 
 // SimBacktest replays probability forecasts day by day for a project or
@@ -77,15 +85,17 @@ func SimBacktest(req BacktestRequest) (*BacktestResult, error) {
 	if err := req.Validate(); err != nil {
 		return res, err
 	}
-	mode, _ := req.mode()
-
-	// Build the fixed sample pool once; reused for every backtested day.
-	run, warns, err := preparePool(req.SimBase, mode, false)
-	res.Warnings = warns
+	mode, err := req.mode()
 	if err != nil {
 		return res, err
 	}
-	res.Run = run
+
+	// Build the fixed sample pool once; reused for every backtested day.
+	run, warns, err := preparePool(req.SimBase, mode, false)
+	res.Warnings, res.Run = warns, run
+	if err != nil {
+		return res, err
+	}
 
 	scoped := backtestIssueSet(req.Issues, req.Project, req.Milestone)
 	if len(scoped) == 0 {
@@ -136,6 +146,7 @@ func SimBacktest(req BacktestRequest) (*BacktestResult, error) {
 		Simulations:   req.Simulations,
 		Workers:       req.Workers,
 		Seed:          req.Seed,
+		Progress:      req.Progress,
 	})
 	for _, r := range rows {
 		res.Rows = append(res.Rows, BacktestRow{

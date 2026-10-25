@@ -11,6 +11,9 @@ import (
 // truncated to its local day first ("now" carries a time of day).
 // effectiveDays is the calendar-day count of [start, end].
 func resolveTargetWindow(start time.Time, days int, end time.Time) (resolvedEnd time.Time, effectiveDays int, err error) {
+	if start.IsZero() {
+		return time.Time{}, 0, &FieldError{Fields: []string{"target-start-date"}, Msg: "target start date must be set"}
+	}
 	if days != 0 && !end.IsZero() {
 		return time.Time{}, 0, &FieldError{Fields: []string{"days", "target-end-date"}, Msg: "-days and -target-end-date are mutually exclusive"}
 	}

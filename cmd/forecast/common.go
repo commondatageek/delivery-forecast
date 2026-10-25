@@ -114,7 +114,7 @@ func printWarnings(warnings []string) {
 // simManifest assembles the manifest parameter bag for a finished sim run,
 // filling in the pieces internal/app may not touch: flags, argv, build info,
 // the input file's fingerprint and the clock.
-func simManifest(subcommand string, cmd *flag.FlagSet, sf *simFlags, inputPath string, run app.SimRun, extra map[string]any) app.ManifestInputs {
+func simManifest(subcommand string, cmd *flag.FlagSet, sf *simFlags, inputFile app.DataFile, run app.SimRun, extra map[string]any) app.ManifestInputs {
 	wd, _ := os.Getwd()
 	return app.ManifestInputs{
 		Subcommand:       subcommand,
@@ -128,18 +128,29 @@ func simManifest(subcommand string, cmd *flag.FlagSet, sf *simFlags, inputPath s
 		Flags:            flagRecords(cmd),
 		Invocation:       app.Invocation{Subcommand: subcommand, Args: os.Args, WorkingDir: wd},
 		Binary:           buildInfo(),
-		DB:               source.Fingerprint(inputPath),
+		DB:               inputFile,
 		GeneratedAt:      nowFunc(),
 	}
 }
 
+// fingerprintForManifest fingerprints the input file as it was when loaded, so
+// the manifest describes the data the run actually used even if the file
+// changes during a long simulation. It skips the hash when no manifest is
+// wanted.
+func fingerprintForManifest(manifestPath, inputPath string) app.DataFile {
+	if manifestPath == "" {
+		return app.DataFile{}
+	}
+	return source.Fingerprint(inputPath)
+}
+
 // writeSimManifest writes the run manifest for a finished sim run to path. It
 // is a no-op (and skips the input file's hash) when path is empty.
-func writeSimManifest(path, subcommand string, cmd *flag.FlagSet, sf *simFlags, inputPath string, run app.SimRun, extra map[string]any) error {
+func writeSimManifest(path, subcommand string, cmd *flag.FlagSet, sf *simFlags, inputFile app.DataFile, run app.SimRun, extra map[string]any) error {
 	if path == "" {
 		return nil
 	}
-	return writeManifest(path, simManifest(subcommand, cmd, sf, inputPath, run, extra))
+	return writeManifest(path, simManifest(subcommand, cmd, sf, inputFile, run, extra))
 }
 
 // describeWindow renders a forecast horizon for report headers, e.g.

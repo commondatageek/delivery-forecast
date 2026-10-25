@@ -40,6 +40,9 @@ func (r ProbabilityRequest) Validate() error {
 	if _, err := r.mode(); err != nil {
 		return err
 	}
+	if err := r.validateWindow(); err != nil {
+		return err
+	}
 	_, _, err := resolveTargetWindow(r.TargetStart, r.Days, r.TargetEnd)
 	return err
 }
@@ -51,12 +54,18 @@ func SimProbability(req ProbabilityRequest) (*ProbabilityResult, error) {
 	if err := req.Validate(); err != nil {
 		return res, err
 	}
-	mode, _ := req.mode()
-	targetEnd, effectiveDays, _ := resolveTargetWindow(req.TargetStart, req.Days, req.TargetEnd)
+	mode, err := req.mode()
+	if err != nil {
+		return res, err
+	}
+	targetEnd, effectiveDays, err := resolveTargetWindow(req.TargetStart, req.Days, req.TargetEnd)
+	if err != nil {
+		return res, err
+	}
 	res.TargetStart, res.TargetEnd, res.EffectiveDays = req.TargetStart, targetEnd, effectiveDays
 
 	run, warns, err := preparePool(req.SimBase, mode, false)
-	res.Warnings = warns
+	res.Warnings, res.Run = warns, run
 	if err != nil {
 		return res, err
 	}
@@ -84,7 +93,6 @@ func SimProbability(req ProbabilityRequest) (*ProbabilityResult, error) {
 			}
 		}
 	}
-	res.Run = run
 	res.Distribution = dist
 	return res, nil
 }

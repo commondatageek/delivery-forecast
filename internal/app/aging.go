@@ -72,6 +72,9 @@ func (r AgingRequest) Validate() error {
 	if r.Percentile < 1 || r.Percentile > 100 {
 		return &FieldError{Fields: []string{"percentile"}, Msg: fmt.Sprintf("-percentile must be between 1 and 100, got %d", r.Percentile)}
 	}
+	if r.Today.IsZero() {
+		return &FieldError{Fields: []string{"today"}, Msg: "today must be set"}
+	}
 	if !r.SampleStart.Before(r.SampleEnd) {
 		return &FieldError{Fields: []string{"sample-start", "sample-end"}, Msg: "-sample-start must be before -sample-end"}
 	}

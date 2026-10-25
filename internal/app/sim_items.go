@@ -49,6 +49,9 @@ func (r ItemsRequest) Validate() error {
 	if _, err := r.mode(); err != nil {
 		return err
 	}
+	if err := r.validateWindow(); err != nil {
+		return err
+	}
 	if _, _, err := resolveTargetWindow(r.TargetStart, r.Days, r.TargetEnd); err != nil {
 		return err
 	}
@@ -61,8 +64,14 @@ func SimItems(req ItemsRequest) (*ItemsResult, error) {
 	if err := req.Validate(); err != nil {
 		return res, err
 	}
-	mode, _ := req.mode()
-	targetEnd, effectiveDays, _ := resolveTargetWindow(req.TargetStart, req.Days, req.TargetEnd)
+	mode, err := req.mode()
+	if err != nil {
+		return res, err
+	}
+	targetEnd, effectiveDays, err := resolveTargetWindow(req.TargetStart, req.Days, req.TargetEnd)
+	if err != nil {
+		return res, err
+	}
 	confidences := req.Confidences
 	if len(confidences) == 0 {
 		confidences = DefaultConfidences()
@@ -70,7 +79,7 @@ func SimItems(req ItemsRequest) (*ItemsResult, error) {
 	res.TargetStart, res.TargetEnd, res.EffectiveDays, res.Confidences = req.TargetStart, targetEnd, effectiveDays, confidences
 
 	run, warns, err := preparePool(req.SimBase, mode, false)
-	res.Warnings = warns
+	res.Warnings, res.Run = warns, run
 	if err != nil {
 		return res, err
 	}
@@ -90,7 +99,6 @@ func SimItems(req ItemsRequest) (*ItemsResult, error) {
 	for _, c := range confidences {
 		res.Rows = append(res.Rows, ItemsRow{Confidence: c, Items: simulate.ItemsAtConfidence(dist, float64(c))})
 	}
-	res.Run = run
 	res.Distribution = dist
 	return res, nil
 }

@@ -52,6 +52,15 @@ func (b SimBase) mode() (simulate.Mode, error) {
 	return mode, nil
 }
 
+// validateWindow rejects an unset sample window. An inverted window is left to
+// preparePool, which reports it as an empty pool.
+func (b SimBase) validateWindow() error {
+	if b.SampleStart.IsZero() || b.SampleEnd.IsZero() {
+		return &FieldError{Fields: []string{"sample-start", "sample-end"}, Msg: "sample window start and end must both be set"}
+	}
+	return nil
+}
+
 // completedForPool selects completed issues assigned to one of engineers (or
 // any assignee, if engineers is empty) whose completed_at falls in
 // [start, end) — start inclusive, end exclusive. Mirrors the old

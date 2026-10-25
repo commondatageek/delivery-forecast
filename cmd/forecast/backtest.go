@@ -13,27 +13,7 @@ import (
 
 	"github.com/commondatageek/delivery-forecast/internal/app"
 	"github.com/commondatageek/delivery-forecast/internal/util"
-	"github.com/commondatageek/delivery-forecast/issues"
-	"github.com/commondatageek/delivery-forecast/simulate"
 )
-
-// backtestIssueSet selects the fixed set of issues sim backtest replays
-// against: exact project match (required), exact milestone match (optional,
-// only within that project), excluding canceled issues — Issue.IsCanceled
-// also covers "duplicate" (D7), matching the old ProjectMilestoneIssues
-// query's `state_type NOT IN ('canceled', 'duplicate')`. No team filtering,
-// same as before.
-func backtestIssueSet(all []issues.Issue, project, milestone string) []issues.Issue {
-	scoped := issues.Filter{Project: project, Milestone: milestone}.Apply(all)
-	var out []issues.Issue
-	for _, it := range scoped {
-		if it.IsCanceled() {
-			continue
-		}
-		out = append(out, it)
-	}
-	return out
-}
 
 func cmdSimBacktest(args []string) error {
 	cmd := flag.NewFlagSet("sim backtest", flag.ExitOnError)
@@ -58,20 +38,14 @@ func cmdSimBacktest(args []string) error {
 	if err != nil {
 		return err
 	}
-	if *project == "" {
-		return fmt.Errorf("-project is required")
-	}
-	if *targetEndStr == "" {
-		return fmt.Errorf("-target-end-date is required")
-	}
-	if *format != "text" && *format != "csv" {
-		return fmt.Errorf(`-format must be "text" or "csv"`)
-	}
 
 	now := nowFunc()
-	targetDate, err := util.ParseFlexibleDate(*targetEndStr, now)
-	if err != nil {
-		return fmt.Errorf("invalid -target-end-date: %w", err)
+	var targetDate time.Time
+	if *targetEndStr != "" {
+		targetDate, err = util.ParseFlexibleDate(*targetEndStr, now)
+		if err != nil {
+			return fmt.Errorf("invalid -target-end-date: %w", err)
+		}
 	}
 
 	sampleStartDate, err := util.ParseFlexibleStartDate(*sf.SampleStart, now)
@@ -83,86 +57,54 @@ func cmdSimBacktest(args []string) error {
 		return fmt.Errorf("invalid -sample-end: %w", err)
 	}
 
-	mode, err := simulate.ResolveMode(isFlagSet(cmd, "engineers"), *sf.WholeTeam)
-	if err != nil {
-		return err
-	}
-
-	// Load the issue set once: it feeds both the sample pool and the fixed
-	// backtested set below.
-	base := newSimBase(cmd, sf, sampleStartDate, sampleEndDate, now)
-	if err := loadSimInputs(&base, inputPath, *stdinFormat, *sf.ExclusionsFile); err != nil {
-		return err
-	}
-	all := base.Issues
-
-	// Build the fixed sample pool once; reused for every backtested day.
-	run, warns, err := app.PreparePoolForBacktest(base)
-	printWarnings(warns)
-	if err != nil {
-		return err
-	}
-	pd := run
-	seed := base.Seed
-
-	scoped := backtestIssueSet(all, *project, *milestone)
-	if len(scoped) == 0 {
-		if *milestone != "" {
-			return fmt.Errorf("no issues found for project %q milestone %q — check spelling", *project, *milestone)
-		}
-		return fmt.Errorf("no issues found for project %q — check spelling", *project)
-	}
-
-	btItems := app.IssuesToBacktestItems(scoped)
-
-	// Resolve start date: explicit flag wins; otherwise infer from the earliest
-	// started_at across the issue set.
-	var startDate time.Time
+	var replayStart time.Time
 	if *replayStartStr != "" {
-		startDate, err = util.ParseFlexibleStartDate(*replayStartStr, now)
+		replayStart, err = util.ParseFlexibleStartDate(*replayStartStr, now)
 		if err != nil {
 			return fmt.Errorf("invalid -replay-start-date: %w", err)
 		}
-	} else {
-		startDate = simulate.EarliestStartedAt(btItems)
-		if startDate.IsZero() {
-			return fmt.Errorf("no started_at found in issue set; provide -replay-start-date explicitly")
-		}
-		startDate = util.LocalDay(startDate)
 	}
 
-	if !targetDate.After(startDate) {
-		return fmt.Errorf("-target-end-date must be after -replay-start-date (inferred: %s)", startDate.Format("2006-01-02"))
+	req := app.BacktestRequest{
+		SimBase:     newSimBase(cmd, sf, sampleStartDate, sampleEndDate, now),
+		Project:     *project,
+		Milestone:   *milestone,
+		ReplayStart: replayStart,
+		TargetEnd:   targetDate,
+		Today:       util.LocalDay(now),
+	}
+	if err := req.Validate(); err != nil {
+		return err
+	}
+	if *format != "text" && *format != "csv" {
+		return fmt.Errorf(`-format must be "text" or "csv"`)
 	}
 
-	rows := simulate.RunBacktest(pd.Pool, btItems, startDate, targetDate, simulate.Params{
-		Mode:          mode,
-		Engineers:     sf.Engineers.Count(),
-		EngineerNames: sf.Engineers.Names(),
-		Calendar:      simulate.NewCalendar(pd.Exclusions, startDate),
-		Simulations:   *sf.Simulations,
-		Workers:       *sf.Goroutines,
-		Seed:          seed,
-	})
+	// Load the issue set once: it feeds both the sample pool and the fixed
+	// backtested set.
+	if err := loadSimInputs(&req.SimBase, inputPath, *stdinFormat, *sf.ExclusionsFile); err != nil {
+		return err
+	}
 
-	today := util.LocalDay(now)
+	res, err := app.SimBacktest(req)
+	printWarnings(res.Warnings)
+	if err != nil {
+		return err
+	}
 
 	switch *format {
 	case "csv":
-		return printBacktestCSV(rows, today)
+		return printBacktestCSV(res)
 	default:
-		label := simulate.ModeLabel(mode, sf.Engineers.Count(), sf.Engineers.Names())
-		scope := *project
-		if *milestone != "" {
-			scope += " / " + *milestone
-		}
-		printBacktestText(rows, scope, label, len(scoped), startDate, sampleStartDate, sampleEndDate, today)
+		printBacktestText(res, sampleStartDate, sampleEndDate, req.Today)
 	}
 	return nil
 }
 
-func printBacktestText(rows []simulate.BacktestRow, scope, label string, total int, startDate, sampleStart, sampleEnd, today time.Time) {
-	fmt.Printf("Backtest: %s (%d issues, %s)\n", scope, total, label)
+func printBacktestText(res *app.BacktestResult, sampleStart, sampleEnd, today time.Time) {
+	rows := res.Rows
+	startDate := res.ReplayStart
+	fmt.Printf("Backtest: %s (%d issues, %s)\n", res.Scope, res.IssueCount, res.Run.ModeLabel)
 	fmt.Printf("Start date: %s  Sample window: %s – %s\n\n",
 		startDate.Format("2006-01-02"), sampleStart.Format("2006-01-02"), sampleEnd.Format("2006-01-02"))
 
@@ -184,7 +126,7 @@ func printBacktestText(rows []simulate.BacktestRow, scope, label string, total i
 		today.Format("2006-01-02"))
 	dividerIdx := -1
 	for i, r := range rows {
-		if r.Date.After(today) {
+		if r.Projected {
 			dividerIdx = i + 1 // +1 to account for the header line
 			break
 		}
@@ -195,18 +137,18 @@ func printBacktestText(rows []simulate.BacktestRow, scope, label string, total i
 	fmt.Println(strings.Join(lines, "\n"))
 }
 
-func printBacktestCSV(rows []simulate.BacktestRow, today time.Time) error {
+func printBacktestCSV(res *app.BacktestResult) error {
 	w := csv.NewWriter(os.Stdout)
 	if err := w.Write([]string{"date", "completed", "remaining", "probability", "projected"}); err != nil {
 		return err
 	}
-	for _, r := range rows {
+	for _, r := range res.Rows {
 		if err := w.Write([]string{
 			r.Date.Format("2006-01-02"),
 			strconv.Itoa(r.Completed),
 			strconv.Itoa(r.Remaining),
 			strconv.FormatFloat(r.Prob, 'f', 2, 64),
-			strconv.FormatBool(r.Date.After(today)),
+			strconv.FormatBool(r.Projected),
 		}); err != nil {
 			return err
 		}

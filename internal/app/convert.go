@@ -128,8 +128,3 @@ func ToCountsIssues(items []issues.Issue) []counts.Issue { return toCountsIssues
 func IssuesToCompletions(items []issues.Issue) []simulate.Completion {
 	return issuesToCompletions(items)
 }
-
-// IssuesToBacktestItems is a temporary export of issuesToBacktestItems.
-func IssuesToBacktestItems(items []issues.Issue) []simulate.BacktestItem {
-	return issuesToBacktestItems(items)
-}

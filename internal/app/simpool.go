@@ -158,14 +158,3 @@ func preparePool(b SimBase, mode simulate.Mode, requireProgress bool) (SimRun, [
 	}
 	return run, warnings, nil
 }
-
-// PreparePoolForBacktest is a temporary export of preparePool for
-// cmd/forecast's backtest, which moves into this package in Phase 3.
-// Removed in Phase 3.
-func PreparePoolForBacktest(b SimBase) (SimRun, []string, error) {
-	mode, err := b.mode()
-	if err != nil {
-		return SimRun{}, nil, err
-	}
-	return preparePool(b, mode, false)
-}

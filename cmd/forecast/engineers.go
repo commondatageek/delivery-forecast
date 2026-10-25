@@ -1,9 +1,10 @@
 package main
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/commondatageek/delivery-forecast/simulate"
 )
 
 // engineerSpec is the flag.Value behind -engineers: either a positive count
@@ -28,38 +29,11 @@ func (e *engineerSpec) String() string {
 }
 
 func (e *engineerSpec) Set(v string) error {
-	v = strings.TrimSpace(v)
-	if v == "" {
-		return fmt.Errorf("-engineers: empty value")
+	count, names, err := simulate.ParseEngineers(v)
+	if err != nil {
+		return err
 	}
-	if n, err := strconv.Atoi(v); err == nil {
-		if n <= 0 {
-			return fmt.Errorf("-engineers: count must be positive, got %d", n)
-		}
-		e.count, e.names = n, nil
-		return nil
-	}
-
-	var names []string
-	seen := make(map[string]bool)
-	for part := range strings.SplitSeq(v, ",") {
-		part = strings.TrimSpace(part)
-		if part == "" {
-			continue
-		}
-		if isAllDigits(part) {
-			return fmt.Errorf("-engineers: %q looks like a count inside a name list", part)
-		}
-		if seen[part] {
-			return fmt.Errorf("-engineers: duplicate name %q", part)
-		}
-		seen[part] = true
-		names = append(names, part)
-	}
-	if len(names) == 0 {
-		return fmt.Errorf("-engineers: no names in %q", v)
-	}
-	e.count, e.names = len(names), names
+	e.count, e.names = count, names
 	return nil
 }
 
@@ -68,12 +42,3 @@ func (e *engineerSpec) Count() int { return e.count }
 
 // Names returns the named engineers, or nil when -engineers was a count.
 func (e *engineerSpec) Names() []string { return e.names }
-
-func isAllDigits(s string) bool {
-	for _, r := range s {
-		if r < '0' || r > '9' {
-			return false
-		}
-	}
-	return s != ""
-}

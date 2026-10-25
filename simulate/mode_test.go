@@ -1,6 +1,10 @@
 package simulate
 
-import "testing"
+import (
+	"reflect"
+	"strings"
+	"testing"
+)
 
 func TestResolveMode(t *testing.T) {
 	cases := []struct {
@@ -97,6 +101,43 @@ func TestValidatePool(t *testing.T) {
 			}
 			if !c.wantErr && err != nil {
 				t.Errorf("ValidatePool = %v, want nil", err)
+			}
+		})
+	}
+}
+
+func TestParseEngineers(t *testing.T) {
+	cases := []struct {
+		in        string
+		wantErr   string // "" = accepted
+		wantCount int
+		wantNames []string
+	}{
+		{" 3 ", "", 3, nil},
+		{"alice, bob ,carol", "", 3, []string{"alice", "bob", "carol"}},
+		{"alice,,", "", 1, []string{"alice"}},
+		{"", "empty value", 0, nil},
+		{"   ", "empty value", 0, nil},
+		{"0", "must be positive", 0, nil},
+		{"-2", "must be positive", 0, nil},
+		{",,", "no names", 0, nil},
+		{"alice,3", "looks like a count", 0, nil},
+		{"alice,alice", "duplicate name", 0, nil},
+	}
+	for _, c := range cases {
+		t.Run(c.in, func(t *testing.T) {
+			count, names, err := ParseEngineers(c.in)
+			if c.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), c.wantErr) {
+					t.Fatalf("ParseEngineers(%q) error = %v, want one containing %q", c.in, err, c.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("ParseEngineers(%q): %v", c.in, err)
+			}
+			if count != c.wantCount || !reflect.DeepEqual(names, c.wantNames) {
+				t.Errorf("got (%d, %v), want (%d, %v)", count, names, c.wantCount, c.wantNames)
 			}
 		})
 	}

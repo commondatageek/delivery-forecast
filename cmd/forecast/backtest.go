@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"encoding/csv"
 	"flag"
 	"fmt"
@@ -91,21 +90,20 @@ func cmdSimBacktest(args []string) error {
 
 	// Load the issue set once: it feeds both the sample pool and the fixed
 	// backtested set below.
-	all, err := loadIssues(context.Background(), inputPath, *stdinFormat)
-	if err != nil {
-		return fmt.Errorf("load issues: %w", err)
+	base := newSimBase(cmd, sf, sampleStartDate, sampleEndDate, now)
+	if err := loadSimInputs(&base, inputPath, *stdinFormat, *sf.ExclusionsFile); err != nil {
+		return err
 	}
+	all := base.Issues
 
 	// Build the fixed sample pool once; reused for every backtested day.
-	pd, err := loadPool(all, *sf.ExclusionsFile, sf.TypicalEngineers, sampleStartDate, sampleEndDate, *sf.WholeTeam)
+	run, warns, err := app.PreparePoolForBacktest(base)
+	printWarnings(warns)
 	if err != nil {
 		return err
 	}
-	warnExclusionMismatches(pd.Exclusions, pd, sf)
-	if err := simulate.ValidatePool(pd.Pool, mode, false); err != nil {
-		return err
-	}
-	seed := resolveSeed(cmd, *sf.RandomSeed, now)
+	pd := run
+	seed := base.Seed
 
 	scoped := backtestIssueSet(all, *project, *milestone)
 	if len(scoped) == 0 {

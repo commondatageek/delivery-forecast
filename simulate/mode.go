@@ -2,6 +2,7 @@ package simulate
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -78,4 +79,51 @@ func ValidatePool(pool *SamplePool, mode Mode, requireProgress bool) error {
 		}
 	}
 	return nil
+}
+
+// ParseEngineers parses an -engineers value: a positive integer is a count
+// of anonymous equivalent engineers; anything else is a comma-separated list
+// of unique names (count = len(names)). It is the parsing rule formerly
+// inside cmd/forecast's engineerSpec.Set, moved verbatim with its error
+// messages.
+func ParseEngineers(v string) (count int, names []string, err error) {
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return 0, nil, fmt.Errorf("-engineers: empty value")
+	}
+	if n, err := strconv.Atoi(v); err == nil {
+		if n <= 0 {
+			return 0, nil, fmt.Errorf("-engineers: count must be positive, got %d", n)
+		}
+		return n, nil, nil
+	}
+
+	seen := make(map[string]bool)
+	for part := range strings.SplitSeq(v, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		if isAllDigits(part) {
+			return 0, nil, fmt.Errorf("-engineers: %q looks like a count inside a name list", part)
+		}
+		if seen[part] {
+			return 0, nil, fmt.Errorf("-engineers: duplicate name %q", part)
+		}
+		seen[part] = true
+		names = append(names, part)
+	}
+	if len(names) == 0 {
+		return 0, nil, fmt.Errorf("-engineers: no names in %q", v)
+	}
+	return len(names), names, nil
+}
+
+func isAllDigits(s string) bool {
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return s != ""
 }

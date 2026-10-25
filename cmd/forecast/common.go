@@ -9,8 +9,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/commondatageek/delivery-forecast/internal/app"
 	"github.com/commondatageek/delivery-forecast/internal/linear"
 	"github.com/commondatageek/delivery-forecast/internal/logx"
+	"github.com/commondatageek/delivery-forecast/internal/source"
 	"github.com/commondatageek/delivery-forecast/internal/util"
 	"github.com/commondatageek/delivery-forecast/issues"
 	"github.com/commondatageek/delivery-forecast/simulate"
@@ -66,16 +68,6 @@ type poolData struct {
 	Skipped        int
 }
 
-// issuesToCompletions converts issues.Issue records to simulate.Completion.
-// No filtering is performed; call simulate.FilterInvalid on the result.
-func issuesToCompletions(items []issues.Issue) []simulate.Completion {
-	records := make([]simulate.Completion, len(items))
-	for i, it := range items {
-		records[i] = simulate.Completion{Engineer: it.Assignee, CompletedAt: it.CompletedAt}
-	}
-	return records
-}
-
 // completedForPool selects completed issues assigned to one of engineers (or
 // any assignee, if engineers is empty) whose completed_at falls in
 // [start, end) — start inclusive, end exclusive. Mirrors the old
@@ -118,20 +110,6 @@ func warnUnmatchedTypicalEngineers(typicalEngineers []string, seen map[string]bo
 			logx.Warnf("-typical-engineers engineer %q not found in data", name)
 		}
 	}
-}
-
-// loadExclusions reads and parses an exclusions JSON file. An empty path means
-// no exclusions were requested and yields an empty Exclusions; a path that was
-// given but cannot be read is an error, never silently treated as empty.
-func loadExclusions(path string) (simulate.Exclusions, error) {
-	if path == "" {
-		return simulate.Exclusions{}, nil
-	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return simulate.Exclusions{}, fmt.Errorf("reading exclusions file %q: %w", path, err)
-	}
-	return simulate.ParseExclusions(data)
 }
 
 // resolveTargetWindow resolves a forecast horizon from -target-start-date and
@@ -222,12 +200,12 @@ func loadPool(all []issues.Issue, exclusionsFile string, typicalEngineers []stri
 	}
 	warnUnmatchedTypicalEngineers(typicalEngineers, engineerSeen)
 
-	exc, err := loadExclusions(exclusionsFile)
+	exc, err := source.LoadExclusions(exclusionsFile)
 	if err != nil {
 		return poolData{}, err
 	}
 
-	records, skipped := simulate.FilterInvalid(issuesToCompletions(completed))
+	records, skipped := simulate.FilterInvalid(app.IssuesToCompletions(completed))
 	if skipped > 0 {
 		logx.Warnf("skipped %d completed issue(s) with no assignee or completion date", skipped)
 	}
@@ -285,20 +263,6 @@ func requireDB(db *string) error {
 		return fmt.Errorf("-db is required")
 	}
 	return nil
-}
-
-// blendingTeamsWarning returns the "blending across all teams" warning line, or
-// "" when no warning is warranted: either the user scoped explicitly (teams
-// non-empty) or the store holds at most one team (allTeams). Kept pure (no I/O)
-// so callers that already know the full team set — like count — can reuse the
-// exact message without a second DistinctTeamKeys query, and so it is unit
-// testable.
-func blendingTeamsWarning(teams linear.TeamKeyList, allTeams []string) string {
-	if len(teams) > 0 || len(allTeams) <= 1 {
-		return ""
-	}
-	return fmt.Sprintf("no -teams filter given; blending data across all %d teams (%s)",
-		len(allTeams), strings.Join(allTeams, ", "))
 }
 
 // addConfigFlag registers the -config flag used by every subcommand.

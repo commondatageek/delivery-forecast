@@ -9,28 +9,11 @@ import (
 	"time"
 
 	"github.com/commondatageek/delivery-forecast/aging"
+	"github.com/commondatageek/delivery-forecast/internal/app"
 	"github.com/commondatageek/delivery-forecast/internal/logx"
 	"github.com/commondatageek/delivery-forecast/internal/util"
 	"github.com/commondatageek/delivery-forecast/issues"
 )
-
-// toAgingIssues converts issues.Issue records to aging.Issue.
-func toAgingIssues(items []issues.Issue) []aging.Issue {
-	out := make([]aging.Issue, len(items))
-	for i, it := range items {
-		out[i] = aging.Issue{
-			Identifier:  it.Identifier,
-			Title:       it.Title,
-			Assignee:    it.Assignee,
-			ProjectName: it.ProjectName,
-			StateType:   it.StateType,
-			StateName:   it.StateName,
-			StartedAt:   it.StartedAt,
-			CompletedAt: it.CompletedAt,
-		}
-	}
-	return out
-}
 
 // completedBetween selects items completed in [start, end) (start inclusive,
 // end exclusive), using Issue.IsCompleted rather than a raw state_type
@@ -133,13 +116,13 @@ func cmdAging(args []string) error {
 		return fmt.Errorf("load issues: %w", err)
 	}
 
-	if msg := blendingTeamsWarning(opts.Teams, distinctTeamKeys(raw)); msg != "" {
+	if msg := app.BlendingTeamsWarning(opts.Teams, app.DistinctTeamKeys(raw)); msg != "" {
 		logx.Warnf("%s", msg)
 	}
 
 	filtered := issues.Filter{Teams: opts.Teams}.Apply(raw)
 
-	agingCompleted := toAgingIssues(completedBetween(filtered, opts.SampleStart, opts.SampleEnd))
+	agingCompleted := app.ToAgingIssues(completedBetween(filtered, opts.SampleStart, opts.SampleEnd))
 
 	cycleTimes := aging.CycleTimes(agingCompleted, opts.MinCycleTime)
 	sort.Float64s(cycleTimes)
@@ -154,7 +137,7 @@ func cmdAging(args []string) error {
 		CompletedCount: len(cycleTimes),
 	}
 
-	inProgressItems := aging.InProgressItems(toAgingIssues(inProgress(filtered)), today)
+	inProgressItems := aging.InProgressItems(app.ToAgingIssues(inProgress(filtered)), today)
 	aging.RankItems(inProgressItems, cycleTimes, threshold)
 
 	sort.Slice(inProgressItems, func(i, j int) bool {

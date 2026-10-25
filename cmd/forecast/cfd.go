@@ -7,25 +7,11 @@ import (
 	"os"
 
 	"github.com/commondatageek/delivery-forecast/cfd"
+	"github.com/commondatageek/delivery-forecast/internal/app"
 	"github.com/commondatageek/delivery-forecast/internal/logx"
 	"github.com/commondatageek/delivery-forecast/internal/util"
 	"github.com/commondatageek/delivery-forecast/issues"
 )
-
-// toCFDIssues converts issues.Issue records to cfd.Issue.
-func toCFDIssues(items []issues.Issue) []cfd.Issue {
-	out := make([]cfd.Issue, len(items))
-	for i, it := range items {
-		out[i] = cfd.Issue{
-			CreatedAt:   it.CreatedAt,
-			StartedAt:   it.StartedAt,
-			CompletedAt: it.CompletedAt,
-			CanceledAt:  it.CanceledAt,
-			StateType:   it.StateType,
-		}
-	}
-	return out
-}
 
 func cmdCFD(args []string) error {
 	cmd := flag.NewFlagSet("cfd", flag.ExitOnError)
@@ -72,7 +58,7 @@ func cmdCFD(args []string) error {
 		return fmt.Errorf("load issues: %w", err)
 	}
 
-	if msg := blendingTeamsWarning(opts.Teams, distinctTeamKeys(raw)); msg != "" {
+	if msg := app.BlendingTeamsWarning(opts.Teams, app.DistinctTeamKeys(raw)); msg != "" {
 		logx.Warnf("%s", msg)
 	}
 
@@ -83,7 +69,7 @@ func cmdCFD(args []string) error {
 
 	var normalized []cfd.NormalizedIssue
 	skipped := 0
-	for _, r := range toCFDIssues(filtered) {
+	for _, r := range app.ToCFDIssues(filtered) {
 		ni, ok := cfd.Normalize(r)
 		if !ok {
 			skipped++

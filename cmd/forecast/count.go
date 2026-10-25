@@ -7,41 +7,11 @@ import (
 	"os"
 
 	"github.com/commondatageek/delivery-forecast/counts"
+	"github.com/commondatageek/delivery-forecast/internal/app"
 	"github.com/commondatageek/delivery-forecast/internal/logx"
 	"github.com/commondatageek/delivery-forecast/internal/util"
 	"github.com/commondatageek/delivery-forecast/issues"
 )
-
-// toCountsIssues converts issues.Issue records to counts.Issue.
-//
-// counts.Aggregate decides "terminal" from StateType alone, so a file source
-// that carries completed_at/canceled_at but no state_type would otherwise
-// count every finished issue as outstanding. Terminal issues are therefore
-// given a terminal StateType here, via issues.Issue.IsCompleted/IsCanceled —
-// the same timestamp-first rule every other command uses.
-func toCountsIssues(items []issues.Issue) []counts.Issue {
-	out := make([]counts.Issue, len(items))
-	for i, it := range items {
-		stateType := it.StateType
-		switch {
-		case stateType == "completed" || stateType == "canceled" || stateType == "duplicate":
-			// Already terminal; keep it as-is (preserves duplicate).
-		case it.IsCompleted():
-			stateType = "completed"
-		case it.IsCanceled():
-			stateType = "canceled"
-		}
-		out[i] = counts.Issue{
-			TeamKey:              it.TeamKey,
-			TeamName:             it.TeamName,
-			ProjectName:          it.ProjectName,
-			ProjectMilestoneName: it.ProjectMilestoneName,
-			StateType:            stateType,
-			UpdatedAt:            it.UpdatedAt,
-		}
-	}
-	return out
-}
 
 func cmdCount(args []string) error {
 	defaultSince := nowFunc().AddDate(0, -3, 0).Format("2006-01-02")
@@ -94,16 +64,16 @@ func loadCountProjects(path, format string, opts counts.Options) ([]counts.Proje
 		return nil, 0, false, fmt.Errorf("load issues: %w", err)
 	}
 
-	allTeams := distinctTeamKeys(raw)
+	allTeams := app.DistinctTeamKeys(raw)
 	multiTeam := len(allTeams) > 1
 
-	if msg := blendingTeamsWarning(opts.Teams, allTeams); msg != "" {
+	if msg := app.BlendingTeamsWarning(opts.Teams, allTeams); msg != "" {
 		logx.Warnf("%s", msg)
 	}
 
 	filtered := issues.Filter{Teams: opts.Teams}.Apply(raw)
 
-	pmCounts, activity := counts.Aggregate(toCountsIssues(filtered))
+	pmCounts, activity := counts.Aggregate(app.ToCountsIssues(filtered))
 	if len(pmCounts) == 0 {
 		logx.Warnf("no outstanding (non-terminal) issues found for the given filters")
 	}

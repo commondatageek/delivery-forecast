@@ -7,8 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/commondatageek/delivery-forecast/issues"
 )
 
 func TestResolveInput(t *testing.T) {
@@ -81,22 +79,5 @@ func TestLoadIssues_Stdin(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "-stdin-format") {
 		t.Errorf("error %q should name the -stdin-format flag, not an internal API", err)
-	}
-}
-
-func TestDistinctTeamKeys(t *testing.T) {
-	items := []issues.Issue{
-		{TeamKey: "ENG"}, {TeamKey: "DATA"}, {TeamKey: "ENG"}, {TeamKey: ""},
-	}
-	got := distinctTeamKeys(items)
-	want := []string{"DATA", "ENG"}
-	if len(got) != len(want) {
-		t.Fatalf("got %v, want %v", got, want)
-	}
-	for i := range want {
-		if got[i] != want[i] {
-			t.Errorf("got %v, want %v", got, want)
-			break
-		}
 	}
 }

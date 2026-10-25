@@ -115,16 +115,3 @@ E-3,ENG,Foo,,2025-01-07,2025-01-07
 		t.Errorf("want TOTAL 1 (only E-1 is outstanding):\n%s", out)
 	}
 }
-
-func TestToCountsIssues_KeepsExplicitTerminalStateType(t *testing.T) {
-	got := toCountsIssues([]issues.Issue{
-		{Identifier: "E-1", StateType: "duplicate", CanceledAt: day(2025, 1, 1)},
-		{Identifier: "E-2", StateType: "started", CompletedAt: day(2025, 1, 2)},
-		{Identifier: "E-3", StateType: "backlog"},
-	})
-	for i, want := range []string{"duplicate", "completed", "backlog"} {
-		if got[i].StateType != want {
-			t.Errorf("item %d: StateType = %q, want %q", i, got[i].StateType, want)
-		}
-	}
-}

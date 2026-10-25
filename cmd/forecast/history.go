@@ -8,24 +8,11 @@ import (
 	"time"
 
 	"github.com/commondatageek/delivery-forecast/history"
+	"github.com/commondatageek/delivery-forecast/internal/app"
 	"github.com/commondatageek/delivery-forecast/internal/logx"
 	"github.com/commondatageek/delivery-forecast/internal/util"
 	"github.com/commondatageek/delivery-forecast/issues"
 )
-
-// toHistoryIssues converts issues.Issue records to history.Issue.
-func toHistoryIssues(items []issues.Issue) []history.Issue {
-	out := make([]history.Issue, len(items))
-	for i, it := range items {
-		out[i] = history.Issue{
-			CreatedAt:   it.CreatedAt,
-			StartedAt:   it.StartedAt,
-			CompletedAt: it.CompletedAt,
-			CanceledAt:  it.CanceledAt,
-		}
-	}
-	return out
-}
 
 func cmdHistory(args []string) error {
 	cmd := flag.NewFlagSet("history", flag.ExitOnError)
@@ -75,7 +62,7 @@ func cmdHistory(args []string) error {
 		}
 	}
 
-	if msg := blendingTeamsWarning(*teams, distinctTeamKeys(filtered)); msg != "" {
+	if msg := app.BlendingTeamsWarning(*teams, app.DistinctTeamKeys(filtered)); msg != "" {
 		logx.Warnf("%s", msg)
 	}
 
@@ -85,7 +72,7 @@ func cmdHistory(args []string) error {
 		return fmt.Errorf("invalid -end %q: %w", *endStr, err)
 	}
 
-	historyIssues := toHistoryIssues(filtered)
+	historyIssues := app.ToHistoryIssues(filtered)
 
 	var startDate time.Time
 	if *startStr != "" {

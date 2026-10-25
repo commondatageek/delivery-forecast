@@ -12,23 +12,11 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/commondatageek/delivery-forecast/internal/app"
 	"github.com/commondatageek/delivery-forecast/internal/util"
 	"github.com/commondatageek/delivery-forecast/issues"
 	"github.com/commondatageek/delivery-forecast/simulate"
 )
-
-// issuesToBacktestItems converts issues.Issue records to simulate.BacktestItem.
-func issuesToBacktestItems(items []issues.Issue) []simulate.BacktestItem {
-	out := make([]simulate.BacktestItem, len(items))
-	for i, it := range items {
-		out[i] = simulate.BacktestItem{
-			CreatedAt:   it.CreatedAt,
-			StartedAt:   it.StartedAt,
-			CompletedAt: it.CompletedAt,
-		}
-	}
-	return out
-}
 
 // backtestIssueSet selects the fixed set of issues sim backtest replays
 // against: exact project match (required), exact milestone match (optional,
@@ -127,7 +115,7 @@ func cmdSimBacktest(args []string) error {
 		return fmt.Errorf("no issues found for project %q — check spelling", *project)
 	}
 
-	btItems := issuesToBacktestItems(scoped)
+	btItems := app.IssuesToBacktestItems(scoped)
 
 	// Resolve start date: explicit flag wins; otherwise infer from the earliest
 	// started_at across the issue set.

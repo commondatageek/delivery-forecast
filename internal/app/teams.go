@@ -31,7 +31,7 @@ func DistinctTeamKeys(items []issues.Issue) []string {
 // so callers that already know the full team set — like count — can reuse the
 // exact message without a second DistinctTeamKeys query, and so it is unit
 // testable. teams is []string rather than linear.TeamKeyList because
-// internal/app must not import internal/linear; call sites pass a TeamKeyList
+// this package must not import the linear package; call sites pass a TeamKeyList
 // unchanged since its underlying type is []string.
 func BlendingTeamsWarning(teams []string, allTeams []string) string {
 	if len(teams) > 0 || len(allTeams) <= 1 {

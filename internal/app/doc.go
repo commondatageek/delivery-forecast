@@ -6,12 +6,13 @@
 // package's input structs, defaults, validation, result tables and warnings —
 // lives here so every adapter behaves identically.
 //
-// Purity. This package does no IO: it never reads files, touches os.Stdout,
-// os.Stderr or os.Args, logs, or calls time.Now. It must not import
-// internal/source, internal/sqlite, internal/linear, internal/logx, flag or
-// os. Loading issues and exclusions is internal/source's job; the caller
-// passes the loaded []issues.Issue in, so a long-lived server can load once
-// and call app many times against the same slice.
+// Purity. This package does no IO: it never reads files, writes to the
+// standard streams, inspects the process arguments, logs, or reads the clock.
+// It must not import the sibling IO packages (source, sqlite, linear, logx),
+// the flag package, or os. Loading issues and exclusions is the source
+// package's job; the caller passes the loaded []issues.Issue in, so a
+// long-lived server can load once and call app many times against the same
+// slice.
 //
 // Requests carry resolved, typed values. Dates are time.Time (parsing
 // "-3 months" or "tomorrow" is the adapter's job), the seed is concrete, and

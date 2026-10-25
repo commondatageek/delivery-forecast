@@ -95,7 +95,7 @@ func cmdSimItems(args []string) error {
 // printTrajectoryReport prints the grouped trajectory report for `sim days
 // -items g1,g2,...`: one row per group plus a Total row, with per-confidence
 // Days/Date columns. All thresholds are simulated with the same seed (see
-// simulate.ComputeTrajectoryTable) so the report's invariants hold.
+// the trajectory table in package simulate) so the report's invariants hold.
 func printTrajectoryReport(res *app.DaysResult) {
 	fmt.Printf("%s, starting %s -> grouped trajectory\n\n", res.Run.ModeLabel, res.TargetStart.Format("2006-01-02"))
 

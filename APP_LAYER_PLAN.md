@@ -1,6 +1,23 @@
 # Implementation plan: extract business logic out of `cmd/forecast`
 
-Status: **not started.**
+Status: **done.** All seven phases (0–6) are implemented, one `jj` commit each
+on the `app-layer-extraction` bookmark. The golden tests from Phase 0 pass
+unchanged against the final tree.
+
+Deviations from the plan as written:
+
+- `grep` audits: the literal §6.1 patterns matched a few prose comments
+  (the `internal/app` package doc and `BlendingTeamsWarning`'s comment, plus
+  two comments in `cmd/forecast`). Those comments were reworded so the audits
+  print nothing; no code needed to change.
+- `writeSimManifest` (CLI) wraps `writeManifest` and returns early when
+  `-manifest` is empty, so the new `source.Fingerprint` (which hashes the
+  input file) is not computed on runs that don't write a manifest, matching
+  the old behaviour.
+- `HistoryResult`'s inferred-start check keeps the old
+  `LocalDay(EarliestCreatedAt(...))` then `IsZero` ordering verbatim.
+- The `sim days` progress bar is created only on the single-value path, as
+  the plan specified; trajectory runs leave `Progress` nil.
 
 ## Why this exists
 

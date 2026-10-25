@@ -13,7 +13,7 @@ import (
 
 // loadIssues reads every issue from path, dispatching on file extension:
 // .db/.sqlite/.sqlite3 open the SQLite store; everything else goes to
-// issues.ReadFile. Returns the issues unfiltered; apply issues.Filter after.
+// issues.ReadFile. Returns the issues unfiltered; apply a Filter after.
 //
 // A path of "-" reads stdin, which has no extension to dispatch on and so
 // requires format ("csv" or "json") — the value of the command's

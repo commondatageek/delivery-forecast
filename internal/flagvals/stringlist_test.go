@@ -1,4 +1,4 @@
-package main
+package flagvals
 
 import (
 	"reflect"
@@ -9,19 +9,19 @@ func TestStringList_Set(t *testing.T) {
 	tests := []struct {
 		name string
 		val  string
-		want stringList
+		want StringList
 	}{
-		{"single value", "alice", stringList{"alice"}},
-		{"multiple values", "alice,bob,carol", stringList{"alice", "bob", "carol"}},
-		{"trims surrounding whitespace", " alice , bob ", stringList{"alice", "bob"}},
-		{"drops empty parts", "alice,,bob,", stringList{"alice", "bob"}},
+		{"single value", "alice", StringList{"alice"}},
+		{"multiple values", "alice,bob,carol", StringList{"alice", "bob", "carol"}},
+		{"trims surrounding whitespace", " alice , bob ", StringList{"alice", "bob"}},
+		{"drops empty parts", "alice,,bob,", StringList{"alice", "bob"}},
 		{"empty string yields nil", "", nil},
 		{"only commas yields nil", ",,,", nil},
 		{"only whitespace yields nil", "   ", nil},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var s stringList
+			var s StringList
 			if err := s.Set(tt.val); err != nil {
 				t.Fatalf("Set(%q) returned error: %v", tt.val, err)
 			}
@@ -33,11 +33,11 @@ func TestStringList_Set(t *testing.T) {
 }
 
 func TestStringList_Set_ResetsExistingValue(t *testing.T) {
-	s := stringList{"old", "values"}
+	s := StringList{"old", "values"}
 	if err := s.Set("new"); err != nil {
 		t.Fatalf("Set returned error: %v", err)
 	}
-	want := stringList{"new"}
+	want := StringList{"new"}
 	if !reflect.DeepEqual(s, want) {
 		t.Fatalf("Set did not reset prior contents: got %#v, want %#v", s, want)
 	}
@@ -46,13 +46,13 @@ func TestStringList_Set_ResetsExistingValue(t *testing.T) {
 func TestStringList_String(t *testing.T) {
 	tests := []struct {
 		name string
-		s    stringList
+		s    StringList
 		want string
 	}{
 		{"nil list", nil, ""},
-		{"empty list", stringList{}, ""},
-		{"single value", stringList{"alice"}, "alice"},
-		{"multiple values", stringList{"alice", "bob", "carol"}, "alice,bob,carol"},
+		{"empty list", StringList{}, ""},
+		{"single value", StringList{"alice"}, "alice"},
+		{"multiple values", StringList{"alice", "bob", "carol"}, "alice,bob,carol"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -64,7 +64,7 @@ func TestStringList_String(t *testing.T) {
 }
 
 func TestStringList_SetThenStringRoundTrip(t *testing.T) {
-	var s stringList
+	var s StringList
 	if err := s.Set("alice, bob ,carol"); err != nil {
 		t.Fatalf("Set returned error: %v", err)
 	}

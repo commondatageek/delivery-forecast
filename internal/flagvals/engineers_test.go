@@ -1,4 +1,4 @@
-package main
+package flagvals
 
 import (
 	"flag"
@@ -12,7 +12,7 @@ import (
 )
 
 func TestEngineerSpec_Count(t *testing.T) {
-	var e engineerSpec
+	var e Engineers
 	if err := e.Set(" 3 "); err != nil {
 		t.Fatalf("Set(3): %v", err)
 	}
@@ -22,7 +22,7 @@ func TestEngineerSpec_Count(t *testing.T) {
 }
 
 func TestEngineerSpec_Names(t *testing.T) {
-	var e engineerSpec
+	var e Engineers
 	if err := e.Set("alice, bob ,carol"); err != nil {
 		t.Fatalf("Set: %v", err)
 	}
@@ -56,7 +56,7 @@ func TestEngineerSpec_Errors(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.in, func(t *testing.T) {
-			var e engineerSpec
+			var e Engineers
 			err := e.Set(c.in)
 			if c.wantErr == "" {
 				if err != nil {
@@ -75,7 +75,7 @@ func TestEngineerSpec_Errors(t *testing.T) {
 }
 
 func TestEngineerSpec_String(t *testing.T) {
-	var e engineerSpec
+	var e Engineers
 	if got := e.String(); got != "" {
 		t.Errorf("unset String = %q, want empty", got)
 	}
@@ -95,7 +95,7 @@ func TestEngineerSpec_ConfigListForm(t *testing.T) {
 		t.Fatal(err)
 	}
 	fs := flag.NewFlagSet("t", flag.ContinueOnError)
-	var e engineerSpec
+	var e Engineers
 	fs.Var(&e, "engineers", "")
 	if err := fs.Parse(nil); err != nil {
 		t.Fatal(err)
@@ -111,7 +111,7 @@ func TestEngineerSpec_ConfigListForm(t *testing.T) {
 	path2 := filepath.Join(t.TempDir(), "cfg2.yaml")
 	os.WriteFile(path2, []byte("engineers: 4\n"), 0o644)
 	fs2 := flag.NewFlagSet("t", flag.ContinueOnError)
-	var e2 engineerSpec
+	var e2 Engineers
 	fs2.Var(&e2, "engineers", "")
 	fs2.Parse(nil)
 	if err := util.ApplyConfig(fs2, path2); err != nil {

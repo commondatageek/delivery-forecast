@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/commondatageek/delivery-forecast/internal/app"
+	"github.com/commondatageek/delivery-forecast/internal/flagvals"
 	"github.com/commondatageek/delivery-forecast/internal/linear"
 	"github.com/commondatageek/delivery-forecast/internal/logx"
 	"github.com/commondatageek/delivery-forecast/internal/source"
@@ -153,12 +154,6 @@ func writeSimManifest(path, subcommand string, cmd *flag.FlagSet, sf *simFlags, 
 	return writeManifest(path, simManifest(subcommand, cmd, sf, inputFile, run, extra))
 }
 
-// describeWindow renders a forecast horizon for report headers, e.g.
-// "2026-10-08 to 2026-11-06 (30 days)".
-func describeWindow(start, end time.Time, days int) string {
-	return fmt.Sprintf("%s to %s (%d days)", start.Format("2006-01-02"), end.Format("2006-01-02"), days)
-}
-
 // --- Flag helpers ---
 
 // isFlagSet reports whether a flag was explicitly provided on the command line
@@ -223,14 +218,14 @@ func addTeamsFlag(fs *flag.FlagSet, usage string) *linear.TeamKeyList {
 // -manifest differ per command and are declared there instead.
 type simFlags struct {
 	ExclusionsFile   *string
-	Engineers        engineerSpec
+	Engineers        flagvals.Engineers
 	WholeTeam        *bool
 	Simulations      *int
 	Goroutines       *int
 	SampleStart      *string
 	SampleEnd        *string
 	RandomSeed       *int64
-	TypicalEngineers stringList
+	TypicalEngineers flagvals.StringList
 }
 
 // addSimFlags registers simFlags's block onto fs and returns the bundle. The

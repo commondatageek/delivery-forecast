@@ -1,4 +1,4 @@
-package main
+package flagvals
 
 import (
 	"strconv"
@@ -7,17 +7,17 @@ import (
 	"github.com/commondatageek/delivery-forecast/simulate"
 )
 
-// engineerSpec is the flag.Value behind -engineers: either a positive count
+// Engineers is the flag.Value behind -engineers: either a positive count
 // of anonymous equivalent engineers ("3") or a comma-separated list of names
 // ("alice,bob,carol") for the same number of named equivalent engineers.
 // Names let per-engineer exclusions attach to a slot; they do not have to
 // appear in the sample data.
-type engineerSpec struct {
+type Engineers struct {
 	count int
 	names []string
 }
 
-func (e *engineerSpec) String() string {
+func (e *Engineers) String() string {
 	switch {
 	case len(e.names) > 0:
 		return strings.Join(e.names, ",")
@@ -28,7 +28,7 @@ func (e *engineerSpec) String() string {
 	}
 }
 
-func (e *engineerSpec) Set(v string) error {
+func (e *Engineers) Set(v string) error {
 	count, names, err := simulate.ParseEngineers(v)
 	if err != nil {
 		return err
@@ -38,7 +38,7 @@ func (e *engineerSpec) Set(v string) error {
 }
 
 // Count is the number of equivalent engineers (0 when the flag was not given).
-func (e *engineerSpec) Count() int { return e.count }
+func (e *Engineers) Count() int { return e.count }
 
 // Names returns the named engineers, or nil when -engineers was a count.
-func (e *engineerSpec) Names() []string { return e.names }
+func (e *Engineers) Names() []string { return e.names }

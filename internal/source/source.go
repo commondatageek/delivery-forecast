@@ -64,3 +64,14 @@ func LoadExclusions(path string) (simulate.Exclusions, error) {
 	}
 	return simulate.ParseExclusions(data)
 }
+
+// ReadExclusions reads and parses an exclusions file, returning the read or
+// parse error unwrapped. Unlike LoadExclusions it is meant for `check`,
+// which reports the error as a finding rather than failing.
+func ReadExclusions(path string) (simulate.Exclusions, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return simulate.Exclusions{}, err
+	}
+	return simulate.ParseExclusions(data)
+}

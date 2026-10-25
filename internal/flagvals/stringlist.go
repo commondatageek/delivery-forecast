@@ -1,15 +1,15 @@
-package main
+package flagvals
 
 import "strings"
 
-// stringList is a flag.Value for a comma-separated list of strings.
-type stringList []string
+// StringList is a flag.Value for a comma-separated list of strings.
+type StringList []string
 
-func (s *stringList) String() string {
+func (s *StringList) String() string {
 	return strings.Join(*s, ",")
 }
 
-func (s *stringList) Set(val string) error {
+func (s *StringList) Set(val string) error {
 	*s = nil
 	for part := range strings.SplitSeq(val, ",") {
 		part = strings.TrimSpace(part)

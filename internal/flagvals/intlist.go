@@ -1,4 +1,4 @@
-package main
+package flagvals
 
 import (
 	"fmt"
@@ -6,10 +6,10 @@ import (
 	"strings"
 )
 
-// intList is a flag.Value for a comma-separated list of ints.
-type intList []int
+// IntList is a flag.Value for a comma-separated list of ints.
+type IntList []int
 
-func (p *intList) String() string {
+func (p *IntList) String() string {
 	parts := make([]string, len(*p))
 	for i, v := range *p {
 		parts[i] = strconv.Itoa(v)
@@ -17,7 +17,7 @@ func (p *intList) String() string {
 	return strings.Join(parts, ",")
 }
 
-func (p *intList) Set(s string) error {
+func (p *IntList) Set(s string) error {
 	*p = nil
 	for _, part := range strings.Split(s, ",") {
 		part = strings.TrimSpace(part)

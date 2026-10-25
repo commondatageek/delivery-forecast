@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/commondatageek/delivery-forecast/simulate"
 )
 
 func TestLoadExclusions_EmptyPathIsNone(t *testing.T) {
@@ -76,5 +78,27 @@ func TestLoad_StdinCSV(t *testing.T) {
 	}
 	if len(got) != 2 || got[0].Identifier != "ENG-1" {
 		t.Errorf("got %+v, want 2 issues starting with ENG-1", got)
+	}
+}
+
+func TestReadExclusions(t *testing.T) {
+	dir := t.TempDir()
+
+	if _, err := ReadExclusions(filepath.Join(dir, "missing.json")); !os.IsNotExist(err) {
+		t.Errorf("missing file: err = %v, want a not-exist error", err)
+	}
+
+	bad := filepath.Join(dir, "bad.json")
+	os.WriteFile(bad, []byte(`{"global": ["not-a-date"]}`), 0o644)
+	data, _ := os.ReadFile(bad)
+	_, wantErr := simulate.ParseExclusions(data)
+	if _, err := ReadExclusions(bad); err == nil || err.Error() != wantErr.Error() {
+		t.Errorf("invalid file: err = %v, want %v", err, wantErr)
+	}
+
+	good := filepath.Join(dir, "good.json")
+	os.WriteFile(good, []byte(`{"global": ["2026-12-25"]}`), 0o644)
+	if _, err := ReadExclusions(good); err != nil {
+		t.Errorf("valid file: %v", err)
 	}
 }

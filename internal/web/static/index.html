@@ -4,14 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Forecast</title>
+<link rel="stylesheet" href="/css/app.css">
 </head>
 <body>
-<h1>Forecast</h1>
-<p id="version">loading…</p>
-<script type="module">
-  const r = await fetch('/api/version');
-  const v = await r.json();
-  document.getElementById('version').textContent = 'version ' + v.version;
-</script>
+<header class="topbar">
+  <a class="brand" href="#/check">Forecast</a>
+  <div id="databar" class="databar"></div>
+  <div id="header-actions" class="header-actions"></div>
+</header>
+<div class="layout">
+  <nav id="nav" class="nav" aria-label="Commands"></nav>
+  <main id="main" class="main"></main>
+</div>
+<footer class="footer"><span id="version">&nbsp;</span> · Update with <code>forecast update</code></footer>
+<script type="module" src="/js/main.js"></script>
 </body>
 </html>

@@ -111,16 +111,35 @@ func printWarnings(warnings []string) {
 	}
 }
 
-// simManifest assembles the manifest parameter bag for a finished sim run.
-func simManifest(subcommand string, cmd *flag.FlagSet, sf *simFlags, inputPath string, run app.SimRun, extra map[string]any) manifestInputs {
-	return manifestInputs{
-		Subcommand: subcommand, Cmd: cmd, Mode: run.Mode, TypicalEngineers: sf.TypicalEngineers,
-		Engineers: sf.Engineers.Count(), EngineerNames: sf.Engineers.Names(), WholeTeam: *sf.WholeTeam, Seed: run.Seed,
-		SampleStart: run.SampleStart, SampleEnd: run.SampleEnd,
-		DBPath: inputPath, ExclusionsPath: *sf.ExclusionsFile,
-		Exclusions: run.Exclusions, SampleCalendar: run.SampleCalendar, HorizonCalendar: run.HorizonCalendar, Pool: run.Pool, Issues: run.PoolIssues, Skipped: run.Skipped,
-		Extra: extra,
+// simManifest assembles the manifest parameter bag for a finished sim run,
+// filling in the pieces internal/app may not touch: flags, argv, build info,
+// the input file's fingerprint and the clock.
+func simManifest(subcommand string, cmd *flag.FlagSet, sf *simFlags, inputPath string, run app.SimRun, extra map[string]any) app.ManifestInputs {
+	wd, _ := os.Getwd()
+	return app.ManifestInputs{
+		Subcommand:       subcommand,
+		Run:              run,
+		TypicalEngineers: sf.TypicalEngineers,
+		Engineers:        sf.Engineers.Count(),
+		EngineerNames:    sf.Engineers.Names(),
+		WholeTeam:        *sf.WholeTeam,
+		ExclusionsPath:   *sf.ExclusionsFile,
+		Extra:            extra,
+		Flags:            flagRecords(cmd),
+		Invocation:       app.Invocation{Subcommand: subcommand, Args: os.Args, WorkingDir: wd},
+		Binary:           buildInfo(),
+		DB:               source.Fingerprint(inputPath),
+		GeneratedAt:      nowFunc(),
 	}
+}
+
+// writeSimManifest writes the run manifest for a finished sim run to path. It
+// is a no-op (and skips the input file's hash) when path is empty.
+func writeSimManifest(path, subcommand string, cmd *flag.FlagSet, sf *simFlags, inputPath string, run app.SimRun, extra map[string]any) error {
+	if path == "" {
+		return nil
+	}
+	return writeManifest(path, simManifest(subcommand, cmd, sf, inputPath, run, extra))
 }
 
 // describeWindow renders a forecast horizon for report headers, e.g.

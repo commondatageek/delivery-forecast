@@ -72,12 +72,12 @@ func cmdSimItems(args []string) error {
 		return err
 	}
 
-	if err := writeManifest(*manifestFile, simManifest("sim items", cmd, sf, inputPath, res.Run, map[string]any{
+	if err := writeSimManifest(*manifestFile, "sim items", cmd, sf, inputPath, res.Run, map[string]any{
 		"effective_confidence_levels": res.Confidences,
 		"target_start_date":           res.TargetStart.Format("2006-01-02"),
 		"target_end_date":             res.TargetEnd.Format("2006-01-02"),
 		"effective_days":              res.EffectiveDays,
-	})); err != nil {
+	}); err != nil {
 		return err
 	}
 
@@ -189,10 +189,10 @@ func cmdSimDays(args []string) error {
 		return err
 	}
 
-	if err := writeManifest(*manifestFile, simManifest("sim days", cmd, sf, inputPath, res.Run, map[string]any{
+	if err := writeSimManifest(*manifestFile, "sim days", cmd, sf, inputPath, res.Run, map[string]any{
 		"effective_confidence_levels": res.Confidences,
 		"target_start_date":           res.TargetStart.Format("2006-01-02"),
-	})); err != nil {
+	}); err != nil {
 		return err
 	}
 
@@ -272,11 +272,11 @@ func cmdSimProbability(args []string) error {
 		return err
 	}
 
-	if err := writeManifest(*manifestFile, simManifest("sim probability", cmd, sf, inputPath, res.Run, map[string]any{
+	if err := writeSimManifest(*manifestFile, "sim probability", cmd, sf, inputPath, res.Run, map[string]any{
 		"target_start_date": res.TargetStart.Format("2006-01-02"),
 		"target_end_date":   res.TargetEnd.Format("2006-01-02"),
 		"effective_days":    res.EffectiveDays,
-	})); err != nil {
+	}); err != nil {
 		return err
 	}
 

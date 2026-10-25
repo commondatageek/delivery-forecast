@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/commondatageek/delivery-forecast/internal/app"
-	"github.com/commondatageek/delivery-forecast/internal/linear"
 	"github.com/commondatageek/delivery-forecast/internal/logx"
 	"github.com/commondatageek/delivery-forecast/internal/params"
 	"github.com/commondatageek/delivery-forecast/internal/source"
@@ -99,44 +98,6 @@ func writeSimManifest(path, subcommand string, cmd *flag.FlagSet, sf *params.Sim
 }
 
 // --- Flag helpers ---
-
-// isFlagSet reports whether a flag was explicitly provided; see params.IsSet.
-func isFlagSet(fs *flag.FlagSet, name string) bool { return params.IsSet(fs, name) }
-
-// --- Shared flag registration ---
-//
-// These helpers just wrap repeated fs.String/fs.Var calls; each subcommand
-// still owns its FlagSet, still calls Parse itself, and still applies
-// -config and the isFlagSet presence checks in the same order as before.
-
-// addDBFlag registers the -db flag used by every subcommand that reads a
-// SQLite store.
-func addDBFlag(fs *flag.FlagSet) *string {
-	return fs.String("db", "", "path to SQLite database")
-}
-
-// requireDB reports an error if -db was left unset.
-func requireDB(db *string) error {
-	if *db == "" {
-		return fmt.Errorf("-db is required")
-	}
-	return nil
-}
-
-// addConfigFlag registers the -config flag used by every subcommand.
-func addConfigFlag(fs *flag.FlagSet) *string {
-	return fs.String("config", "", "path to a YAML config file supplying flag values (CLI flags override)")
-}
-
-// addTeamsFlag registers the -teams flag. usage is passed in whole (not just
-// an example) because its wording differs meaningfully between commands that
-// filter to a team set (aging/cfd/count) and linear sync, where -teams
-// extends the candidate set rather than filtering.
-func addTeamsFlag(fs *flag.FlagSet, usage string) *linear.TeamKeyList {
-	var teams linear.TeamKeyList
-	fs.Var(&teams, "teams", usage)
-	return &teams
-}
 
 // nowFunc is the CLI's clock. Tests replace it to make date defaults
 // ("now", "today", "-3 months") and aging/backtest "today" deterministic.

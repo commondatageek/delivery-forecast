@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/commondatageek/delivery-forecast/internal/linear"
+	"github.com/commondatageek/delivery-forecast/internal/params"
 	"github.com/commondatageek/delivery-forecast/internal/sqlite"
 	"github.com/commondatageek/delivery-forecast/internal/syncer"
 	"github.com/commondatageek/delivery-forecast/internal/util"
@@ -14,18 +15,16 @@ import (
 
 func cmdLinearSync(args []string) error {
 	cmd := flag.NewFlagSet("linear sync", flag.ExitOnError)
-	dbFile := addDBFlag(cmd)
-	teams := addTeamsFlag(cmd, "comma-separated team keys, e.g. ENG,DESIGN; limits the candidate team set")
-	allTeams := cmd.Bool("all-teams", false, "expand the candidate team set to every accessible Linear team; mutually exclusive with -teams")
-	fullReload := cmd.Bool("full-reload", false, "ignore each team's stored watermark and do a full reload")
-	configFile := addConfigFlag(cmd)
+	c := params.NewLinearSync(cmd)
 	cmd.Parse(args)
 
-	if err := util.ApplyConfig(cmd, *configFile); err != nil {
+	if err := util.ApplyConfig(cmd, *c.Config); err != nil {
 		return err
 	}
 
-	if err := requireDB(dbFile); err != nil {
+	r, err := c.Resolve()
+	printWarnings(r.Warnings)
+	if err != nil {
 		return err
 	}
 
@@ -36,25 +35,21 @@ func cmdLinearSync(args []string) error {
 
 	client := linear.New(apiKey)
 
-	store, err := sqlite.Open(*dbFile)
+	store, err := sqlite.Open(r.InputPath)
 	if err != nil {
 		return fmt.Errorf("open db: %w", err)
 	}
 	defer store.Close()
 
-	return syncer.Run(context.Background(), client, store, syncer.Options{
-		Teams:      *teams,
-		AllTeams:   *allTeams,
-		FullReload: *fullReload,
-	})
+	return syncer.Run(context.Background(), client, store, r.Request)
 }
 
 func cmdLinearTeams(args []string) error {
 	cmd := flag.NewFlagSet("linear teams", flag.ExitOnError)
-	configFile := addConfigFlag(cmd)
+	c := params.NewLinearTeams(cmd)
 	cmd.Parse(args)
 
-	if err := util.ApplyConfig(cmd, *configFile); err != nil {
+	if err := util.ApplyConfig(cmd, *c.Config); err != nil {
 		return err
 	}
 

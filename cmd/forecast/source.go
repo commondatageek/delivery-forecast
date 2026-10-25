@@ -2,11 +2,8 @@ package main
 
 import (
 	"context"
-	"flag"
-	"fmt"
 	"os"
 
-	"github.com/commondatageek/delivery-forecast/internal/logx"
 	"github.com/commondatageek/delivery-forecast/internal/source"
 	"github.com/commondatageek/delivery-forecast/issues"
 )
@@ -21,29 +18,4 @@ import (
 // -input - works uniformly wherever -input is accepted.
 func loadIssues(ctx context.Context, path, format string) ([]issues.Issue, error) {
 	return source.Load(ctx, path, format, os.Stdin)
-}
-
-// addInputFlag registers -input, the source-agnostic replacement for -db.
-func addInputFlag(fs *flag.FlagSet) *string {
-	return fs.String("input", "", "path to a SQLite database (.db), CSV, or JSON file; \"-\" reads stdin (requires -stdin-format)")
-}
-
-// addStdinFormatFlag registers -stdin-format, which names the format of
-// -input when it is "-" (stdin). It pairs with addInputFlag: every command
-// that offers one offers the other, so -input's help text is true everywhere.
-func addStdinFormatFlag(fs *flag.FlagSet) *string {
-	return fs.String("stdin-format", "", `format of -input when reading stdin ("-"): "csv" or "json"`)
-}
-
-// resolveInput returns the input path, preferring -input and falling back to
-// -db (deprecated). Errors if neither is set; warns if -db was used.
-func resolveInput(fs *flag.FlagSet, input, db *string) (string, error) {
-	if *input != "" {
-		return *input, nil
-	}
-	if *db != "" {
-		logx.Warnf("-db is deprecated; use -input instead")
-		return *db, nil
-	}
-	return "", fmt.Errorf("-input is required")
 }

@@ -56,6 +56,10 @@ func (c *datasetCache) get(ctx context.Context, absPath string) (*dataset, error
 
 	key, err := keyFor(absPath)
 	if err != nil {
+		// Let the loader produce the same error text the CLI would.
+		if _, lerr := source.Load(ctx, absPath, "", strings.NewReader("")); lerr != nil {
+			return nil, lerr
+		}
 		return nil, err
 	}
 	for i, d := range c.entries {

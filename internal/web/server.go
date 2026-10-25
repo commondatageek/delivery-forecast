@@ -33,6 +33,8 @@ type Server struct {
 	opts     Options
 	mux      *http.ServeMux
 	datasets *datasetCache
+	runs     *runStore
+	runSlots chan struct{} // capacity 1: one simulation at a time (D10)
 }
 
 const defaultMaxUpload = 512 << 20
@@ -70,7 +72,7 @@ func New(opts Options) (*Server, error) {
 		opts.DataDir = dataDir
 	}
 
-	s := &Server{opts: opts, mux: http.NewServeMux(), datasets: newDatasetCache(4)}
+	s := &Server{opts: opts, mux: http.NewServeMux(), datasets: newDatasetCache(4), runs: newRunStore(), runSlots: make(chan struct{}, 1)}
 	s.routes()
 	return s, nil
 }
@@ -84,6 +86,9 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/files", s.handleFiles)
 	s.mux.HandleFunc("POST /api/uploads", s.handleUpload)
 	s.mux.HandleFunc("GET /api/datasets/summary", s.handleSummary)
+	s.mux.HandleFunc("GET /api/commands", s.handleCommands)
+	s.mux.HandleFunc("POST /api/run/{id}", s.handleRun)
+	s.mux.HandleFunc("GET /api/runs/{run_id}/export/{format}", s.handleExport)
 	s.mux.Handle("/", staticHandler())
 }
 

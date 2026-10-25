@@ -165,12 +165,19 @@ func firstDiff(want, got string) string {
 	return "no difference"
 }
 
-func TestGolden(t *testing.T) {
+// pinGoldenClock fixes time.Local and the CLI clock to the golden tests'
+// zone and instant for the duration of t.
+func pinGoldenClock(t *testing.T) {
+	t.Helper()
 	origLocal, origNow := time.Local, nowFunc
 	t.Cleanup(func() { time.Local, nowFunc = origLocal, origNow })
 	time.Local = time.FixedZone("GOLDEN", -5*60*60)
 	fixed := time.Date(2025, 3, 15, 10, 30, 0, 0, time.Local)
 	nowFunc = func() time.Time { return fixed }
+}
+
+func TestGolden(t *testing.T) {
+	pinGoldenClock(t)
 
 	for _, c := range goldenCases() {
 		t.Run(c.name, func(t *testing.T) {

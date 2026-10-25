@@ -8,9 +8,7 @@ import (
 
 	"github.com/commondatageek/delivery-forecast/counts"
 	"github.com/commondatageek/delivery-forecast/internal/app"
-	"github.com/commondatageek/delivery-forecast/internal/logx"
 	"github.com/commondatageek/delivery-forecast/internal/util"
-	"github.com/commondatageek/delivery-forecast/issues"
 )
 
 func cmdCount(args []string) error {
@@ -40,44 +38,24 @@ func cmdCount(args []string) error {
 		return fmt.Errorf("invalid -updated-since %q: %w", *updatedSince, err)
 	}
 
-	opts := counts.Options{Teams: *teams, Since: since}
+	req := app.CountRequest{Options: counts.Options{Teams: *teams, Since: since}}
+	if err := req.Validate(); err != nil {
+		return err
+	}
 
-	projects, total, multiTeam, err := loadCountProjects(inputPath, *stdinFormat, opts)
+	req.Issues, err = loadIssues(context.Background(), inputPath, *stdinFormat)
+	if err != nil {
+		return fmt.Errorf("load issues: %w", err)
+	}
+
+	res, err := app.RunCount(req)
+	printWarnings(res.Warnings)
 	if err != nil {
 		return err
 	}
 
-	showTeams := len(opts.Teams) == 0 && multiTeam
-
 	if *milestones {
-		return counts.RenderGrouped(os.Stdout, projects, total, showTeams)
+		return counts.RenderGrouped(os.Stdout, res.Projects, res.Total, res.ShowTeams)
 	}
-	return counts.RenderSummary(os.Stdout, projects, total, showTeams)
-}
-
-// loadCountProjects loads issues from path (format naming the stdin format
-// when path is "-") and returns the folded project list. It also reports
-// whether the loaded issue set holds more than one team.
-func loadCountProjects(path, format string, opts counts.Options) ([]counts.Project, int, bool, error) {
-	raw, err := loadIssues(context.Background(), path, format)
-	if err != nil {
-		return nil, 0, false, fmt.Errorf("load issues: %w", err)
-	}
-
-	allTeams := app.DistinctTeamKeys(raw)
-	multiTeam := len(allTeams) > 1
-
-	if msg := app.BlendingTeamsWarning(opts.Teams, allTeams); msg != "" {
-		logx.Warnf("%s", msg)
-	}
-
-	filtered := issues.Filter{Teams: opts.Teams}.Apply(raw)
-
-	pmCounts, activity := counts.Aggregate(app.ToCountsIssues(filtered))
-	if len(pmCounts) == 0 {
-		logx.Warnf("no outstanding (non-terminal) issues found for the given filters")
-	}
-
-	projects, total := counts.Compute(pmCounts, activity, opts.Since)
-	return projects, total, multiTeam, nil
+	return counts.RenderSummary(os.Stdout, res.Projects, res.Total, res.ShowTeams)
 }

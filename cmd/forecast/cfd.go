@@ -8,9 +8,7 @@ import (
 
 	"github.com/commondatageek/delivery-forecast/cfd"
 	"github.com/commondatageek/delivery-forecast/internal/app"
-	"github.com/commondatageek/delivery-forecast/internal/logx"
 	"github.com/commondatageek/delivery-forecast/internal/util"
-	"github.com/commondatageek/delivery-forecast/issues"
 )
 
 func cmdCFD(args []string) error {
@@ -47,46 +45,23 @@ func cmdCFD(args []string) error {
 		return fmt.Errorf("invalid -start %q: %w", *startStr, err)
 	}
 
-	if !windowStart.Before(windowEnd) {
-		return fmt.Errorf("-start must be before -end")
+	req := app.CFDRequest{Options: cfd.Options{Teams: *teams, Start: windowStart, End: windowEnd}}
+	if err := req.Validate(); err != nil {
+		return err
 	}
 
-	opts := cfd.Options{Teams: *teams, Start: windowStart, End: windowEnd}
-
-	raw, err := loadIssues(context.Background(), inputPath, *stdinFormat)
+	req.Issues, err = loadIssues(context.Background(), inputPath, *stdinFormat)
 	if err != nil {
 		return fmt.Errorf("load issues: %w", err)
 	}
 
-	if msg := app.BlendingTeamsWarning(opts.Teams, app.DistinctTeamKeys(raw)); msg != "" {
-		logx.Warnf("%s", msg)
+	res, err := app.RunCFD(req)
+	printWarnings(res.Warnings)
+	if err != nil {
+		return err
 	}
-
-	filtered := issues.Filter{Teams: opts.Teams}.Apply(raw)
-	if len(filtered) == 0 {
-		logx.Warnf("no issues found for the given team filter")
-	}
-
-	var normalized []cfd.NormalizedIssue
-	skipped := 0
-	for _, r := range app.ToCFDIssues(filtered) {
-		ni, ok := cfd.Normalize(r)
-		if !ok {
-			skipped++
-			continue
-		}
-		normalized = append(normalized, ni)
-	}
-
-	rows := cfd.BuildGrid(normalized, opts.Start, opts.End)
-
-	if err := cfd.AssertInvariants(rows); err != nil {
-		return fmt.Errorf("CFD invariant violated: %w", err)
-	}
-
-	health := cfd.ComputeHealth(rows, normalized, opts.Start, opts.End)
-	health.TotalIssues = len(filtered)
-	health.SkippedIssues = skipped
+	rows, health := res.Rows, res.Health
+	opts := req.Options
 
 	out := os.Stdout
 	if *outPath != "" {
@@ -100,7 +75,7 @@ func cmdCFD(args []string) error {
 
 	switch *format {
 	case "html":
-		return cfd.RenderHTML(out, rows, health, len(filtered), skipped, opts.Start, opts.End)
+		return cfd.RenderHTML(out, rows, health, health.TotalIssues, health.SkippedIssues, opts.Start, opts.End)
 	case "json":
 		return cfd.RenderJSON(out, rows, health)
 	default:

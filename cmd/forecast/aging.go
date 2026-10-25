@@ -5,55 +5,12 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"sort"
 	"time"
 
 	"github.com/commondatageek/delivery-forecast/aging"
 	"github.com/commondatageek/delivery-forecast/internal/app"
-	"github.com/commondatageek/delivery-forecast/internal/logx"
 	"github.com/commondatageek/delivery-forecast/internal/util"
-	"github.com/commondatageek/delivery-forecast/issues"
 )
-
-// completedBetween selects items completed in [start, end) (start inclusive,
-// end exclusive), using Issue.IsCompleted rather than a raw state_type
-// check so file sources that omit state_type still work (D7).
-//
-// Unlike sim's sample pool, this deliberately does not require a non-empty
-// assignee: aging never filters or groups by assignee, so an unassigned
-// completed issue still belongs in the cycle-time distribution. The old
-// SQL-backed CompletedBetween required one unconditionally (a query it
-// shares with sim, where the pool genuinely is per-engineer and an
-// unassigned issue has nowhere to go), which silently dropped unassigned
-// completed issues from aging's distribution — see DATA_REQUIREMENTS.md
-// footnote 1. This fixes that for every source, not just file ones.
-func completedBetween(items []issues.Issue, start, end time.Time) []issues.Issue {
-	var out []issues.Issue
-	for _, it := range items {
-		if !it.IsCompleted() || it.CompletedAt.IsZero() {
-			continue
-		}
-		if it.CompletedAt.Before(start) || !it.CompletedAt.Before(end) {
-			continue
-		}
-		out = append(out, it)
-	}
-	return out
-}
-
-// inProgress selects items currently in progress, using Issue.IsInProgress
-// rather than a raw state_type check (D7). aging.InProgressItems already
-// skips issues with a zero StartedAt, matching the old query's
-// `started_at IS NOT NULL`.
-func inProgress(items []issues.Issue) []issues.Issue {
-	var out []issues.Issue
-	for _, it := range items {
-		if it.IsInProgress() {
-			out = append(out, it)
-		}
-	}
-	return out
-}
 
 func cmdAging(args []string) error {
 	cmd := flag.NewFlagSet("aging", flag.ExitOnError)
@@ -72,10 +29,6 @@ func cmdAging(args []string) error {
 
 	if err := util.ApplyConfig(cmd, *configFile); err != nil {
 		return err
-	}
-
-	if *percentile < 1 || *percentile > 100 {
-		return fmt.Errorf("-percentile must be between 1 and 100, got %d", *percentile)
 	}
 
 	inputPath, err := resolveInput(cmd, inputFile, dbFile)
@@ -105,58 +58,26 @@ func cmdAging(args []string) error {
 		return fmt.Errorf("invalid -sample-start %q: %w", *sampleStartStr, err)
 	}
 
-	if !sampleStart.Before(sampleEnd) {
-		return fmt.Errorf("-sample-start must be before -sample-end")
+	req := app.AgingRequest{
+		Options:       aging.Options{Teams: *teams, SampleStart: sampleStart, SampleEnd: sampleEnd, MinCycleTime: minCycleTime, Percentile: *percentile},
+		ShowCompleted: *showCompleted,
+		Today:         today,
+	}
+	if err := req.Validate(); err != nil {
+		return err
 	}
 
-	opts := aging.Options{Teams: *teams, SampleStart: sampleStart, SampleEnd: sampleEnd, MinCycleTime: minCycleTime, Percentile: *percentile}
-
-	raw, err := loadIssues(context.Background(), inputPath, *stdinFormat)
+	req.Issues, err = loadIssues(context.Background(), inputPath, *stdinFormat)
 	if err != nil {
 		return fmt.Errorf("load issues: %w", err)
 	}
 
-	if msg := app.BlendingTeamsWarning(opts.Teams, app.DistinctTeamKeys(raw)); msg != "" {
-		logx.Warnf("%s", msg)
+	res, err := app.RunAging(req)
+	printWarnings(res.Warnings)
+	if err != nil {
+		return err
 	}
-
-	filtered := issues.Filter{Teams: opts.Teams}.Apply(raw)
-
-	agingCompleted := app.ToAgingIssues(completedBetween(filtered, opts.SampleStart, opts.SampleEnd))
-
-	cycleTimes := aging.CycleTimes(agingCompleted, opts.MinCycleTime)
-	sort.Float64s(cycleTimes)
-
-	threshold := util.PercentileValue(cycleTimes, float64(opts.Percentile))
-
-	meta := aging.Meta{
-		Percentile:     opts.Percentile,
-		Threshold:      threshold,
-		SampleStart:    opts.SampleStart,
-		SampleEnd:      opts.SampleEnd,
-		CompletedCount: len(cycleTimes),
-	}
-
-	inProgressItems := aging.InProgressItems(app.ToAgingIssues(inProgress(filtered)), today)
-	aging.RankItems(inProgressItems, cycleTimes, threshold)
-
-	sort.Slice(inProgressItems, func(i, j int) bool {
-		return inProgressItems[i].AgeDays > inProgressItems[j].AgeDays
-	})
-
-	var completedItems []aging.Item
-	if *showCompleted {
-		completedItems = aging.CompletedItems(agingCompleted, opts.MinCycleTime)
-		aging.RankItems(completedItems, cycleTimes, threshold)
-
-		sort.Slice(completedItems, func(i, j int) bool {
-			return completedItems[i].AgeDays > completedItems[j].AgeDays
-		})
-	}
-
-	if len(cycleTimes) == 0 {
-		logx.Warnf("no completed issues found in the sample window; percentiles will be 0 and multipliers blank")
-	}
+	meta, inProgressItems, completedItems := res.Meta, res.InProgress, res.Completed
 
 	switch *format {
 	case "text":

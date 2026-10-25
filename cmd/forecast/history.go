@@ -9,9 +9,7 @@ import (
 
 	"github.com/commondatageek/delivery-forecast/history"
 	"github.com/commondatageek/delivery-forecast/internal/app"
-	"github.com/commondatageek/delivery-forecast/internal/logx"
 	"github.com/commondatageek/delivery-forecast/internal/util"
-	"github.com/commondatageek/delivery-forecast/issues"
 )
 
 func cmdHistory(args []string) error {
@@ -36,34 +34,8 @@ func cmdHistory(args []string) error {
 	if *format != "csv" && *format != "json" && *format != "text" {
 		return fmt.Errorf(`-format must be "csv", "json", or "text"`)
 	}
-	if *window <= 0 {
-		return fmt.Errorf("-window must be positive")
-	}
 	if *input == "" {
 		return fmt.Errorf("-input is required")
-	}
-
-	ctx := context.Background()
-
-	raw, err := loadIssues(ctx, *input, *stdinFormat)
-	if err != nil {
-		return fmt.Errorf("load issues: %w", err)
-	}
-
-	filtered := issues.Filter{Teams: *teams, Project: *project, Milestone: *milestone}.Apply(raw)
-	if len(filtered) == 0 {
-		switch {
-		case *milestone != "":
-			return fmt.Errorf("no issues found for project %q milestone %q — check spelling", *project, *milestone)
-		case *project != "":
-			return fmt.Errorf("no issues found for project %q — check spelling", *project)
-		default:
-			return fmt.Errorf("no issues found for the given filters — check spelling")
-		}
-	}
-
-	if msg := app.BlendingTeamsWarning(*teams, app.DistinctTeamKeys(filtered)); msg != "" {
-		logx.Warnf("%s", msg)
 	}
 
 	now := nowFunc()
@@ -72,35 +44,37 @@ func cmdHistory(args []string) error {
 		return fmt.Errorf("invalid -end %q: %w", *endStr, err)
 	}
 
-	historyIssues := app.ToHistoryIssues(filtered)
-
 	var startDate time.Time
 	if *startStr != "" {
 		startDate, err = util.ParseFlexibleStartDate(*startStr, now)
 		if err != nil {
 			return fmt.Errorf("invalid -start %q: %w", *startStr, err)
 		}
-	} else {
-		// Differs from sim backtest, which defaults to the earliest
-		// started_at: history's Total is a created-to-date burnup line, so
-		// created_at is the right anchor here.
-		startDate = util.LocalDay(history.EarliestCreatedAt(historyIssues))
-		if startDate.IsZero() {
-			return fmt.Errorf("no created_at found in issue set; provide -start explicitly")
-		}
 	}
 
-	if endDate.Before(startDate) {
-		return fmt.Errorf("-end must not be before -start (%s)", startDate.Format("2006-01-02"))
+	req := app.HistoryRequest{
+		Teams:      *teams,
+		Project:    *project,
+		Milestone:  *milestone,
+		Start:      startDate,
+		End:        endDate,
+		WindowDays: *window,
+	}
+	if err := req.Validate(); err != nil {
+		return err
 	}
 
-	res, err := history.Compute(historyIssues, history.Options{Start: startDate, End: endDate, WindowDays: *window})
+	req.Issues, err = loadIssues(context.Background(), *input, *stdinFormat)
+	if err != nil {
+		return fmt.Errorf("load issues: %w", err)
+	}
+
+	hres, err := app.RunHistory(req)
+	printWarnings(hres.Warnings)
 	if err != nil {
 		return err
 	}
-	if err := history.AssertInvariants(res.Rows); err != nil {
-		return fmt.Errorf("history invariant violated: %w", err)
-	}
+	res := hres.Result
 
 	out := os.Stdout
 	if *outPath != "" {

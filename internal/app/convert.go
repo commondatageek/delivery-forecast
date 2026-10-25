@@ -109,22 +109,3 @@ func issuesToBacktestItems(items []issues.Issue) []simulate.BacktestItem {
 	}
 	return out
 }
-
-// Deprecated shims for cmd/forecast during the migration; removed in Phase 4.
-
-// ToAgingIssues is a temporary export of toAgingIssues.
-func ToAgingIssues(items []issues.Issue) []aging.Issue { return toAgingIssues(items) }
-
-// ToCFDIssues is a temporary export of toCFDIssues.
-func ToCFDIssues(items []issues.Issue) []cfd.Issue { return toCFDIssues(items) }
-
-// ToHistoryIssues is a temporary export of toHistoryIssues.
-func ToHistoryIssues(items []issues.Issue) []history.Issue { return toHistoryIssues(items) }
-
-// ToCountsIssues is a temporary export of toCountsIssues.
-func ToCountsIssues(items []issues.Issue) []counts.Issue { return toCountsIssues(items) }
-
-// IssuesToCompletions is a temporary export of issuesToCompletions.
-func IssuesToCompletions(items []issues.Issue) []simulate.Completion {
-	return issuesToCompletions(items)
-}

@@ -1,3 +1,10 @@
-// Registry of native result views: command id → (result, command) => Node.
+// Registry of native result views: command id → (resultEvent, command) => Node.
 // Commands without an entry fall back to the "Output" content.
-export const views = {};
+import { simItems, simDays, simProbability, simBacktest } from './sim.js';
+
+export const views = {
+  'sim-items': simItems,
+  'sim-days': simDays,
+  'sim-probability': simProbability,
+  'sim-backtest': simBacktest,
+};

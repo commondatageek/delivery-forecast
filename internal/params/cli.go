@@ -38,7 +38,7 @@ func CommandLine(name string, fs *flag.FlagSet) []string {
 
 // ShellJoin quotes args for a POSIX shell: an arg made only of
 // [A-Za-z0-9_./:=,@%+-] is left bare; anything else is single-quoted with
-// embedded ' written as '\''.
+// embedded ' written as '\”.
 func ShellJoin(args []string) string {
 	out := make([]string, len(args))
 	for i, a := range args {

@@ -250,7 +250,7 @@ func newAgingItems(items []aging.Item, meta aging.Meta) []agingItemDTO {
 	for _, it := range items {
 		d := agingItemDTO{
 			Identifier: it.Identifier, Title: it.Title, Assignee: it.Assignee, ProjectName: it.ProjectName,
-			State: aging.FormatState(it.StateName, it.StateType), StartedAt: date(it.StartedAt.Local()),
+			State: aging.FormatState(it.StatusName, it.Status), StartedAt: date(it.StartedAt.Local()),
 			AgeDays: it.AgeDays, Percentile: it.Percentile,
 			PercentileLabel: strconv.Itoa(it.Percentile) + util.OrdinalSuffix(it.Percentile),
 			MultiplierLabel: aging.FormatMultiplier(it.Multiplier, meta),

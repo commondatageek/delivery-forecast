@@ -41,9 +41,9 @@ func TestToCountsIssues_TerminalFromStatusOrTimestamps(t *testing.T) {
 		{Identifier: "E-2", Status: issues.StatusStarted, CompletedAt: day(2025, 1, 2)},
 		{Identifier: "E-3", Status: issues.StatusBacklog},
 	})
-	for i, want := range []string{"canceled", "completed", "backlog"} {
-		if got[i].StateType != want {
-			t.Errorf("item %d: StateType = %q, want %q", i, got[i].StateType, want)
+	for i, want := range []bool{true, true, false} {
+		if got[i].Terminal != want {
+			t.Errorf("item %d: Terminal = %v, want %v", i, got[i].Terminal, want)
 		}
 	}
 }

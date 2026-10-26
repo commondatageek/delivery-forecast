@@ -13,7 +13,7 @@ import (
 const defaultWindowDays = 28
 
 // Issue is the neutral per-issue input: the four lifecycle timestamps. It
-// mirrors cfd.Issue minus StateType, which history does not need.
+// mirrors cfd.Issue.
 type Issue struct {
 	CreatedAt   time.Time
 	StartedAt   time.Time

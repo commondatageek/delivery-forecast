@@ -117,12 +117,14 @@ SQLite-only bookkeeping (no primary key constraint, no `NOT NULL DEFAULT`) —
 just the column names as headers (CSV) or keys (JSON), matching
 `issues.Issue`'s JSON tags exactly (snake_case, e.g. `milestone_name`,
 `created_at`). Column/key order doesn't matter, and unrecognized columns are
-ignored rather than erroring — this is what lets a raw Linear or Jira export
-work with only its relevant columns renamed. At least one recognized column
-is required, or the file is rejected outright (`issues.ReadCSV`/`ReadJSON`
-return an error). Only `identifier` plus whichever fields a given command
-needs (per the [table above](#per-command-requirements)) actually matter in
-practice — everything else can simply be omitted.
+ignored rather than erroring. A CSV header must include `identifier`, or
+the file is rejected outright (`issues.ReadCSV` returns an `*issues.HeaderError`)
+— a file without one can't be a forecast data file, even if a few other
+columns happen to match. A recognized column named twice is an error too,
+and a leading UTF-8 byte order mark (as Excel and Jira write) is ignored.
+Only `identifier` plus whichever fields a given command needs (per the
+[table above](#per-command-requirements)) actually matter in practice —
+everything else can simply be omitted.
 
 **CSV** — one row per issue, header required:
 

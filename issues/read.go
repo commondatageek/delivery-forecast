@@ -81,25 +81,55 @@ func parseTimestamp(v string) (time.Time, error) {
 	return time.Time{}, fmt.Errorf("unrecognized timestamp %q", v)
 }
 
+// HeaderError reports a CSV header that can't be a forecast data file.
+type HeaderError struct {
+	Header []string // the header row as read (BOM stripped)
+	Msg    string
+}
+
+func (e *HeaderError) Error() string { return e.Msg }
+
+// bom is the UTF-8 byte order mark some exporters (Excel, Jira) write before
+// the first header cell.
+const bom = "\uFEFF"
+
 // columnIndex maps recognized header names (case-insensitive, trimmed) to
-// their column position. Unrecognized headers are ignored. Returns an error
-// if no header cell is recognized at all.
+// their column position. Unrecognized headers are ignored. A header with no
+// recognized cell, or without an identifier column, is a *HeaderError; a
+// recognized column named twice is an error too, since there is no telling
+// which one is meant.
 func columnIndex(header []string) (map[string]int, error) {
 	idx := make(map[string]int)
+	seen := make(map[string]int)
+	var repeated []string
 	for i, h := range header {
 		name := strings.ToLower(strings.TrimSpace(h))
-		if _, ok := fieldSetters[name]; ok {
+		if _, ok := fieldSetters[name]; !ok {
+			continue
+		}
+		seen[name]++
+		if seen[name] == 2 {
+			repeated = append(repeated, name)
+		}
+		if _, ok := idx[name]; !ok {
 			idx[name] = i
 		}
 	}
 	if len(idx) == 0 {
-		return nil, fmt.Errorf("no recognized columns in header; expected one or more of: %s", strings.Join(columnNames, ", "))
+		return nil, &HeaderError{Header: header, Msg: fmt.Sprintf("no recognized columns in header; expected one or more of: %s", strings.Join(columnNames, ", "))}
+	}
+	if _, ok := idx["identifier"]; !ok {
+		return nil, &HeaderError{Header: header, Msg: `no "identifier" column; expected the forecast column names (see DATA_REQUIREMENTS.md)`}
+	}
+	if len(repeated) > 0 {
+		return nil, fmt.Errorf("column %q appears %d times", repeated[0], seen[repeated[0]])
 	}
 	return idx, nil
 }
 
 // ReadCSV parses issues from CSV. The first row must be a header naming
-// columns; column order is irrelevant and unrecognized columns are ignored.
+// columns, including identifier; column order is irrelevant, unrecognized
+// columns are ignored, and a leading UTF-8 byte order mark is skipped.
 func ReadCSV(r io.Reader) ([]Issue, error) {
 	cr := csv.NewReader(r)
 	header, err := cr.Read()
@@ -108,6 +138,9 @@ func ReadCSV(r io.Reader) ([]Issue, error) {
 	}
 	if err != nil {
 		return nil, fmt.Errorf("reading header: %w", err)
+	}
+	if len(header) > 0 {
+		header[0] = strings.TrimPrefix(header[0], bom)
 	}
 	idx, err := columnIndex(header)
 	if err != nil {

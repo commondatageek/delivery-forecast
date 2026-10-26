@@ -1,8 +1,11 @@
 package issues
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -138,6 +141,63 @@ func TestReadCSV_NoRecognizedColumns(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "no recognized columns") {
 		t.Errorf("unexpected error: %v", err)
+	}
+	var he *HeaderError
+	if !errors.As(err, &he) || !slices.Equal(he.Header, []string{"foo", "bar"}) {
+		t.Errorf("error = %#v, want a *HeaderError carrying the header", err)
+	}
+}
+
+func TestReadCSV_BOMHeaderReadsSameAsWithout(t *testing.T) {
+	const body = "identifier,assignee\nENG-1,alice\n"
+	plain, err := ReadCSV(strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("ReadCSV: %v", err)
+	}
+	withBOM, err := ReadCSV(strings.NewReader("\uFEFF" + body))
+	if err != nil {
+		t.Fatalf("ReadCSV with BOM: %v", err)
+	}
+	if !reflect.DeepEqual(plain, withBOM) || withBOM[0].Identifier != "ENG-1" {
+		t.Fatalf("with BOM = %+v, without = %+v", withBOM, plain)
+	}
+}
+
+func TestReadCSV_RepeatedRecognizedHeader(t *testing.T) {
+	_, err := ReadCSV(strings.NewReader("identifier,assignee,Assignee\nENG-1,a,b\n"))
+	if err == nil || err.Error() != `column "assignee" appears 2 times` {
+		t.Fatalf("err = %v, want repeated-column error", err)
+	}
+	// Repeated unrecognized headers are fine: they are ignored.
+	if _, err := ReadCSV(strings.NewReader("identifier,Comment,Comment\nENG-1,a,b\n")); err != nil {
+		t.Fatalf("repeated unrecognized header: %v", err)
+	}
+}
+
+func TestReadCSV_NoIdentifierColumn(t *testing.T) {
+	_, err := ReadCSV(strings.NewReader("Summary,Status,Assignee\nx,Done,alice\n"))
+	var he *HeaderError
+	if !errors.As(err, &he) {
+		t.Fatalf("err = %v, want *HeaderError", err)
+	}
+	if he.Error() != `no "identifier" column; expected the forecast column names (see DATA_REQUIREMENTS.md)` {
+		t.Errorf("message = %q", he.Error())
+	}
+	if !slices.Equal(he.Header, []string{"Summary", "Status", "Assignee"}) {
+		t.Errorf("Header = %q", he.Header)
+	}
+}
+
+// A tracker export that happens to share a few column names (status,
+// assignee, resolution) must not load as identifier-less garbage.
+func TestReadFile_JiraExportIsAHeaderError(t *testing.T) {
+	_, err := ReadFile("../testdata/jira-export-sample.csv")
+	var he *HeaderError
+	if !errors.As(err, &he) {
+		t.Fatalf("err = %v, want *HeaderError", err)
+	}
+	if he.Header[0] != "Summary" {
+		t.Errorf("first header cell = %q, want the BOM stripped", he.Header[0])
 	}
 }
 

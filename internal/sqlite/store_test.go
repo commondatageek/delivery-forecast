@@ -289,3 +289,91 @@ func TestUpsertStoresAbsentOptionalFieldsAsNull(t *testing.T) {
 		t.Fatalf("NULL did not round-trip to empty string: %+v", got[0])
 	}
 }
+
+func sourceIDs(t *testing.T, store *Store) []string {
+	t.Helper()
+	all, err := store.AllIssues(context.Background())
+	if err != nil {
+		t.Fatalf("AllIssues: %v", err)
+	}
+	var out []string
+	for _, it := range all {
+		out = append(out, it.Source+"/"+it.Identifier)
+	}
+	slices.Sort(out)
+	return out
+}
+
+func TestReplaceSource(t *testing.T) {
+	store := openTestStore(t)
+	ctx := context.Background()
+	if err := store.Upsert(ctx,
+		issues.Issue{Source: "jira", Identifier: "DEMO-1"},
+		issues.Issue{Source: "jira", Identifier: "DEMO-2"},
+		issues.Issue{Source: "linear", Identifier: "DEMO-1"},
+	); err != nil {
+		t.Fatalf("Upsert: %v", err)
+	}
+
+	deleted, err := store.ReplaceSource(ctx, "jira", []issues.Issue{
+		{Source: "jira", Identifier: "DEMO-2", Title: "new"},
+		{Source: "jira", Identifier: "DEMO-3"},
+	})
+	if err != nil {
+		t.Fatalf("ReplaceSource: %v", err)
+	}
+	if deleted != 2 {
+		t.Errorf("deleted = %d, want 2", deleted)
+	}
+	want := []string{"jira/DEMO-2", "jira/DEMO-3", "linear/DEMO-1"}
+	if got := sourceIDs(t, store); !slices.Equal(got, want) {
+		t.Fatalf("after replace: %v, want %v (DEMO-1 gone from jira, linear untouched)", got, want)
+	}
+
+	// Replacing into an empty source deletes nothing.
+	deleted, err = store.ReplaceSource(ctx, "csv", []issues.Issue{{Source: "csv", Identifier: "X-1"}})
+	if err != nil || deleted != 0 {
+		t.Fatalf("ReplaceSource(csv) = %d, %v; want 0, nil", deleted, err)
+	}
+}
+
+func TestReplaceSource_MismatchedSourceWritesNothing(t *testing.T) {
+	store := openTestStore(t)
+	ctx := context.Background()
+	if err := store.Upsert(ctx, issues.Issue{Source: "jira", Identifier: "DEMO-1"}); err != nil {
+		t.Fatalf("Upsert: %v", err)
+	}
+	_, err := store.ReplaceSource(ctx, "jira", []issues.Issue{
+		{Source: "jira", Identifier: "DEMO-2"},
+		{Source: "linear", Identifier: "ENG-1"},
+	})
+	if err == nil || !strings.Contains(err.Error(), `issue ENG-1 has source "linear"`) {
+		t.Fatalf("err = %v, want a source mismatch", err)
+	}
+	if got := sourceIDs(t, store); !slices.Equal(got, []string{"jira/DEMO-1"}) {
+		t.Fatalf("store changed: %v", got)
+	}
+}
+
+func TestReplaceSource_InsertFailureRollsBackDelete(t *testing.T) {
+	store := openTestStore(t)
+	ctx := context.Background()
+	if err := store.Upsert(ctx, issues.Issue{Source: "jira", Identifier: "DEMO-1"}); err != nil {
+		t.Fatalf("Upsert: %v", err)
+	}
+	// A trigger makes one insert fail after the delete has run.
+	if _, err := store.db.ExecContext(ctx, `CREATE TRIGGER no_bad BEFORE INSERT ON issues
+		WHEN NEW.identifier = 'BAD' BEGIN SELECT RAISE(ABORT, 'bad row'); END`); err != nil {
+		t.Fatalf("create trigger: %v", err)
+	}
+	_, err := store.ReplaceSource(ctx, "jira", []issues.Issue{
+		{Source: "jira", Identifier: "DEMO-2"},
+		{Source: "jira", Identifier: "BAD"},
+	})
+	if err == nil {
+		t.Fatal("ReplaceSource = nil error, want the insert failure")
+	}
+	if got := sourceIDs(t, store); !slices.Equal(got, []string{"jira/DEMO-1"}) {
+		t.Fatalf("after a failed replace the store is %v, want the original jira/DEMO-1", got)
+	}
+}

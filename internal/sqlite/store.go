@@ -218,6 +218,38 @@ func upsertTx(ctx context.Context, tx *sql.Tx, items []issues.Issue) error {
 	return nil
 }
 
+// ReplaceSource deletes every issue whose source is src and inserts items
+// (whose Source must all equal src), in one transaction. It returns how
+// many rows were deleted. Rows of other sources are untouched.
+func (s *Store) ReplaceSource(ctx context.Context, src string, items []issues.Issue) (deleted int, err error) {
+	for _, it := range items {
+		if it.Source != src {
+			return 0, fmt.Errorf("replace source %q: issue %s has source %q", src, it.Identifier, it.Source)
+		}
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	res, err := tx.ExecContext(ctx, `DELETE FROM issues WHERE source = ?`, src)
+	if err != nil {
+		return 0, fmt.Errorf("delete source %q: %w", src, err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("delete source %q: %w", src, err)
+	}
+	if err := upsertTx(ctx, tx, items); err != nil {
+		return 0, err
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, fmt.Errorf("commit: %w", err)
+	}
+	return int(n), nil
+}
+
 // Delete removes source's issues by identifier. Identifiers not in the store
 // (or stored under another source) are ignored.
 func (s *Store) Delete(ctx context.Context, source string, identifiers ...string) error {

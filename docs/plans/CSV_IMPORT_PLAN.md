@@ -1,6 +1,6 @@
 # Implementation plan: mapped CSV import (`forecast import`)
 
-Status: **agreed design, implementation not started.** Written 2026-10-25
+Status: **implemented** (Phases A–D, 2026-10-26; the §10 acceptance check against the real export is still to run). Written 2026-10-25
 from a profile of a real Jira Cloud export ("SDLC Workload Export
 (Jira).csv", 983 issues, one project); revised the same day with the user's
 feedback (keep `-input` for normalized files, §3 D-I12; sort the colleague's

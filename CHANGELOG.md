@@ -13,6 +13,18 @@ behavior changes ship in minor releases, called out here.
 
 ### Added
 
+- **`forecast import`** converts a tracker's raw CSV export into a data source
+  (`.db`, `.csv` or `.json`) using a mapping file: which export column fills
+  which field, how the workflow's statuses map onto backlog / started /
+  completed / canceled, which lifecycle timestamps to keep for which
+  statuses, and which rows to drop. Importing into a `.db` replaces every
+  issue of the mapping's `source`, so re-running it with a fresh export
+  refreshes the data. Nothing is guessed: anything the mapping doesn't
+  cover stops the import with the rule, column and example rows. `-dry-run`
+  prints only the report; `-example jira-cloud-csv` prints the embedded
+  Jira Cloud template. The web UI has an Import page with export and mapping
+  uploads. See [docs/IMPORT_MAPPING.md](docs/IMPORT_MAPPING.md).
+
 - **Exclusions now apply to the forecast horizon.** One `exclusions.json` is a
   calendar of non-working days for everyone (`global`) or a named engineer
   (`engineers`, via `-engineers alice,bob`), and each date takes effect on
@@ -67,6 +79,12 @@ behavior changes ship in minor releases, called out here.
   percentile, so `1.34x` reads as "34% older than the anchor."
 
 ### Changed
+
+- **`-input` rejects a CSV without an `identifier` column**, and a CSV that
+  names a recognized column twice; a leading byte order mark is ignored. A
+  tracker export passed to `-input` (one whose header has a template's
+  `detect` columns) now gets an error naming the `forecast import` commands
+  that convert it, instead of loading as rows with no identifiers or dates.
 
 - **The issue record speaks the tool's own vocabulary (v2).** Breaking, no
   aliases: `state_type` is now `status`, one of `backlog`, `started`,

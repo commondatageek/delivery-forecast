@@ -12,6 +12,9 @@ tool's own, and each tracker is mapped onto it):
   `linear sync` or by writing to it yourself from another system (Jira,
   GitHub Issues, a spreadsheet, ...).
 - **CSV** — one row per issue; see [CSV/JSON format](#csvjson-format) below.
+  A tracker's own export (e.g. Jira's) isn't in this shape; convert it with
+  `forecast import` and a mapping file — see
+  [docs/IMPORT_MAPPING.md](docs/IMPORT_MAPPING.md).
 - **JSON** — an array of objects, or JSON-Lines (one object per line); same
   section.
 
@@ -52,6 +55,10 @@ is SQLite, CSV, or JSON.
 | `history` | `created_at`³ | Same day-walk as `cfd` (`history.Normalize`/`BuildRows`, which `cfd.BuildGrid` now wraps): `started_at`/`completed_at`/`canceled_at` optional, affecting only which day an issue's arrival/backlog-exit/completion lands on. `-project`/`-milestone` exact match, both optional. `team_key` filter only if `-teams` given | `status`² |
 | `count` | none per-issue — aggregate counts and a max timestamp | `IsTerminal()` (not counted) vs. not (counted): prefers `completed_at`/`canceled_at`; falls back to `status` only when both are zero² — the one command where that fallback regularly matters, since backlog/unstarted issues often carry no timestamps at all. `updated_at` recency (`-updated-since`, project ordering) is measured across **all** issues, including terminal ones. `team_key` filter only if `-teams` given | `team_name`, `project_name`, `milestone_name` (grouping/display keys) |
 | `linear sync` | writes all 21 columns | n/a — ingest, not a read | not needed at all if you populate the database/file yourself |
+
+`forecast import` (see [docs/IMPORT_MAPPING.md](docs/IMPORT_MAPPING.md)) writes
+all 21 columns it is told about; its report ends with the same readiness
+check.
 
 `forecast check -input <file>` runs a lighter-weight version of this table
 against your data and prints a per-command readiness report — run it before
@@ -122,6 +129,8 @@ the file is rejected outright (`issues.ReadCSV` returns an `*issues.HeaderError`
 — a file without one can't be a forecast data file, even if a few other
 columns happen to match. A recognized column named twice is an error too,
 and a leading UTF-8 byte order mark (as Excel and Jira write) is ignored.
+Passing a recognizable tracker export to `-input` gets an error naming the
+`forecast import` commands that convert it.
 Only `identifier` plus whichever fields a given command needs (per the
 [table above](#per-command-requirements)) actually matter in practice —
 everything else can simply be omitted.

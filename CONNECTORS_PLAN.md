@@ -1,6 +1,6 @@
 # Implementation plan: tracker connectors (Linear, Jira, …)
 
-Status: **agreed design, implementation not started.** The decisions in §3
+Status: **agreed design; Phase 1 implemented (2026-10-26), Phases 2–4 not started.** The decisions in §3
 were settled with the user on 2026-10-08 except where a row says *open*;
 §11 lists what is still open and which phase each item blocks. Nothing in
 §11 blocks Phase 1 or Phase 2.

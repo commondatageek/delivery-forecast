@@ -303,8 +303,8 @@ func TestCmdSimItems_SampleExclusionsInManifest(t *testing.T) {
 	if err := json.NewDecoder(strings.NewReader(out)).Decode(&m); err != nil {
 		t.Fatalf("decoding manifest: %v\n%s", err, out)
 	}
-	if m.SchemaVersion != 2 {
-		t.Errorf("schema_version = %d, want 2", m.SchemaVersion)
+	if m.SchemaVersion != 3 {
+		t.Errorf("schema_version = %d, want 3", m.SchemaVersion)
 	}
 	if got := m.Pool.PerEngineerSampleDays["alice"]; got != 9 {
 		t.Errorf("per_engineer_sample_days[alice] = %d, want 9 (10 days minus the excluded one)", got)

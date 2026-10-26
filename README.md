@@ -146,7 +146,7 @@ Which columns does each command need?
 |---|---|
 | `history`, `cfd` | `created_at` (issues without it are skipped); `started_at`, `completed_at`, `canceled_at` sharpen the picture |
 | `aging` | `started_at` and `completed_at` on completed issues; `started_at` on in-progress ones |
-| `count` | `updated_at`, `state_type` (or `completed_at`/`canceled_at`), and `project_name` for grouping. Projects with no recent `updated_at` are hidden. |
+| `count` | `updated_at`, `status` (or `completed_at`/`canceled_at`), and `project_name` for grouping. Projects with no recent `updated_at` are hidden. |
 | `sim *` | `completed_at` and a non-empty `assignee` on completed issues |
 
 `forecast check` tests your file against this list and tells you how many

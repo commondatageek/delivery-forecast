@@ -20,6 +20,8 @@
 #   -engineers   comma-separated list of assignee names to check (required)
 #   -start       sample window start, YYYY-MM-DD, inclusive (default: 90 days before -end)
 #   -end         sample window end, YYYY-MM-DD, exclusive (default: today)
+#   -source      only count issues from this source, e.g. linear or jira
+#                (default: every source in the database)
 
 set -euo pipefail
 
@@ -27,6 +29,7 @@ db="linear.db"
 engineers=""
 start=""
 end=""
+source=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -34,8 +37,9 @@ while [ $# -gt 0 ]; do
     -engineers) engineers="$2"; shift 2 ;;
     -start) start="$2"; shift 2 ;;
     -end) end="$2"; shift 2 ;;
+    -source) source="$2"; shift 2 ;;
     -h|-help|--help)
-      sed -n '2,20p' "$0" | sed 's/^# \?//'
+      sed -n '2,22p' "$0" | sed 's/^# \?//'
       exit 0
       ;;
     *) echo "unknown flag: $1" >&2; exit 1 ;;
@@ -78,6 +82,12 @@ sql_in_list() {
 }
 in_list="$(sql_in_list)"
 
+# Restricts every query to one source when -source is given.
+source_filter=""
+if [ -n "$source" ]; then
+  source_filter="AND source = '${source//\'/\'\'}'"
+fi
+
 echo "Window: [$start, $end) -- $total_days days"
 echo
 
@@ -85,7 +95,7 @@ echo "=== Engineers not found in data at all (check for typos) ==="
 any_missing=0
 for eng in "${engineer_list[@]}"; do
   escaped="${eng//\'/\'\'}"
-  count=$(sqlite3 "$db" "SELECT COUNT(*) FROM issues WHERE assignee = '$escaped';")
+  count=$(sqlite3 "$db" "SELECT COUNT(*) FROM issues WHERE assignee = '$escaped' $source_filter;")
   if [ "$count" -eq 0 ]; then
     echo "  MISSING: $eng"
     any_missing=1
@@ -103,8 +113,9 @@ SELECT assignee,
        COUNT(DISTINCT substr(completed_at,1,10)) AS distinct_days,
        $total_days - COUNT(DISTINCT substr(completed_at,1,10)) AS zero_days_in_pool
 FROM issues
-WHERE state_type = 'completed'
+WHERE status = 'completed'
   AND assignee IN ($in_list)
+  $source_filter
   AND completed_at >= '$start'
   AND completed_at <  '$end'
 GROUP BY assignee
@@ -119,8 +130,9 @@ SELECT assignee,
        MIN(completed_at) AS earliest,
        MAX(completed_at) AS latest
 FROM issues
-WHERE state_type = 'completed'
+WHERE status = 'completed'
   AND assignee IN ($in_list)
+  $source_filter
 GROUP BY assignee
 ORDER BY assignee;
 "

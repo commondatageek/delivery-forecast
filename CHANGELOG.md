@@ -68,6 +68,22 @@ behavior changes ship in minor releases, called out here.
 
 ### Changed
 
+- **The issue record speaks the tool's own vocabulary (v2).** Breaking, no
+  aliases: `state_type` is now `status`, one of `backlog`, `started`,
+  `completed`, `canceled` (Linear's `triage`/`unstarted` map to `backlog`,
+  `duplicate` to `canceled`); `state_name` is `status_name`;
+  `project_milestone_id`/`_name` are `milestone_id`/`_name`. New columns:
+  `source`, `url`, `issue_type`, `parent_identifier`, `resolution`. The
+  Linear-only `archived_at`, `auto_archived_at` and `added_to_project_at` are
+  gone. Old CSV/JSON headers are simply unknown columns now — rename them.
+  `aging -format json` emits `status`/`status_name` instead of
+  `state_type`/`state_name`. Analysis numbers are unchanged.
+- **SQLite databases are versioned and keyed by `(source, identifier)`.** A
+  database built by an earlier version is refused with instructions; delete
+  it and run `forecast linear sync` again.
+- **Manifest `schema_version` is 3.** `data.db` is now `data.input`, and each
+  `issues.records` entry carries `source` and `status` (was `state_type`).
+  `scripts/check-engineer-data.sh` reads the v2 columns and takes `-source`.
 - **Manifest `schema_version` is 2.** `data.exclusions` replaces
   `data.exclusions_path`/`data.exclusions_applied` and records both the source
   entries and the resolved dates dropped from the sample and zeroed in the

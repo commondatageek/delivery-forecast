@@ -88,7 +88,7 @@ behavior changes ship in minor releases, called out here.
   boundary-day `completed`/`remaining` count — and the probability derived
   from it — may differ by one day from a previous release. The upside is that
   `sim backtest`, `cfd`, and `history` can no longer disagree about which day
-  an event landed on. (Decision D4 in `HISTORY_PLAN.md`.)
+  an event landed on. (Decision D4 in `docs/plans/HISTORY_PLAN.md`.)
 - **`forecast aging` no longer drops unassigned completed issues** from its
   cycle-time distribution. The old SQL query required a non-empty `assignee`
   even though `aging` never groups by assignee, so an unassigned completed

@@ -84,6 +84,7 @@ func SimItems(req ItemsRequest) (*ItemsResult, error) {
 		return res, err
 	}
 	run.HorizonCalendar = simulate.NewCalendar(req.Exclusions, req.TargetStart)
+	res.Run = run // res.Run is a copy taken above; refresh it so the manifest sees the horizon
 
 	dist := simulate.ItemsInDays(run.Pool, simulate.Params{
 		Mode:          mode,

@@ -265,6 +265,13 @@ down in your phase report instead.
 4. **Exclusions-file read errors** now surface after the input file loads but
    before any typical-engineer warning. Today they come after that warning.
    This is a consequence of (1) and D2.
+5. **(Accepted after the fact.) The `-manifest` flag record for an unset
+   `-confidence` now reads `"value": ""`** instead of `"50,75,85,95"`. The old
+   CLI wrote the defaults back into the flag variable before the manifest
+   recorded it; defaults are now applied in `internal/app`, leaving the flag
+   untouched. The levels actually used are still in
+   `resolved.extra.effective_confidence_levels`, and replaying from `flags`
+   resolves to the same defaults.
 
 ---
 

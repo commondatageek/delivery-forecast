@@ -100,6 +100,7 @@ func SimDays(req DaysRequest) (*DaysResult, error) {
 		return res, err
 	}
 	run.HorizonCalendar = simulate.NewCalendar(req.Exclusions, req.TargetStart)
+	res.Run = run // res.Run is a copy taken above; refresh it so the manifest sees the horizon
 
 	params := simulate.Params{
 		Mode:          mode,

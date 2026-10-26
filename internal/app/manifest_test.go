@@ -139,3 +139,42 @@ func TestNewManifest_NoExclusionsMarshalsEmptyLists(t *testing.T) {
 		}
 	}
 }
+
+// TestNewManifest_HorizonFromRun goes through the real run functions rather
+// than a hand-built SimRun, so it catches a result whose Run lacks the
+// horizon calendar the engine used.
+func TestNewManifest_HorizonFromRun(t *testing.T) {
+	exc, err := simulate.ParseExclusions([]byte(`{"global": ["2025-03-05"]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	base := constantBase()
+	base.Exclusions = exc
+
+	runs := map[string]func() (SimRun, error){
+		"sim items": func() (SimRun, error) {
+			res, err := SimItems(ItemsRequest{SimBase: base, TargetStart: horizonStart, Days: 10})
+			return res.Run, err
+		},
+		"sim days": func() (SimRun, error) {
+			res, err := SimDays(DaysRequest{SimBase: base, TargetStart: horizonStart, Items: []int{3}})
+			return res.Run, err
+		},
+		"sim probability": func() (SimRun, error) {
+			res, err := SimProbability(ProbabilityRequest{SimBase: base, TargetStart: horizonStart, Days: 10, Items: 5})
+			return res.Run, err
+		},
+	}
+	for name, run := range runs {
+		t.Run(name, func(t *testing.T) {
+			r, err := run()
+			if err != nil {
+				t.Fatal(err)
+			}
+			m := NewManifest(ManifestInputs{Subcommand: name, Run: r, Engineers: 1})
+			if want := []string{"2025-03-05"}; !reflect.DeepEqual(m.Data.Exclusions.HorizonDaysOff.Global, want) {
+				t.Errorf("HorizonDaysOff.Global = %v, want %v", m.Data.Exclusions.HorizonDaysOff.Global, want)
+			}
+		})
+	}
+}

@@ -1,5 +1,6 @@
 *.yaml
 *.json
+*.csv
 !testdata/*.json
 *.html
 !internal/**/*.html

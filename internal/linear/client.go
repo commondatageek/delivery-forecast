@@ -18,6 +18,10 @@ import (
 
 const endpoint = "https://api.linear.app/graphql"
 
+// Kind is the source every issue fetched from Linear is stored under
+// (issues.Issue.Source).
+const Kind = "linear"
+
 func GetAPIKey() (string, error) {
 	apiKey := os.Getenv("LINEAR_API_KEY")
 	if apiKey == "" {
@@ -195,28 +199,41 @@ func toIssue(n issueNode) issues.Issue {
 	}
 	status := issues.StatusUnknown
 	stateName := ""
+	resolution := ""
 	if n.State != nil {
 		status = statusFromStateType(n.State.Type)
 		stateName = n.State.Name
+		if n.State.Type == "duplicate" {
+			// Status folds duplicate into canceled; keep the raw fact.
+			resolution = "duplicate"
+		}
+	}
+	parent := ""
+	if n.Parent != nil {
+		parent = n.Parent.Identifier
 	}
 
 	return issues.Issue{
-		Identifier:    n.Identifier,
-		Title:         n.Title,
-		Assignee:      assigneeName,
-		TeamKey:       teamKey,
-		TeamName:      teamName,
-		ProjectID:     projectID,
-		ProjectName:   projectName,
-		MilestoneID:   milestoneID,
-		MilestoneName: milestoneName,
-		Status:        status,
-		StatusName:    stateName,
-		CreatedAt:     n.CreatedAt,
-		StartedAt:     n.StartedAt,
-		CompletedAt:   n.CompletedAt,
-		CanceledAt:    n.CanceledAt,
-		UpdatedAt:     n.UpdatedAt,
+		Source:           Kind,
+		Identifier:       n.Identifier,
+		Title:            n.Title,
+		URL:              n.URL,
+		Assignee:         assigneeName,
+		TeamKey:          teamKey,
+		TeamName:         teamName,
+		ProjectID:        projectID,
+		ProjectName:      projectName,
+		MilestoneID:      milestoneID,
+		MilestoneName:    milestoneName,
+		ParentIdentifier: parent,
+		Status:           status,
+		StatusName:       stateName,
+		Resolution:       resolution,
+		CreatedAt:        n.CreatedAt,
+		StartedAt:        n.StartedAt,
+		CompletedAt:      n.CompletedAt,
+		CanceledAt:       n.CanceledAt,
+		UpdatedAt:        n.UpdatedAt,
 	}
 }
 
@@ -269,12 +286,16 @@ query FetchIssues($after: String) {
     nodes {
       identifier
       title
+      url
       createdAt
       startedAt
       completedAt
       canceledAt
       updatedAt
       trashed
+      parent {
+        identifier
+      }
       assignee {
         name
       }
@@ -319,6 +340,7 @@ type pageInfo struct {
 type issueNode struct {
 	Identifier       string        `json:"identifier"`
 	Title            string        `json:"title"`
+	URL              string        `json:"url"`
 	CreatedAt        time.Time     `json:"createdAt"`
 	StartedAt        time.Time     `json:"startedAt"`
 	CompletedAt      time.Time     `json:"completedAt"`
@@ -330,6 +352,11 @@ type issueNode struct {
 	Project          *projectRef   `json:"project"`
 	ProjectMilestone *milestoneRef `json:"projectMilestone"`
 	State            *stateRef     `json:"state"`
+	Parent           *parentRef    `json:"parent"`
+}
+
+type parentRef struct {
+	Identifier string `json:"identifier"`
 }
 
 type assignee struct {

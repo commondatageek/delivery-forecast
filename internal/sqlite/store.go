@@ -19,34 +19,42 @@ type Store struct {
 	db *sql.DB
 }
 
-// schema is the full (and only) table definition. The store just replicates
-// Linear's own data, so rebuilding the database from scratch is trivial and
-// cheap; there's no history worth preserving across schema changes, so a
-// single idempotent CREATE IF NOT EXISTS replaces versioned migrations.
+// SchemaVersion is the issues table layout this build reads and writes,
+// recorded in PRAGMA user_version. There are no migrations: the store is a
+// replica of trackers' data (or of an imported file), so a database built by
+// a different version is refused and the user rebuilds it.
+const SchemaVersion = 2
+
+// schema is the full (and only) table definition. Issues are keyed by
+// (source, identifier) so one database can hold several trackers' issues
+// without identifier collisions.
 const schema = `
 CREATE TABLE IF NOT EXISTS issues (
-    identifier              TEXT NOT NULL PRIMARY KEY,
-    title                   TEXT NOT NULL DEFAULT '',
-    assignee                TEXT,
-    team_key                TEXT NOT NULL DEFAULT '',
-    team_name               TEXT NOT NULL DEFAULT '',
-    project_id              TEXT,
-    project_name            TEXT,
-    project_milestone_id    TEXT,
-    project_milestone_name  TEXT,
-    state_type              TEXT NOT NULL DEFAULT '',
-    state_name              TEXT NOT NULL DEFAULT '',
-    created_at              DATETIME,
-    started_at              DATETIME,
-    completed_at            DATETIME,
-    canceled_at             DATETIME,
-    archived_at             DATETIME,
-    auto_archived_at        DATETIME,
-    added_to_project_at     DATETIME,
-    updated_at              DATETIME
+    source            TEXT NOT NULL DEFAULT '',
+    identifier        TEXT NOT NULL,
+    title             TEXT NOT NULL DEFAULT '',
+    url               TEXT,
+    assignee          TEXT,
+    team_key          TEXT NOT NULL DEFAULT '',
+    team_name         TEXT NOT NULL DEFAULT '',
+    project_id        TEXT,
+    project_name      TEXT,
+    milestone_id      TEXT,
+    milestone_name    TEXT,
+    issue_type        TEXT,
+    parent_identifier TEXT,
+    status            TEXT NOT NULL DEFAULT '',
+    status_name       TEXT NOT NULL DEFAULT '',
+    resolution        TEXT,
+    created_at        DATETIME,
+    started_at        DATETIME,
+    completed_at      DATETIME,
+    canceled_at       DATETIME,
+    updated_at        DATETIME,
+    PRIMARY KEY (source, identifier)
 );
 
-CREATE INDEX IF NOT EXISTS idx_issues_team_key_updated_at ON issues (team_key, updated_at);
+CREATE INDEX IF NOT EXISTS idx_issues_source_team_updated ON issues (source, team_key, updated_at);
 CREATE INDEX IF NOT EXISTS idx_issues_completed_at        ON issues (completed_at);
 `
 
@@ -54,6 +62,9 @@ CREATE INDEX IF NOT EXISTS idx_issues_completed_at        ON issues (completed_a
 // exists. Since this always creates a missing file, it's meant for the
 // ingest path (`linear sync`), which legitimately seeds a brand-new database.
 // Read-only commands should use OpenExisting instead.
+//
+// A brand-new (table-less) database is stamped with SchemaVersion; any other
+// database whose user_version differs is refused, naming both versions.
 func Open(path string) (*Store, error) {
 	db, err := sql.Open("sqlite", path)
 	if err != nil {
@@ -66,12 +77,41 @@ func Open(path string) (*Store, error) {
 		return nil, fmt.Errorf("pragma: %w", err)
 	}
 
+	if err := checkVersion(db, path); err != nil {
+		db.Close()
+		return nil, err
+	}
+
 	if _, err := db.Exec(schema); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("create schema: %w", err)
 	}
 
 	return &Store{db: db}, nil
+}
+
+// checkVersion stamps a brand-new database with SchemaVersion and refuses an
+// existing one built by a different version. Databases from before
+// versioning read as user_version 0.
+func checkVersion(db *sql.DB, path string) error {
+	var version int
+	if err := db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil {
+		return fmt.Errorf("read schema version: %w", err)
+	}
+	if version == SchemaVersion {
+		return nil
+	}
+	var tables int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table'`).Scan(&tables); err != nil {
+		return fmt.Errorf("inspect schema: %w", err)
+	}
+	if version == 0 && tables == 0 {
+		if _, err := db.Exec(fmt.Sprintf(`PRAGMA user_version = %d`, SchemaVersion)); err != nil {
+			return fmt.Errorf("set schema version: %w", err)
+		}
+		return nil
+	}
+	return fmt.Errorf("%s: database schema is v%d, this build needs v%d; delete the file and create it again (e.g. forecast linear sync)", path, version, SchemaVersion)
 }
 
 // OpenExisting opens the SQLite database at path, first checking that the
@@ -94,39 +134,54 @@ func (s *Store) Close() error {
 	return s.db.Close()
 }
 
-// Upsert inserts or updates issues. The unique key is identifier.
-func (s *Store) Upsert(ctx context.Context, items ...issues.Issue) error {
-	const q = `
+// upsertSQL inserts an issue or, when its (source, identifier) is already
+// stored, replaces every other column.
+const upsertSQL = `
 INSERT INTO issues
-    (identifier, title, assignee, team_key, team_name, project_id, project_name,
-     project_milestone_id, project_milestone_name, state_type, state_name,
+    (source, identifier, title, url, assignee, team_key, team_name,
+     project_id, project_name, milestone_id, milestone_name,
+     issue_type, parent_identifier, status, status_name, resolution,
      created_at, started_at, completed_at, canceled_at, updated_at)
 VALUES
-    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-ON CONFLICT(identifier) DO UPDATE SET
-    title                  = excluded.title,
-    assignee               = excluded.assignee,
-    team_key               = excluded.team_key,
-    team_name              = excluded.team_name,
-    project_id             = excluded.project_id,
-    project_name           = excluded.project_name,
-    project_milestone_id   = excluded.project_milestone_id,
-    project_milestone_name = excluded.project_milestone_name,
-    state_type             = excluded.state_type,
-    state_name             = excluded.state_name,
-    created_at             = excluded.created_at,
-    started_at             = excluded.started_at,
-    completed_at           = excluded.completed_at,
-    canceled_at            = excluded.canceled_at,
-    updated_at             = excluded.updated_at`
+    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(source, identifier) DO UPDATE SET
+    title             = excluded.title,
+    url               = excluded.url,
+    assignee          = excluded.assignee,
+    team_key          = excluded.team_key,
+    team_name         = excluded.team_name,
+    project_id        = excluded.project_id,
+    project_name      = excluded.project_name,
+    milestone_id      = excluded.milestone_id,
+    milestone_name    = excluded.milestone_name,
+    issue_type        = excluded.issue_type,
+    parent_identifier = excluded.parent_identifier,
+    status            = excluded.status,
+    status_name       = excluded.status_name,
+    resolution        = excluded.resolution,
+    created_at        = excluded.created_at,
+    started_at        = excluded.started_at,
+    completed_at      = excluded.completed_at,
+    canceled_at       = excluded.canceled_at,
+    updated_at        = excluded.updated_at`
 
+// Upsert inserts or updates issues. The unique key is (source, identifier).
+func (s *Store) Upsert(ctx context.Context, items ...issues.Issue) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)
 	}
 	defer tx.Rollback()
 
-	stmt, err := tx.PrepareContext(ctx, q)
+	if err := upsertTx(ctx, tx, items); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// upsertTx runs upsertSQL for every item inside tx.
+func upsertTx(ctx context.Context, tx *sql.Tx, items []issues.Issue) error {
+	stmt, err := tx.PrepareContext(ctx, upsertSQL)
 	if err != nil {
 		return fmt.Errorf("prepare upsert: %w", err)
 	}
@@ -134,8 +189,10 @@ ON CONFLICT(identifier) DO UPDATE SET
 
 	for _, it := range items {
 		_, err := stmt.ExecContext(ctx,
+			it.Source,
 			it.Identifier,
 			it.Title,
+			nullString(it.URL),
 			nullString(it.Assignee),
 			it.TeamKey,
 			it.TeamName,
@@ -143,8 +200,11 @@ ON CONFLICT(identifier) DO UPDATE SET
 			nullString(it.ProjectName),
 			nullString(it.MilestoneID),
 			nullString(it.MilestoneName),
+			nullString(it.IssueType),
+			nullString(it.ParentIdentifier),
 			string(it.Status),
 			it.StatusName,
+			nullString(it.Resolution),
 			nullTime(it.CreatedAt),
 			nullTime(it.StartedAt),
 			nullTime(it.CompletedAt),
@@ -155,12 +215,12 @@ ON CONFLICT(identifier) DO UPDATE SET
 			return fmt.Errorf("upsert %s: %w", it.Identifier, err)
 		}
 	}
-
-	return tx.Commit()
+	return nil
 }
 
-// Delete removes issues by identifier. Identifiers not in the store are ignored.
-func (s *Store) Delete(ctx context.Context, identifiers ...string) error {
+// Delete removes source's issues by identifier. Identifiers not in the store
+// (or stored under another source) are ignored.
+func (s *Store) Delete(ctx context.Context, source string, identifiers ...string) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)
@@ -168,7 +228,7 @@ func (s *Store) Delete(ctx context.Context, identifiers ...string) error {
 	defer tx.Rollback()
 
 	for _, id := range identifiers {
-		if _, err := tx.ExecContext(ctx, `DELETE FROM issues WHERE identifier = ?`, id); err != nil {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM issues WHERE source = ? AND identifier = ?`, source, id); err != nil {
 			return fmt.Errorf("delete %s: %w", id, err)
 		}
 	}
@@ -179,8 +239,9 @@ func (s *Store) Delete(ctx context.Context, identifiers ...string) error {
 // apply issues.Filter in memory and get semantics identical to file sources.
 func (s *Store) AllIssues(ctx context.Context) ([]issues.Issue, error) {
 	const q = `
-SELECT identifier, title, assignee, team_key, team_name, project_id, project_name,
-       project_milestone_id, project_milestone_name, state_type, state_name,
+SELECT source, identifier, title, url, assignee, team_key, team_name,
+       project_id, project_name, milestone_id, milestone_name,
+       issue_type, parent_identifier, status, status_name, resolution,
        created_at, started_at, completed_at, canceled_at, updated_at
 FROM issues`
 
@@ -194,22 +255,26 @@ FROM issues`
 	for rows.Next() {
 		var it issues.Issue
 		var status string
-		var assignee, projectID, projectName, milestoneID, milestoneName sql.NullString
+		var url, assignee, projectID, projectName, milestoneID, milestoneName, issueType, parent, resolution sql.NullString
 		var createdAt, startedAt, completedAt, canceledAt, updatedAt sql.NullTime
 		if err := rows.Scan(
-			&it.Identifier, &it.Title, &assignee, &it.TeamKey, &it.TeamName,
+			&it.Source, &it.Identifier, &it.Title, &url, &assignee, &it.TeamKey, &it.TeamName,
 			&projectID, &projectName, &milestoneID, &milestoneName,
-			&status, &it.StatusName,
+			&issueType, &parent, &status, &it.StatusName, &resolution,
 			&createdAt, &startedAt, &completedAt, &canceledAt, &updatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("AllIssues scan: %w", err)
 		}
 		it.Status, _ = issues.ParseStatus(status)
+		it.URL = url.String
 		it.Assignee = assignee.String
 		it.ProjectID = projectID.String
 		it.ProjectName = projectName.String
 		it.MilestoneID = milestoneID.String
 		it.MilestoneName = milestoneName.String
+		it.IssueType = issueType.String
+		it.ParentIdentifier = parent.String
+		it.Resolution = resolution.String
 		if createdAt.Valid {
 			it.CreatedAt = createdAt.Time
 		}
@@ -230,16 +295,16 @@ FROM issues`
 	return out, rows.Err()
 }
 
-// LatestUpdatedAtForTeam returns the maximum updated_at among issues for the
-// given team key. Returns zero time if the team has no issues yet (signals a
-// full fetch for that team).
-func (s *Store) LatestUpdatedAtForTeam(ctx context.Context, teamKey string) (time.Time, error) {
+// LatestUpdatedAt returns the maximum updated_at among source's issues for
+// the given team key. Returns zero time if that team has no issues from that
+// source yet (signals a full fetch for that team).
+func (s *Store) LatestUpdatedAt(ctx context.Context, source, teamKey string) (time.Time, error) {
 	// Selecting the updated_at column directly (rather than MAX(updated_at))
 	// keeps the result typed as DATETIME, which the sqlite driver requires
 	// in order to scan it back into a time.Time instead of a string.
 	row := s.db.QueryRowContext(ctx,
-		`SELECT updated_at FROM issues WHERE team_key = ? ORDER BY updated_at DESC LIMIT 1`,
-		teamKey)
+		`SELECT updated_at FROM issues WHERE source = ? AND team_key = ? ORDER BY updated_at DESC LIMIT 1`,
+		source, teamKey)
 
 	var ts sql.NullTime
 	if err := row.Scan(&ts); err != nil {
@@ -254,25 +319,37 @@ func (s *Store) LatestUpdatedAtForTeam(ctx context.Context, teamKey string) (tim
 	return ts.Time, nil
 }
 
-// DistinctTeamKeys returns every non-empty team_key currently present in the
+// DistinctTeams returns every non-empty team_key source currently has in the
 // store, ordered alphabetically.
-func (s *Store) DistinctTeamKeys(ctx context.Context) ([]string, error) {
-	rows, err := s.db.QueryContext(ctx,
-		`SELECT DISTINCT team_key FROM issues WHERE team_key <> '' ORDER BY team_key`)
+func (s *Store) DistinctTeams(ctx context.Context, source string) ([]string, error) {
+	return s.queryStrings(ctx, "distinct team keys",
+		`SELECT DISTINCT team_key FROM issues WHERE source = ? AND team_key <> '' ORDER BY team_key`, source)
+}
+
+// Identifiers returns the identifiers of source's issues for one team,
+// ordered alphabetically.
+func (s *Store) Identifiers(ctx context.Context, source, teamKey string) ([]string, error) {
+	return s.queryStrings(ctx, "identifiers",
+		`SELECT identifier FROM issues WHERE source = ? AND team_key = ? ORDER BY identifier`, source, teamKey)
+}
+
+// queryStrings runs a one-column query and collects its values.
+func (s *Store) queryStrings(ctx context.Context, what, q string, args ...any) ([]string, error) {
+	rows, err := s.db.QueryContext(ctx, q, args...)
 	if err != nil {
-		return nil, fmt.Errorf("distinct team keys: %w", err)
+		return nil, fmt.Errorf("%s: %w", what, err)
 	}
 	defer rows.Close()
 
-	var keys []string
+	var out []string
 	for rows.Next() {
-		var key string
-		if err := rows.Scan(&key); err != nil {
-			return nil, fmt.Errorf("distinct team keys scan: %w", err)
+		var v string
+		if err := rows.Scan(&v); err != nil {
+			return nil, fmt.Errorf("%s scan: %w", what, err)
 		}
-		keys = append(keys, key)
+		out = append(out, v)
 	}
-	return keys, rows.Err()
+	return out, rows.Err()
 }
 
 // nullTime converts a time.Time to sql.NullTime, treating zero as NULL.
@@ -284,8 +361,9 @@ func nullTime(t time.Time) sql.NullTime {
 }
 
 // nullString converts a string to sql.NullString, treating "" as NULL. Used
-// for the optional columns (assignee, project, milestone) so that absent data
-// is stored as NULL rather than an empty string.
+// for the optional columns (url, assignee, project, milestone, issue type,
+// parent, resolution) so that absent data is stored as NULL rather than an
+// empty string.
 func nullString(s string) sql.NullString {
 	if s == "" {
 		return sql.NullString{}

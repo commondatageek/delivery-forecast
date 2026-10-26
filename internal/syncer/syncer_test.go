@@ -87,12 +87,12 @@ func TestRun_EmptyDBWithTeams_FullSync(t *testing.T) {
 		t.Fatalf("since = %v, want zero (full sync)", sc.fetchCalls[0].since)
 	}
 
-	keys, err := store.DistinctTeamKeys(context.Background())
+	keys, err := store.DistinctTeams(context.Background(), linear.Kind)
 	if err != nil {
-		t.Fatalf("DistinctTeamKeys: %v", err)
+		t.Fatalf("DistinctTeams: %v", err)
 	}
 	if len(keys) != 1 || keys[0] != "ENG" {
-		t.Fatalf("DistinctTeamKeys = %v, want [ENG]", keys)
+		t.Fatalf("DistinctTeams = %v, want [ENG]", keys)
 	}
 }
 
@@ -102,7 +102,7 @@ func TestRun_ExistingTeamIncremental_UsesWatermark(t *testing.T) {
 
 	watermark := time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC)
 	seed := issues.Issue{
-		Identifier: "ENG-1", TeamKey: "ENG", Status: issues.StatusCompleted,
+		Source: linear.Kind, Identifier: "ENG-1", TeamKey: "ENG", Status: issues.StatusCompleted,
 		UpdatedAt: watermark,
 	}
 	if err := store.Upsert(ctx, seed); err != nil {
@@ -129,7 +129,7 @@ func TestRun_ExistingTeamFullReload_IgnoresWatermark(t *testing.T) {
 
 	watermark := time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC)
 	seed := issues.Issue{
-		Identifier: "ENG-1", TeamKey: "ENG", Status: issues.StatusCompleted,
+		Source: linear.Kind, Identifier: "ENG-1", TeamKey: "ENG", Status: issues.StatusCompleted,
 		UpdatedAt: watermark,
 	}
 	if err := store.Upsert(ctx, seed); err != nil {
@@ -177,8 +177,8 @@ func TestRun_NoCandidates_SyncsExistingTeams(t *testing.T) {
 	ctx := context.Background()
 
 	if err := store.Upsert(ctx,
-		issues.Issue{Identifier: "ENG-1", TeamKey: "ENG", Status: issues.StatusCompleted, UpdatedAt: time.Now()},
-		issues.Issue{Identifier: "DATA-1", TeamKey: "DATA", Status: issues.StatusCompleted, UpdatedAt: time.Now()},
+		issues.Issue{Source: linear.Kind, Identifier: "ENG-1", TeamKey: "ENG", Status: issues.StatusCompleted, UpdatedAt: time.Now()},
+		issues.Issue{Source: linear.Kind, Identifier: "DATA-1", TeamKey: "DATA", Status: issues.StatusCompleted, UpdatedAt: time.Now()},
 	); err != nil {
 		t.Fatalf("seed Upsert: %v", err)
 	}
@@ -207,12 +207,12 @@ func TestRun_FetchErrorMidLoop_PriorTeamCommitted(t *testing.T) {
 		t.Fatal("Run = nil, want error from DATA fetch failure")
 	}
 
-	keys, kerr := store.DistinctTeamKeys(context.Background())
+	keys, kerr := store.DistinctTeams(context.Background(), linear.Kind)
 	if kerr != nil {
-		t.Fatalf("DistinctTeamKeys: %v", kerr)
+		t.Fatalf("DistinctTeams: %v", kerr)
 	}
 	if len(keys) != 1 || keys[0] != "ENG" {
-		t.Fatalf("DistinctTeamKeys = %v, want [ENG] (ENG's upsert must survive DATA's failure)", keys)
+		t.Fatalf("DistinctTeams = %v, want [ENG] (ENG's upsert must survive DATA's failure)", keys)
 	}
 }
 
@@ -220,8 +220,8 @@ func TestRun_TrashedIssueIsPurgedFromStore(t *testing.T) {
 	store := openTestStore(t)
 	ctx := context.Background()
 	if err := store.Upsert(ctx,
-		issues.Issue{Identifier: "ENG-1", TeamKey: "ENG"},
-		issues.Issue{Identifier: "ENG-2", TeamKey: "ENG"},
+		issues.Issue{Source: linear.Kind, Identifier: "ENG-1", TeamKey: "ENG"},
+		issues.Issue{Source: linear.Kind, Identifier: "ENG-2", TeamKey: "ENG"},
 	); err != nil {
 		t.Fatalf("Upsert: %v", err)
 	}

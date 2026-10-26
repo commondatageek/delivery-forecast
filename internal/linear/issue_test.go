@@ -38,6 +38,7 @@ func TestToIssueFullyPopulated(t *testing.T) {
 	n := issueNode{
 		Identifier:       "ENG-123",
 		Title:            "Fix bug",
+		URL:              "https://linear.app/acme/issue/ENG-123",
 		CreatedAt:        createdAt,
 		StartedAt:        startedAt,
 		CompletedAt:      completedAt,
@@ -48,27 +49,31 @@ func TestToIssueFullyPopulated(t *testing.T) {
 		Project:          &projectRef{ID: "proj-1", Name: "Q3"},
 		ProjectMilestone: &milestoneRef{ID: "ms-1", Name: "Milestone 1"},
 		State:            &stateRef{Type: "completed", Name: "Done"},
+		Parent:           &parentRef{Identifier: "ENG-100"},
 	}
 
 	got := toIssue(n)
 
 	want := issues.Issue{
-		Identifier:    "ENG-123",
-		Title:         "Fix bug",
-		Assignee:      "alice",
-		TeamKey:       "ENG",
-		TeamName:      "Engineering",
-		ProjectID:     "proj-1",
-		ProjectName:   "Q3",
-		MilestoneID:   "ms-1",
-		MilestoneName: "Milestone 1",
-		Status:        issues.StatusCompleted,
-		StatusName:    "Done",
-		CreatedAt:     createdAt,
-		StartedAt:     startedAt,
-		CompletedAt:   completedAt,
-		CanceledAt:    canceledAt,
-		UpdatedAt:     updatedAt,
+		Source:           Kind,
+		Identifier:       "ENG-123",
+		Title:            "Fix bug",
+		URL:              "https://linear.app/acme/issue/ENG-123",
+		ParentIdentifier: "ENG-100",
+		Assignee:         "alice",
+		TeamKey:          "ENG",
+		TeamName:         "Engineering",
+		ProjectID:        "proj-1",
+		ProjectName:      "Q3",
+		MilestoneID:      "ms-1",
+		MilestoneName:    "Milestone 1",
+		Status:           issues.StatusCompleted,
+		StatusName:       "Done",
+		CreatedAt:        createdAt,
+		StartedAt:        startedAt,
+		CompletedAt:      completedAt,
+		CanceledAt:       canceledAt,
+		UpdatedAt:        updatedAt,
 	}
 	if got != want {
 		t.Fatalf("toIssue() = %+v, want %+v", got, want)
@@ -111,5 +116,16 @@ func TestStatusFromStateType(t *testing.T) {
 		if got := statusFromStateType(in); got != want {
 			t.Errorf("statusFromStateType(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+func TestToIssueDuplicateKeepsResolution(t *testing.T) {
+	got := toIssue(issueNode{Identifier: "ENG-2", State: &stateRef{Type: "duplicate", Name: "Duplicate"}})
+	if got.Status != issues.StatusCanceled || got.Resolution != "duplicate" {
+		t.Fatalf("duplicate: Status=%q Resolution=%q, want canceled/duplicate", got.Status, got.Resolution)
+	}
+	got = toIssue(issueNode{Identifier: "ENG-3", State: &stateRef{Type: "canceled", Name: "Canceled"}})
+	if got.Status != issues.StatusCanceled || got.Resolution != "" {
+		t.Fatalf("canceled: Status=%q Resolution=%q, want canceled/\"\"", got.Status, got.Resolution)
 	}
 }

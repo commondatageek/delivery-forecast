@@ -31,6 +31,7 @@ var topCommands = []command{
 	{Name: "check", Summary: "Validate a source file/db and report per-command data readiness.", Run: cmdCheck},
 	{Name: "count", Summary: "Count of non-terminal issues, grouped by project.", Run: cmdCount},
 	{Name: "history", Summary: "Per-day history of flow metrics for a project or team.", Run: cmdHistory},
+	{Name: "import", Summary: "Convert a tracker export into a forecast data source using a mapping file.", Run: cmdImport},
 	{Name: "serve", Summary: "Start the local web UI.", Run: cmdServe},
 	{Name: "version", Summary: "Print version and build info.", Run: cmdVersion},
 	{Name: "update", Summary: "Download and install the latest release.", Run: cmdUpdate},

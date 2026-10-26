@@ -1,0 +1,42 @@
+==== stdout
+read      12 rows, 26 columns from ../../testdata/jira-export-sample.csv
+excluded   1 Issue Type = Epic
+imported  11 issues (source "jira")
+
+status
+  backlog      3  To Do 3
+  started      2  In Progress 2
+  completed    4  Done 4
+  canceled     2  won't do (override) 1, Wont Do (override) 1
+
+timestamps
+  created_at   11  Created 11
+  started_at    2  Status category changed 2
+  completed_at  4  Resolved 3, Status category changed 1
+  canceled_at   2  Resolved 1, Status category changed 1
+  updated_at   11  Updated 11
+
+fields (non-empty of 11)
+  title 11, assignee 9, team_key 11, team_name 11, project_id 4,
+  project_name 4, milestone_name 4, issue_type 11, parent_identifier 4,
+  status_name 11, resolution 5
+
+Read 11 issues from the imported set
+  history   ok
+  cfd       ok
+  aging     4 completed issues have no started_at and will be excluded from the cycle-time distribution
+  count     ok
+  sim       1 completed issue has no assignee and will be excluded
+
+dry run: nothing written
+==== stderr
+INFO  effective flag values for this run:
+INFO  FLAG     VALUE                                  SOURCE
+INFO  config                                          default
+INFO  dry-run  true                                   CLI flag
+INFO  example                                         default
+INFO  from     ../../testdata/jira-export-sample.csv  CLI flag
+INFO  map      testdata/golden/jira-mapping.yaml      CLI flag
+INFO  out                                             default
+==== error
+<nil>

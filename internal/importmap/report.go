@@ -4,6 +4,7 @@ package importmap
 // statuses were decided, where timestamps came from and how full the other
 // fields are. JSON tags let the web UI serve it as-is.
 type Report struct {
+	Source     string        `json:"source"`     // the mapping's source
 	Rows       int           `json:"rows"`       // data rows read
 	Columns    int           `json:"columns"`    // header width
 	Excluded   []ValueCount  `json:"excluded"`   // Label "Issue Type = Epic", rule then first-seen order

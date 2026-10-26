@@ -22,7 +22,7 @@ type goldenCase struct {
 	args []string
 }
 
-// gargs expands the shorthands S/M/X/B/SIM in a space-separated argument string
+// gargs expands the shorthands S/M/X/B/J/SIM in a space-separated argument string
 // and splits it, honouring double quotes so "Search Revamp" stays one element.
 func gargs(s string) []string {
 	r := strings.NewReplacer(
@@ -31,6 +31,7 @@ func gargs(s string) []string {
 		"@M", "testdata/golden/multiteam.csv",
 		"@X", "testdata/golden/exclusions.json",
 		"@B", "testdata/golden/bad-exclusions.json",
+		"@J", "../../testdata/jira-export-sample.csv",
 	)
 	s = r.Replace(s)
 	var out []string
@@ -100,6 +101,10 @@ func goldenCases() []goldenCase {
 		c("check-clean", cmdCheck, "-input @S"),
 		c("check-exclusions", cmdCheck, "-input @M -exclusions @X"),
 		c("check-bad-exclusions", cmdCheck, "-input @S -exclusions @B"),
+		c("import-dry-run", cmdImport, "-from @J -map testdata/golden/jira-mapping.yaml -dry-run"),
+		c("err-import-bad-map", cmdImport, "-from @J -map testdata/golden/bad-jira-mapping.yaml -dry-run"),
+		c("err-import-unmatched-status", cmdImport, "-from @J -map testdata/golden/partial-jira-mapping.yaml -dry-run"),
+		c("err-import-no-out", cmdImport, "-from @J -map testdata/golden/jira-mapping.yaml"),
 		c("err-sim-no-mode", cmdSimItems, "-input @S SIM -days 30"),
 		c("err-sim-days-and-end", cmdSimItems, "-input @S -engineers 2 SIM -days 30 -target-end-date 2025-04-30"),
 		c("err-sim-days-zero-throughput", cmdSimDays, "-input @S -whole-team -sample-start 2025-03-10 -sample-end 2025-03-15 -items 5 -random-seed 1 -goroutines 1"),

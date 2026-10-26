@@ -49,7 +49,7 @@ const maxExamples = 5
 // (a non-empty resolution only), values[status.column]. A conditional
 // timestamp is kept only when the row's status is in its rule's when list.
 func Apply(m *Mapping, header []string, rows [][]string) ([]issues.Issue, Report, error) {
-	rep := Report{Rows: len(rows), Columns: len(header)}
+	rep := Report{Source: m.Source, Rows: len(rows), Columns: len(header)}
 	a := &applier{m: m, header: header, pos: make(map[string][]int)}
 	for i, h := range header {
 		a.pos[norm(h)] = append(a.pos[norm(h)], i)

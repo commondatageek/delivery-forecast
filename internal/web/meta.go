@@ -58,6 +58,13 @@ var metaByFlag = map[string]fieldMeta{
 var metaOverrides = map[string]map[string]fieldMeta{
 	"sim-days":    {"items": meta("int-list", "basic", "Items (comma-separated for a grouped trajectory)")},
 	"linear-sync": {"db": meta("db-path", "data", "Database file"), "teams": meta("string", "basic", "Teams")},
+	"import": {
+		"from":    meta("raw-path", "data", "Tracker export (CSV)"),
+		"map":     meta("map-path", "data", "Mapping file (YAML)"),
+		"out":     meta("db-path", "data", "Write to"),
+		"dry-run": meta("bool", "basic", "Dry run (report only)"),
+		"example": hidden("CLI-only: prints a template to stdout"),
+	},
 }
 
 // metaFor returns the UI decision for flag name of command id, and whether
@@ -71,5 +78,5 @@ func metaFor(id, name string) (fieldMeta, bool) {
 }
 
 func isPathKind(kind string) bool {
-	return kind == "input-path" || kind == "exclusions-path" || kind == "db-path"
+	return kind == "input-path" || kind == "exclusions-path" || kind == "db-path" || kind == "raw-path" || kind == "map-path"
 }

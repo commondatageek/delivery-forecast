@@ -170,7 +170,7 @@ func TestApply_JiraFixture(t *testing.T) {
 	}
 
 	wantRep := Report{
-		Rows: 12, Columns: 26, Imported: 11,
+		Source: "jira", Rows: 12, Columns: 26, Imported: 11,
 		Excluded: []ValueCount{{"Issue Type = Epic", 1}},
 		Status: []StatusCount{
 			{"backlog", 3, []ValueCount{{"To Do", 3}}},

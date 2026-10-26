@@ -1,0 +1,12 @@
+==== stdout
+==== stderr
+INFO  effective flag values for this run:
+INFO  FLAG     VALUE                                  SOURCE
+INFO  config                                          default
+INFO  dry-run  false                                  default
+INFO  example                                         default
+INFO  from     ../../testdata/jira-export-sample.csv  CLI flag
+INFO  map      testdata/golden/jira-mapping.yaml      CLI flag
+INFO  out                                             default
+==== error
+-out is required unless -dry-run is given

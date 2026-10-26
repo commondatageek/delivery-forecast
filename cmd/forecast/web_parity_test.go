@@ -28,6 +28,7 @@ func webIDs() map[uintptr]string {
 		reflect.ValueOf(cmdAging).Pointer():          "aging",
 		reflect.ValueOf(cmdCount).Pointer():          "count",
 		reflect.ValueOf(cmdCheck).Pointer():          "check",
+		reflect.ValueOf(cmdImport).Pointer():         "import",
 	}
 }
 

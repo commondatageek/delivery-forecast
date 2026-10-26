@@ -296,6 +296,8 @@ func concurrentParams() map[string]map[string]string {
 		"aging":           flow(map[string]string{"sample-start": "2025-01-01", "sample-end": "2025-03-15", "show-completed": "true"}),
 		"count":           flow(map[string]string{"updated-since": "2025-01-01"}),
 		"check":           flow(nil),
+		"import": {"from": "../../testdata/jira-export-sample.csv", "map": "../../cmd/forecast/testdata/golden/jira-mapping.yaml",
+			"dry-run": "true"},
 	}
 }
 

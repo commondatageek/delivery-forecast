@@ -1,0 +1,12 @@
+==== stdout
+==== stderr
+INFO  effective flag values for this run:
+INFO  FLAG     VALUE                                      SOURCE
+INFO  config                                              default
+INFO  dry-run  true                                       CLI flag
+INFO  example                                             default
+INFO  from     ../../testdata/jira-export-sample.csv      CLI flag
+INFO  map      testdata/golden/partial-jira-mapping.yaml  CLI flag
+INFO  out                                                 default
+==== error
+-from ../../testdata/jira-export-sample.csv: status: 6 rows match no rule: "Done" (6, rows 3, 4, 5, 6, 11)

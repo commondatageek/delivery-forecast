@@ -35,13 +35,13 @@ func TestToHistoryIssues(t *testing.T) {
 	}
 }
 
-func TestToCountsIssues_KeepsExplicitTerminalStateType(t *testing.T) {
+func TestToCountsIssues_TerminalFromStatusOrTimestamps(t *testing.T) {
 	got := toCountsIssues([]issues.Issue{
-		{Identifier: "E-1", StateType: "duplicate", CanceledAt: day(2025, 1, 1)},
-		{Identifier: "E-2", StateType: "started", CompletedAt: day(2025, 1, 2)},
-		{Identifier: "E-3", StateType: "backlog"},
+		{Identifier: "E-1", Status: issues.StatusCanceled},
+		{Identifier: "E-2", Status: issues.StatusStarted, CompletedAt: day(2025, 1, 2)},
+		{Identifier: "E-3", Status: issues.StatusBacklog},
 	})
-	for i, want := range []string{"duplicate", "completed", "backlog"} {
+	for i, want := range []string{"canceled", "completed", "backlog"} {
 		if got[i].StateType != want {
 			t.Errorf("item %d: StateType = %q, want %q", i, got[i].StateType, want)
 		}

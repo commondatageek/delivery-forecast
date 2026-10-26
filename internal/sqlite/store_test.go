@@ -112,7 +112,7 @@ func TestUpsertNullTimeRoundTrip(t *testing.T) {
 	store := openTestStore(t)
 	ctx := context.Background()
 
-	if err := store.Upsert(ctx, issues.Issue{Identifier: "ENG-1", StateType: "started", StartedAt: mustParse(t, "2024-01-01T00:00:00Z")}); err != nil {
+	if err := store.Upsert(ctx, issues.Issue{Identifier: "ENG-1", Status: issues.StatusStarted, StartedAt: mustParse(t, "2024-01-01T00:00:00Z")}); err != nil {
 		t.Fatalf("Upsert: %v", err)
 	}
 
@@ -133,7 +133,7 @@ func TestUpsertStoresAbsentOptionalFieldsAsNull(t *testing.T) {
 	ctx := context.Background()
 
 	// An unassigned issue with no project/milestone — every optional field empty.
-	if err := store.Upsert(ctx, issues.Issue{Identifier: "ENG-1", StateType: "started", StartedAt: mustParse(t, "2024-01-01T00:00:00Z")}); err != nil {
+	if err := store.Upsert(ctx, issues.Issue{Identifier: "ENG-1", Status: issues.StatusStarted, StartedAt: mustParse(t, "2024-01-01T00:00:00Z")}); err != nil {
 		t.Fatalf("Upsert: %v", err)
 	}
 

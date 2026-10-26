@@ -147,8 +147,8 @@ ON CONFLICT(identifier) DO UPDATE SET
 			nullString(it.ProjectName),
 			nullString(it.ProjectMilestoneID),
 			nullString(it.ProjectMilestoneName),
-			it.StateType,
-			it.StateName,
+			string(it.Status),
+			it.StatusName,
 			nullTime(it.CreatedAt),
 			nullTime(it.StartedAt),
 			nullTime(it.CompletedAt),
@@ -201,17 +201,19 @@ FROM issues`
 	var out []issues.Issue
 	for rows.Next() {
 		var it issues.Issue
+		var status string
 		var assignee, projectID, projectName, milestoneID, milestoneName sql.NullString
 		var createdAt, startedAt, completedAt, canceledAt, archivedAt, autoArchivedAt, addedToProjectAt, updatedAt sql.NullTime
 		if err := rows.Scan(
 			&it.Identifier, &it.Title, &assignee, &it.TeamKey, &it.TeamName,
 			&projectID, &projectName, &milestoneID, &milestoneName,
-			&it.StateType, &it.StateName,
+			&status, &it.StatusName,
 			&createdAt, &startedAt, &completedAt, &canceledAt, &archivedAt, &autoArchivedAt,
 			&addedToProjectAt, &updatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("AllIssues scan: %w", err)
 		}
+		it.Status, _ = issues.ParseStatus(status)
 		it.Assignee = assignee.String
 		it.ProjectID = projectID.String
 		it.ProjectName = projectName.String

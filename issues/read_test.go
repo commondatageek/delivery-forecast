@@ -13,7 +13,7 @@ func mustLocal(y int, m time.Month, d, hh, mm, ss int) time.Time {
 }
 
 func TestReadCSV_RoundTrip(t *testing.T) {
-	csv := `identifier,title,assignee,team_key,team_name,project_id,project_name,project_milestone_id,project_milestone_name,state_type,state_name,created_at,started_at,completed_at,canceled_at,archived_at,auto_archived_at,added_to_project_at,updated_at
+	csv := `identifier,title,assignee,team_key,team_name,project_id,project_name,project_milestone_id,project_milestone_name,status,status_name,created_at,started_at,completed_at,canceled_at,archived_at,auto_archived_at,added_to_project_at,updated_at
 ENG-1,Fix bug,alice,ENG,Engineering,proj-1,Project One,ms-1,Milestone One,completed,Done,2025-06-01T00:00:00Z,2025-06-02 09:00:00,2025-06-05T10:30:00,2025-06-06,2025-06-07,2025-06-08T00:00:00Z,2025-06-01,2025-06-05T10:30:00Z
 `
 	issues, err := ReadCSV(strings.NewReader(csv))
@@ -34,8 +34,8 @@ ENG-1,Fix bug,alice,ENG,Engineering,proj-1,Project One,ms-1,Milestone One,comple
 		ProjectName:          "Project One",
 		ProjectMilestoneID:   "ms-1",
 		ProjectMilestoneName: "Milestone One",
-		StateType:            "completed",
-		StateName:            "Done",
+		Status:               StatusCompleted,
+		StatusName:           "Done",
 		CreatedAt:            time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC),
 		StartedAt:            mustLocal(2025, 6, 2, 9, 0, 0),
 		CompletedAt:          mustLocal(2025, 6, 5, 10, 30, 0),
@@ -48,8 +48,8 @@ ENG-1,Fix bug,alice,ENG,Engineering,proj-1,Project One,ms-1,Milestone One,comple
 	if got.Identifier != want.Identifier || got.Title != want.Title || got.Assignee != want.Assignee ||
 		got.TeamKey != want.TeamKey || got.TeamName != want.TeamName || got.ProjectID != want.ProjectID ||
 		got.ProjectName != want.ProjectName || got.ProjectMilestoneID != want.ProjectMilestoneID ||
-		got.ProjectMilestoneName != want.ProjectMilestoneName || got.StateType != want.StateType ||
-		got.StateName != want.StateName {
+		got.ProjectMilestoneName != want.ProjectMilestoneName || got.Status != want.Status ||
+		got.StatusName != want.StatusName {
 		t.Fatalf("string fields mismatch:\ngot  %+v\nwant %+v", got, want)
 	}
 	for name, pair := range map[string][2]time.Time{
@@ -221,11 +221,12 @@ func TestStatusHelpers(t *testing.T) {
 		{"timestamp-only completed", Issue{CompletedAt: completedAt}, true, false, true, false},
 		{"timestamp-only canceled", Issue{CanceledAt: canceledAt}, false, true, true, false},
 		{"timestamp-only in progress", Issue{StartedAt: startedAt}, false, false, false, true},
-		{"state-type-only completed", Issue{StateType: "completed"}, true, false, true, false},
-		{"state-type-only canceled", Issue{StateType: "canceled"}, false, true, true, false},
-		{"state-type-only duplicate", Issue{StateType: "duplicate"}, false, true, true, false},
-		{"state-type-only started", Issue{StateType: "started"}, false, false, false, true},
-		{"timestamp wins over disagreeing state_type", Issue{CompletedAt: completedAt, StateType: "started"}, true, false, true, false},
+		{"status-only backlog", Issue{Status: StatusBacklog}, false, false, false, false},
+		{"status-only started", Issue{Status: StatusStarted}, false, false, false, true},
+		{"status-only completed", Issue{Status: StatusCompleted}, true, false, true, false},
+		{"status-only canceled", Issue{Status: StatusCanceled}, false, true, true, false},
+		{"status-only unknown", Issue{Status: StatusUnknown}, false, false, false, false},
+		{"timestamp wins over disagreeing status", Issue{CompletedAt: completedAt, Status: StatusStarted}, true, false, true, false},
 		{"neither set", Issue{}, false, false, false, false},
 	}
 	for _, tt := range tests {
@@ -243,5 +244,50 @@ func TestStatusHelpers(t *testing.T) {
 				t.Errorf("IsInProgress() = %v, want %v", got, tt.inProgress)
 			}
 		})
+	}
+}
+
+func TestParseStatus(t *testing.T) {
+	tests := []struct {
+		in   string
+		want Status
+		ok   bool
+	}{
+		{"backlog", StatusBacklog, true},
+		{"started", StatusStarted, true},
+		{"completed", StatusCompleted, true},
+		{"canceled", StatusCanceled, true},
+		{" Completed ", StatusCompleted, true},
+		{"CANCELED", StatusCanceled, true},
+		{"", StatusUnknown, false},
+		{"duplicate", StatusUnknown, false},
+		{"unstarted", StatusUnknown, false},
+		{"cancelled", StatusUnknown, false},
+	}
+	for _, tt := range tests {
+		got, ok := ParseStatus(tt.in)
+		if got != tt.want || ok != tt.ok {
+			t.Errorf("ParseStatus(%q) = (%q, %v), want (%q, %v)", tt.in, got, ok, tt.want, tt.ok)
+		}
+	}
+}
+
+func TestReaders_UnknownStatusIsUnknownNotError(t *testing.T) {
+	csv := "identifier,status\nA-1,duplicate\nA-2,Started\n"
+	got, err := ReadCSV(strings.NewReader(csv))
+	if err != nil {
+		t.Fatalf("ReadCSV: %v", err)
+	}
+	if got[0].Status != StatusUnknown || got[1].Status != StatusStarted {
+		t.Fatalf("CSV statuses = %q, %q; want unknown, started", got[0].Status, got[1].Status)
+	}
+	js := `{"identifier":"A-1","status":"triage"}
+{"identifier":"A-2","status":"completed"}`
+	got, err = ReadJSON(strings.NewReader(js))
+	if err != nil {
+		t.Fatalf("ReadJSON: %v", err)
+	}
+	if got[0].Status != StatusUnknown || got[1].Status != StatusCompleted {
+		t.Fatalf("JSON statuses = %q, %q; want unknown, completed", got[0].Status, got[1].Status)
 	}
 }

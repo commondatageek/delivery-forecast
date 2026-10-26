@@ -11,7 +11,7 @@ import (
 	"github.com/commondatageek/delivery-forecast/issues"
 )
 
-const backtestFixtureCSV = `identifier,team_key,assignee,project_name,state_type,created_at,started_at,completed_at,canceled_at
+const backtestFixtureCSV = `identifier,team_key,assignee,project_name,status,created_at,started_at,completed_at,canceled_at
 E-1,ENG,alice,Foo,completed,2025-01-01,2025-01-02,2025-01-05,
 E-2,ENG,alice,Foo,completed,2025-01-02,2025-01-03,2025-01-09,
 E-3,ENG,alice,Foo,started,2025-01-03,2025-01-04,,

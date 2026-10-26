@@ -8,7 +8,7 @@ import (
 	"github.com/commondatageek/delivery-forecast/aging"
 )
 
-const agingFixtureCSV = `identifier,team_key,assignee,state_type,created_at,started_at,completed_at
+const agingFixtureCSV = `identifier,team_key,assignee,status,created_at,started_at,completed_at
 E-1,ENG,alice,completed,2025-01-01,2025-01-02,2025-01-05
 E-2,ENG,,completed,2025-01-01,2025-01-02,2025-01-06
 E-3,ENG,bob,started,2025-01-03,2025-01-04,

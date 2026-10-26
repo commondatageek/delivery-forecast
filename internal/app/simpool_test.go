@@ -38,7 +38,7 @@ func TestUnmatchedExclusionNames(t *testing.T) {
 func TestPreparePool_WarningsInOrder(t *testing.T) {
 	b := constantBase()
 	b.Issues = append(b.Issues, issues.Issue{ // assigned but with no usable completion record is skipped elsewhere; here: unassigned completed
-		Identifier: "U-1", StateType: "completed", CompletedAt: localDay(2025, 1, 4),
+		Identifier: "U-1", Status: issues.StatusCompleted, CompletedAt: localDay(2025, 1, 4),
 	})
 	b.TypicalEngineers = []string{"alice", "zed"}
 	exc, err := simulate.ParseExclusions([]byte(`{"engineers": {"yan": ["2025-03-03"]}}`))

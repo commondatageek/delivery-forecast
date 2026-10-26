@@ -208,7 +208,7 @@ func NewManifest(in ManifestInputs) *Manifest {
 			Assignee:    it.Assignee,
 			TeamName:    it.TeamName,
 			ProjectName: it.ProjectName,
-			StateType:   it.StateType,
+			StateType:   string(it.Status),
 			StartedAt:   issueTime(it.StartedAt),
 			CompletedAt: issueTime(it.CompletedAt),
 			UpdatedAt:   issueTime(it.UpdatedAt),

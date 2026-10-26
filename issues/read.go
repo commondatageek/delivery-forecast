@@ -19,7 +19,7 @@ import (
 var columnNames = []string{
 	"identifier", "title", "assignee", "team_key", "team_name",
 	"project_id", "project_name", "project_milestone_id", "project_milestone_name",
-	"state_type", "state_name",
+	"status", "status_name",
 	"created_at", "started_at", "completed_at", "canceled_at",
 	"archived_at", "auto_archived_at", "added_to_project_at", "updated_at",
 }
@@ -35,8 +35,8 @@ var fieldSetters = map[string]func(*Issue, string) error{
 	"project_name":           func(i *Issue, v string) error { i.ProjectName = v; return nil },
 	"project_milestone_id":   func(i *Issue, v string) error { i.ProjectMilestoneID = v; return nil },
 	"project_milestone_name": func(i *Issue, v string) error { i.ProjectMilestoneName = v; return nil },
-	"state_type":             func(i *Issue, v string) error { i.StateType = v; return nil },
-	"state_name":             func(i *Issue, v string) error { i.StateName = v; return nil },
+	"status":                 func(i *Issue, v string) error { i.Status, _ = ParseStatus(v); return nil },
+	"status_name":            func(i *Issue, v string) error { i.StatusName = v; return nil },
 	"created_at":             func(i *Issue, v string) error { return setTimestamp(&i.CreatedAt, v) },
 	"started_at":             func(i *Issue, v string) error { return setTimestamp(&i.StartedAt, v) },
 	"completed_at":           func(i *Issue, v string) error { return setTimestamp(&i.CompletedAt, v) },
@@ -151,8 +151,8 @@ type jsonIssue struct {
 	ProjectName          string          `json:"project_name"`
 	ProjectMilestoneID   string          `json:"project_milestone_id"`
 	ProjectMilestoneName string          `json:"project_milestone_name"`
-	StateType            string          `json:"state_type"`
-	StateName            string          `json:"state_name"`
+	Status               string          `json:"status"`
+	StatusName           string          `json:"status_name"`
 	CreatedAt            json.RawMessage `json:"created_at"`
 	StartedAt            json.RawMessage `json:"started_at"`
 	CompletedAt          json.RawMessage `json:"completed_at"`
@@ -191,9 +191,9 @@ func decodeJSONIssue(data []byte) (Issue, error) {
 		ProjectName:          raw.ProjectName,
 		ProjectMilestoneID:   raw.ProjectMilestoneID,
 		ProjectMilestoneName: raw.ProjectMilestoneName,
-		StateType:            raw.StateType,
-		StateName:            raw.StateName,
+		StatusName:           raw.StatusName,
 	}
+	it.Status, _ = ParseStatus(raw.Status)
 	fields := []struct {
 		raw string
 		dst *time.Time

@@ -34,7 +34,7 @@ func TestRunCount_ShowTeamsMatrix(t *testing.T) {
 
 	// A single-team set never shows the team column.
 	res, err := RunCount(CountRequest{
-		Issues:  readCSV(t, "identifier,team_key,project_name,state_type,updated_at\nE-1,ENG,Foo,started,2025-01-05\n"),
+		Issues:  readCSV(t, "identifier,team_key,project_name,status,updated_at\nE-1,ENG,Foo,started,2025-01-05\n"),
 		Options: counts.Options{Since: localDay(2025, 1, 1)},
 	})
 	if err != nil {
@@ -45,7 +45,7 @@ func TestRunCount_ShowTeamsMatrix(t *testing.T) {
 	}
 }
 
-// A file with completed_at/canceled_at but no state_type column must still
+// A file with completed_at/canceled_at but no status column must still
 // treat those issues as terminal, like every other command does.
 func TestRunCount_TerminalFromTimestampsWithoutStateType(t *testing.T) {
 	const noStateTypeCSV = `identifier,team_key,project_name,completed_at,canceled_at,updated_at
@@ -67,7 +67,7 @@ E-3,ENG,Foo,,2025-01-07,2025-01-07
 
 func TestRunCount_NothingOutstandingWarns(t *testing.T) {
 	res, err := RunCount(CountRequest{
-		Issues:  readCSV(t, "identifier,team_key,project_name,state_type,updated_at\nE-1,ENG,Foo,completed,2025-01-05\n"),
+		Issues:  readCSV(t, "identifier,team_key,project_name,status,updated_at\nE-1,ENG,Foo,completed,2025-01-05\n"),
 		Options: counts.Options{Since: localDay(2025, 1, 1)},
 	})
 	if err != nil {

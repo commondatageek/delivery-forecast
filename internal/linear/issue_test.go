@@ -68,8 +68,8 @@ func TestToIssueFullyPopulated(t *testing.T) {
 		ProjectName:          "Q3",
 		ProjectMilestoneID:   "ms-1",
 		ProjectMilestoneName: "Milestone 1",
-		StateType:            "completed",
-		StateName:            "Done",
+		Status:               issues.StatusCompleted,
+		StatusName:           "Done",
 		CreatedAt:            createdAt,
 		StartedAt:            startedAt,
 		CompletedAt:          completedAt,
@@ -95,7 +95,7 @@ func TestToIssueNilRelationsYieldEmptyStrings(t *testing.T) {
 	got := toIssue(n)
 	if got.TeamKey != "" || got.TeamName != "" || got.ProjectID != "" || got.ProjectName != "" ||
 		got.ProjectMilestoneID != "" || got.ProjectMilestoneName != "" ||
-		got.StateType != "" || got.StateName != "" {
+		got.Status != issues.StatusUnknown || got.StatusName != "" {
 		t.Fatalf("toIssue() with nil relations = %+v, want all relation fields empty", got)
 	}
 }
@@ -103,5 +103,22 @@ func TestToIssueNilRelationsYieldEmptyStrings(t *testing.T) {
 func TestBuildQueryRequestsTrashed(t *testing.T) {
 	if !strings.Contains(buildQuery(nil, time.Time{}), "\n      trashed\n") {
 		t.Fatal("query does not request the trashed field")
+	}
+}
+
+func TestStatusFromStateType(t *testing.T) {
+	for in, want := range map[string]issues.Status{
+		"triage":    issues.StatusBacklog,
+		"backlog":   issues.StatusBacklog,
+		"unstarted": issues.StatusBacklog,
+		"started":   issues.StatusStarted,
+		"completed": issues.StatusCompleted,
+		"canceled":  issues.StatusCanceled,
+		"duplicate": issues.StatusCanceled,
+		"mystery":   issues.StatusUnknown,
+	} {
+		if got := statusFromStateType(in); got != want {
+			t.Errorf("statusFromStateType(%q) = %q, want %q", in, got, want)
+		}
 	}
 }

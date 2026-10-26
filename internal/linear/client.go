@@ -193,10 +193,10 @@ func toIssue(n issueNode) issues.Issue {
 		milestoneID = n.ProjectMilestone.ID
 		milestoneName = n.ProjectMilestone.Name
 	}
-	stateType := ""
+	status := issues.StatusUnknown
 	stateName := ""
 	if n.State != nil {
-		stateType = n.State.Type
+		status = statusFromStateType(n.State.Type)
 		stateName = n.State.Name
 	}
 
@@ -210,8 +210,8 @@ func toIssue(n issueNode) issues.Issue {
 		ProjectName:          projectName,
 		ProjectMilestoneID:   milestoneID,
 		ProjectMilestoneName: milestoneName,
-		StateType:            stateType,
-		StateName:            stateName,
+		Status:               status,
+		StatusName:           stateName,
 		CreatedAt:            n.CreatedAt,
 		StartedAt:            n.StartedAt,
 		CompletedAt:          n.CompletedAt,
@@ -221,6 +221,24 @@ func toIssue(n issueNode) issues.Issue {
 		AddedToProjectAt:     n.AddedToProjectAt,
 		UpdatedAt:            n.UpdatedAt,
 	}
+}
+
+// statusFromStateType maps Linear's workflow state type onto issues.Status:
+// triage/backlog/unstarted are not started yet, and duplicate is a variant
+// of canceled. An unrecognized type maps to StatusUnknown, leaving the
+// timestamps to decide.
+func statusFromStateType(t string) issues.Status {
+	switch t {
+	case "triage", "backlog", "unstarted":
+		return issues.StatusBacklog
+	case "started":
+		return issues.StatusStarted
+	case "completed":
+		return issues.StatusCompleted
+	case "canceled", "duplicate":
+		return issues.StatusCanceled
+	}
+	return issues.StatusUnknown
 }
 
 // buildQuery constructs the GraphQL query string.

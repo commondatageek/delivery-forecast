@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-const checkFixtureCSV = `identifier,team_key,assignee,state_type,created_at,started_at,completed_at,updated_at
+const checkFixtureCSV = `identifier,team_key,assignee,status,created_at,started_at,completed_at,updated_at
 E-1,ENG,alice,completed,2025-01-01,2025-01-02,2025-01-05,2025-01-05
 E-2,ENG,,completed,2025-01-01,2025-01-02,2025-01-06,2025-01-06
 E-3,ENG,bob,completed,2025-01-01,,2025-01-07,2025-01-07

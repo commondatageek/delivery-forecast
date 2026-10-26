@@ -1,0 +1,81 @@
+# name: Jira Cloud CSV export
+#
+# Mapping for a Jira Cloud "Export > CSV (all fields)" file. Copy it, adjust
+# the marked lines, then:
+#   forecast import -from export.csv -map this-file.yaml -out data.db
+#
+# Every rule below is checked against the export; anything that doesn't fit
+# stops the import with a message saying what to change here.
+version: 1
+source: jira
+
+# Jira writes dates in the exporting user's profile format and timezone.
+# CHANGE timezone to that profile's zone (Jira: Profile > Account settings),
+# e.g. America/New_York. Change time_format only if your dates don't look
+# like 22/Oct/26 7:55 AM (it is a Go time layout).
+time_format: "02/Jan/06 3:04 PM"
+timezone: Local
+
+columns:
+  identifier: Issue key
+  title: Summary
+  # Assignee is whoever holds the issue at export time. If work is handed
+  # between people (BA -> Dev -> QA), a role field such as
+  # "Custom field (Dev)" may credit the right person; or forecast with
+  # -whole-team and ignore assignees entirely.
+  assignee: Assignee
+  team_key: Project key
+  team_name: Project name
+  # "Project" (used by count, history and sim backtest) = the parent epic.
+  # Alternatives: {column: Fix versions, pick: first}, or {value: All}.
+  project_id: Parent key
+  project_name: Parent summary
+  milestone_name: {column: Fix versions, pick: first}
+  issue_type: Issue Type
+  parent_identifier: Parent key
+  status_name: Status
+  resolution: Resolution
+  created_at: Created
+  updated_at: Updated
+
+# Status: Jira's status category decides, except for the statuses and
+# resolutions listed under overrides. A status your team adds later is
+# handled by its category automatically. Matching ignores case.
+status:
+  column: Status category
+  values:
+    To Do: backlog
+    In Progress: started
+    Done: completed
+  overrides:
+    # Done-category statuses that mean "not delivered". Add your own.
+    Won't Do: canceled
+    Wont Do: canceled
+    Canceled: canceled
+    Cancelled: canceled
+    Declined: canceled
+    Duplicate: canceled
+  resolution_overrides:
+    Won't Do: canceled
+    Won't Fix: canceled
+    Duplicate: canceled
+    Cannot Reproduce: canceled
+    Declined: canceled
+
+# The export only records when an issue entered its *current* category, so
+# started_at is only known for work currently in progress. If your Jira admin
+# adds a "Work Started" date field (set by automation on the first move to an
+# In Progress status), use:
+#   started_at: {columns: [Custom field (Work Started), Status category changed], when: [started, completed, canceled]}
+timestamps:
+  started_at: {columns: [Status category changed], when: started}
+  completed_at: {columns: [Resolved, Status category changed], when: completed}
+  canceled_at: {columns: [Resolved, Status category changed], when: canceled}
+
+# Rows dropped before anything else. Epics are containers, not deliverables.
+# Add Sub-task here if sub-tasks shouldn't count as throughput.
+exclude:
+  Issue Type: [Epic]
+
+# Used by `forecast` to recognize a Jira export passed to -input.
+detect: [Issue key, Status category, Summary]

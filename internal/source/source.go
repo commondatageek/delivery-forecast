@@ -5,12 +5,14 @@ package source
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/commondatageek/delivery-forecast/internal/importmap"
 	"github.com/commondatageek/delivery-forecast/internal/sqlite"
 	"github.com/commondatageek/delivery-forecast/issues"
 	"github.com/commondatageek/delivery-forecast/simulate"
@@ -47,8 +49,39 @@ func Load(ctx context.Context, path, format string, stdin io.Reader) ([]issues.I
 		}
 		return all, nil
 	default:
-		return issues.ReadFile(path)
+		items, err := issues.ReadFile(path)
+		var he *issues.HeaderError
+		if errors.As(err, &he) {
+			return nil, headerHint(path, he)
+		}
+		return items, err
 	}
+}
+
+// headerHint explains a CSV header that isn't a forecast data file. When it
+// looks like a tracker export one of importmap's templates knows, the error
+// says how to convert it with forecast import.
+func headerHint(path string, he *issues.HeaderError) error {
+	name, ok := importmap.Suggest(he.Header)
+	if !ok {
+		return fmt.Errorf("%s: %s", path, he.Msg)
+	}
+	return fmt.Errorf("%s: this looks like a %s (template %q), which needs converting first:\n"+
+		"  forecast import -example %s > mapping.yaml\n"+
+		"  forecast import -from %s -map mapping.yaml -out data.db",
+		path, importmap.Describe(name), name, name, shellQuote(path))
+}
+
+// shellQuote single-quotes s for a POSIX shell when it holds anything but
+// plainly safe characters, so a suggested command can be pasted as-is.
+func shellQuote(s string) string {
+	safe := s != "" && strings.IndexFunc(s, func(r rune) bool {
+		return !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || strings.ContainsRune("-_./:@%+=,", r))
+	}) < 0
+	if safe {
+		return s
+	}
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
 // LoadExclusions reads and parses an exclusions JSON file. An empty path means

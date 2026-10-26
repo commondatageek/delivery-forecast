@@ -1,0 +1,20 @@
+==== stdout
+PROJECT        TEAM           ISSUES  MILESTONES
+Warehouse      Data Platform  1       1
+Search Revamp  Engineering    1       1
+(No Project)   Data Platform  1       0
+(No Project)   Engineering    1       0
+TOTAL                         4       
+==== stderr
+INFO  effective flag values for this run:
+INFO  FLAG           VALUE                          SOURCE
+INFO  config                                        default
+INFO  db                                            default
+INFO  input          testdata/golden/multiteam.csv  CLI flag
+INFO  milestones     false                          default
+INFO  stdin-format                                  default
+INFO  teams                                         default
+INFO  updated-since  2025-01-01                     CLI flag
+WARN  no -teams filter given; blending data across all 2 teams (DATA, ENG)
+==== error
+<nil>

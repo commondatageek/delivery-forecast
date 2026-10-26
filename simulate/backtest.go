@@ -29,7 +29,7 @@ type BacktestRow struct {
 //
 // RunBacktest no longer calls this (it now walks history.Compute's rows
 // instead, which day-truncate and clamp timestamps before counting — see D4
-// in HISTORY_PLAN.md). CountAsOf keeps its original raw-timestamp semantics
+// in docs/plans/HISTORY_PLAN.md). CountAsOf keeps its original raw-timestamp semantics
 // on purpose: it's the baseline history_test.go's cross-check test compares
 // against to document that truncation's effect on boundary days, and
 // reimplementing it as a thin wrapper over history would collapse the very
@@ -89,7 +89,7 @@ func AllCreatedBy(items []BacktestItem, d time.Time) bool {
 // The day-by-day completed/remaining counts come from history.Compute (the
 // same day-walk engine forecast history and cfd.BuildGrid use), not a
 // bespoke loop, so all three agree on which day a boundary event lands on.
-// This is D4 in HISTORY_PLAN.md: history day-truncates and clamps timestamps
+// This is D4 in docs/plans/HISTORY_PLAN.md: history day-truncates and clamps timestamps
 // before counting, where the old inline loop compared raw timestamps, so a
 // completion that lands mid-day can now count a calendar day earlier than it
 // used to. items carries no CanceledAt (the backtested issue set already

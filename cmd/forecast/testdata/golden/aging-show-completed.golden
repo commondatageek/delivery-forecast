@@ -1,0 +1,48 @@
+==== stdout
+Cycle time distribution: 24 completed issues (2025-01-01 to 2025-03-15)  ·  P70: 8.0 days
+
+IDENTIFIER  TITLE  DAYS  PERCENTILE  MULTIPLIER  STATE      START DATE  ASSIGNEE
+ENG-27             13.0  100th       1.62x       started    Sun 3/2     carol
+ENG-28             11.0  100th       1.38x       started    Tue 3/4     alice
+----------  -----  ----  ----------  ----------  -----      ----------  --------
+IDENTIFIER  TITLE  DAYS  PERCENTILE  MULTIPLIER  STATE      START DATE  ASSIGNEE
+ENG-26             10.0  100th       1.25x       completed  Wed 2/26    bob
+ENG-25             9.0   96th        1.12x       completed  Mon 2/24    alice
+ENG-21             8.0   92nd        1.00x       completed  Thu 2/13    carol
+ENG-4              8.0   92nd        1.00x       completed  Tue 1/7     alice
+ENG-24             8.0   92nd        1.00x       completed  Fri 2/21    carol
+ENG-6              8.0   92nd        1.00x       completed  Sun 1/12    carol
+ENG-23             8.0   92nd        1.00x       completed  Wed 2/19    bob
+ENG-22             8.0   92nd        1.00x       completed  Sun 2/16    alice
+ENG-14             7.0   67th        0.88x       completed  Wed 1/29    bob
+ENG-11             7.0   67th        0.88x       completed  Tue 1/21    bob
+ENG-12             7.0   67th        0.88x       completed  Thu 1/23    carol
+ENG-13             7.0   67th        0.88x       completed  Mon 1/27    alice
+ENG-10             7.0   67th        0.88x       completed  Sat 1/18    alice
+ENG-20             7.0   67th        0.88x       completed  Tue 2/11    bob
+ENG-19             7.0   67th        0.88x       completed  Sun 2/9     alice
+ENG-18             6.0   38th        0.75x       completed  Thu 2/6     carol
+ENG-17             6.0   38th        0.75x       completed  Tue 2/4     bob
+ENG-16             6.0   38th        0.75x       completed  Sun 2/2     alice
+ENG-9              6.0   38th        0.75x       completed  Thu 1/16    carol
+ENG-2              6.0   38th        0.75x       completed  Sat 1/4     bob
+ENG-1              5.0   17th        0.62x       completed  Fri 1/3     alice
+ENG-7              5.0   17th        0.62x       completed  Mon 1/13    alice
+ENG-5              5.0   17th        0.62x       completed  Thu 1/9     bob
+ENG-3              3.0   4th         0.38x       completed  Mon 1/6     carol
+==== stderr
+INFO  effective flag values for this run:
+INFO  FLAG            VALUE                             SOURCE
+INFO  config                                            default
+INFO  db                                                default
+INFO  format          text                              default
+INFO  input           ../../testdata/sample-issues.csv  CLI flag
+INFO  min-cycle-time  1d                                CLI flag
+INFO  percentile      70                                CLI flag
+INFO  sample-end      2025-03-15                        CLI flag
+INFO  sample-start    2025-01-01                        CLI flag
+INFO  show-completed  true                              CLI flag
+INFO  stdin-format                                      default
+INFO  teams                                             default
+==== error
+<nil>

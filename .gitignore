@@ -1,5 +1,6 @@
 *.yaml
 *.json
+*.csv
 !testdata/*.json
 *.html
 !internal/**/*.html
@@ -10,3 +11,5 @@ scratch
 *.db-wal
 .venv
 .claude
+
+!cmd/forecast/testdata/**

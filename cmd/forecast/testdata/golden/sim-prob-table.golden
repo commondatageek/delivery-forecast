@@ -1,0 +1,37 @@
+==== stdout
+whole-team throughput, 2025-03-16 to 2025-03-29 (14 days) -> probability of completing N items
+  (each row's % is also that many items' confidence level; see `sim items -confidence`)
+  1 items: 99.6%
+  2 items: 96.6%
+  3 items: 89.1%
+  4 items: 72.3%
+  5 items: 49.5%
+  6 items: 28.9%
+  7 items: 13.0%
+  8 items: 4.3%
+  9 items: 0.9%
+  10 items: 0.3%
+  11 items: 0.0%
+==== stderr
+INFO  effective flag values for this run:
+INFO  FLAG               VALUE                             SOURCE
+INFO  config                                               default
+INFO  days               14                                CLI flag
+INFO  db                                                   default
+INFO  engineers                                            default
+INFO  exclusions                                           default
+INFO  goroutines         4                                 CLI flag
+INFO  input              ../../testdata/sample-issues.csv  CLI flag
+INFO  items              -1                                default
+INFO  manifest                                             default
+INFO  random-seed        42                                CLI flag
+INFO  sample-end         2025-03-15                        CLI flag
+INFO  sample-start       2025-01-01                        CLI flag
+INFO  simulations        2000                              CLI flag
+INFO  stdin-format                                         default
+INFO  target-end-date                                      default
+INFO  target-start-date  2025-03-16                        CLI flag
+INFO  typical-engineers                                    default
+INFO  whole-team         true                              CLI flag
+==== error
+<nil>

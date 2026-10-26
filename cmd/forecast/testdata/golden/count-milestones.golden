@@ -1,0 +1,18 @@
+==== stdout
+Search Revamp (4)
+  Ranking         2
+  (No Milestone)  2
+
+TOTAL: 4 not-completed issues
+==== stderr
+INFO  effective flag values for this run:
+INFO  FLAG           VALUE                             SOURCE
+INFO  config                                           default
+INFO  db                                               default
+INFO  input          ../../testdata/sample-issues.csv  CLI flag
+INFO  milestones     true                              CLI flag
+INFO  stdin-format                                     default
+INFO  teams                                            default
+INFO  updated-since  2025-01-01                        CLI flag
+==== error
+<nil>

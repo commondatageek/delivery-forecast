@@ -1,0 +1,30 @@
+==== stdout
+2 equivalent engineers, 10 items -> how many days?
+
+Confidence  Days  Date
+50%         44    2025-04-29 Tue
+75%         54    2025-05-09 Fri
+85%         60    2025-05-15 Thu
+95%         71    2025-05-26 Mon
+==== stderr
+INFO  effective flag values for this run:
+INFO  FLAG               VALUE                             SOURCE
+INFO  confidence                                           default
+INFO  config                                               default
+INFO  db                                                   default
+INFO  engineers          2                                 CLI flag
+INFO  exclusions                                           default
+INFO  goroutines         4                                 CLI flag
+INFO  input              ../../testdata/sample-issues.csv  CLI flag
+INFO  items              10                                CLI flag
+INFO  manifest                                             default
+INFO  random-seed        42                                CLI flag
+INFO  sample-end         2025-03-15                        CLI flag
+INFO  sample-start       2025-01-01                        CLI flag
+INFO  simulations        2000                              CLI flag
+INFO  stdin-format                                         default
+INFO  target-start-date  2025-03-16                        CLI flag
+INFO  typical-engineers                                    default
+INFO  whole-team         false                             default
+==== error
+<nil>

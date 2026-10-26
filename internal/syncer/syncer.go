@@ -28,6 +28,10 @@ type Options struct {
 	// FullReload is the `-full-reload` flag: ignore each team's watermark and
 	// re-sync its full issue history instead of an incremental sync.
 	FullReload bool
+	// Logf, when non-nil, receives the progress lines Run would otherwise log
+	// through logx.Infof (same format strings and arguments). The CLI leaves it
+	// nil; the web server streams the lines to the browser.
+	Logf func(format string, args ...any)
 }
 
 // client is the subset of *linear.Client that Run needs. It exists as a test
@@ -40,8 +44,12 @@ type client interface {
 }
 
 // Run syncs issues from the Linear API into store according to opts.
-// It logs progress via internal/logx.
+// It logs progress via internal/logx, or through opts.Logf when set.
 func Run(ctx context.Context, client client, store *sqlite.Store, opts Options) error {
+	logf := opts.Logf
+	if logf == nil {
+		logf = logx.Infof
+	}
 	if opts.AllTeams && len(opts.Teams) > 0 {
 		return fmt.Errorf("-teams and -all-teams are mutually exclusive")
 	}
@@ -80,16 +88,16 @@ func Run(ctx context.Context, client client, store *sqlite.Store, opts Options) 
 		var since time.Time
 		if full {
 			if exists {
-				logx.Infof("full sync (full reload): team=%s", key)
+				logf("full sync (full reload): team=%s", key)
 			} else {
-				logx.Infof("full sync (new team): team=%s", key)
+				logf("full sync (new team): team=%s", key)
 			}
 		} else {
 			since, err = store.LatestUpdatedAtForTeam(ctx, key)
 			if err != nil {
 				return fmt.Errorf("watermark for %s: %w", key, err)
 			}
-			logx.Infof("incremental sync: team=%s since=%s", key, since.Format(time.RFC3339))
+			logf("incremental sync: team=%s since=%s", key, since.Format(time.RFC3339))
 		}
 
 		fetched, trashed, err := client.Fetch(ctx, since, []string{key})
@@ -107,7 +115,7 @@ func Run(ctx context.Context, client client, store *sqlite.Store, opts Options) 
 				return fmt.Errorf("delete trashed %s: %w", key, err)
 			}
 		}
-		logx.Infof("upserted: team=%s count=%d trashed-skipped=%d", key, len(fetched), len(trashed))
+		logf("upserted: team=%s count=%d trashed-skipped=%d", key, len(fetched), len(trashed))
 	}
 
 	return nil

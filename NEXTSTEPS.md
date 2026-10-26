@@ -5,7 +5,7 @@
 ## Historical Things
 - CFD
 - A chart showing how the probability of success of hitting a certain target date has changed over time.
-- ~~A chart showing how p85 for Cycle Time has changed over time.~~ Data now available: `forecast history`'s `CycleTimeP50`/`CycleTimeP85` columns give this per day (see `history` package, `HISTORY_PLAN.md`). The chart itself — rendering it — is still TODO.
+- ~~A chart showing how p85 for Cycle Time has changed over time.~~ Data now available: `forecast history`'s `CycleTimeP50`/`CycleTimeP85` columns give this per day (see `history` package, `docs/plans/HISTORY_PLAN.md`). The chart itself — rendering it — is still TODO.
 
 ## Simulation Report
 

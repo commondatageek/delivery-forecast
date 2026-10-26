@@ -1,0 +1,32 @@
+==== stdout
+whole-team throughput, 2025-03-16 to 2025-04-14 (30 days) -> how many items?
+
+Confidence  Items
+50%         at least 8
+75%         at least 7
+85%         at least 6
+95%         at least 5
+==== stderr
+INFO  effective flag values for this run:
+INFO  FLAG               VALUE                             SOURCE
+INFO  confidence                                           default
+INFO  config                                               default
+INFO  days               30                                CLI flag
+INFO  db                                                   default
+INFO  engineers                                            default
+INFO  exclusions         testdata/golden/exclusions.json   CLI flag
+INFO  goroutines         4                                 CLI flag
+INFO  input              ../../testdata/sample-issues.csv  CLI flag
+INFO  manifest                                             default
+INFO  random-seed        42                                CLI flag
+INFO  sample-end         2025-03-15                        CLI flag
+INFO  sample-start       2025-01-01                        CLI flag
+INFO  simulations        2000                              CLI flag
+INFO  stdin-format                                         default
+INFO  target-end-date                                      default
+INFO  target-start-date  2025-03-16                        CLI flag
+INFO  typical-engineers                                    default
+INFO  whole-team         true                              CLI flag
+WARN  exclusions: per-engineer entries are ignored in -whole-team mode
+==== error
+<nil>

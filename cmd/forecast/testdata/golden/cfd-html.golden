@@ -1,0 +1,172 @@
+==== stdout
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Cumulative Flow Diagram</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 2rem auto; max-width: 1200px; color: #1a1a1a; background: #f5f5f5; padding: 0 1rem; }
+  h1 { font-size: 1.35rem; font-weight: 600; margin: 0 0 0.25rem; }
+  .meta { color: #555; font-size: 0.875rem; margin-bottom: 1.5rem; }
+  #chart { background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.10); margin-bottom: 1.5rem; }
+  .health { background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.10); padding: 1.25rem 1.5rem; margin-bottom: 1.5rem; }
+  .health h2 { font-size: 1rem; font-weight: 600; margin: 0 0 1rem; }
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.75rem 1.5rem; }
+  .stat { }
+  .stat-label { font-size: 0.75rem; color: #666; text-transform: uppercase; letter-spacing: 0.05em; }
+  .stat-value { font-size: 1.1rem; font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 0.1rem; }
+  .stat-sub { font-size: 0.8rem; color: #555; margin-top: 0.1rem; }
+  .band-table { border-collapse: collapse; width: 100%; margin-top: 1rem; font-size: 0.875rem; }
+  .band-table th { text-align: left; padding: 0.35rem 0.75rem; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #555; border-bottom: 1px solid #ddd; }
+  .band-table td { padding: 0.35rem 0.75rem; border-bottom: 1px solid #f0f0f0; }
+  .band-table tr:last-child td { border-bottom: none; }
+  .verdict-stable { color: #15803d; }
+  .verdict-widening { color: #b91c1c; }
+  .verdict-narrowing { color: #c2410c; }
+  .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: middle; }
+  .explainer { background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.10); padding: 1.25rem 1.5rem; font-size: 0.875rem; line-height: 1.6; color: #444; }
+  .explainer h2 { font-size: 1rem; font-weight: 600; margin: 0 0 0.5rem; color: #1a1a1a; }
+</style>
+</head>
+<body>
+<h1>Cumulative Flow Diagram</h1>
+<p class="meta">2025-01-01 → 2025-03-15 &nbsp;·&nbsp; 30 issues</p>
+
+<div id="chart"></div>
+
+<div class="health">
+  <h2>Flow Health</h2>
+  <div class="stats-grid">
+    <div class="stat">
+      <div class="stat-label">Throughput</div>
+      <div class="stat-value">0.37 items/day</div>
+      <div class="stat-sub">slope of Done line</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Total departure rate</div>
+      <div class="stat-value">0.40 items/day</div>
+      <div class="stat-sub">completed + canceled</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Avg cycle time</div>
+      <div class="stat-value">8.0 days</div>
+      <div class="stat-sub">created→completed (in window)</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Little's Law cycle time</div>
+      <div class="stat-value">7.1 days</div>
+      <div class="stat-sub">avg WIP in-progress ÷ throughput</div>
+    </div>
+  </div>
+
+  <table class="band-table" style="margin-top:1.25rem">
+    <thead>
+      <tr><th>Band</th><th>Avg WIP</th><th>Stability</th><th>Verdict</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="swatch" style="background:#636EFA"></span>Backlog</td>
+        <td>0.7</td>
+        <td>&#43;0.010 items/day</td>
+        <td class="verdict-stable">stable</td>
+      </tr>
+      <tr>
+        <td><span class="swatch" style="background:#00CC96"></span>In Progress</td>
+        <td>2.6</td>
+        <td>&#43;0.005 items/day</td>
+        <td class="verdict-stable">stable</td>
+      </tr>
+      <tr>
+        <td><span class="swatch" style="background:#EF553B"></span>Canceled</td>
+        <td>1.4</td>
+        <td>&#43;0.033 items/day</td>
+        <td class="verdict-stable">stable</td>
+      </tr>
+      <tr>
+        <td><span class="swatch" style="background:#AB63FA"></span>Done</td>
+        <td>12.9</td>
+        <td>&mdash;</td>
+        <td>&mdash;</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="explainer">
+  <h2>How to read this diagram</h2>
+  <p>Each colored band represents items currently in that stage. The band's <strong>vertical height</strong> at any point equals the WIP in that stage. The <strong>horizontal distance</strong> between the top edge of a band and its bottom edge approximates the average time items spend there (Little's Law: WIP = throughput × cycle time).</p>
+  <p><strong>Ideal shape</strong>: straight, parallel lines with constant-width bands. Straight means a steady rate; parallel means inflow equals outflow at every boundary so no queue is accumulating. A <em>widening</em> band signals a bottleneck; a <em>narrowing</em> band means that stage is draining. A flattening top line means fewer new issues are being created.</p>
+</div>
+
+<script>
+var dates = ["2025-01-01","2025-01-02","2025-01-03","2025-01-04","2025-01-05","2025-01-06","2025-01-07","2025-01-08","2025-01-09","2025-01-10","2025-01-11","2025-01-12","2025-01-13","2025-01-14","2025-01-15","2025-01-16","2025-01-17","2025-01-18","2025-01-19","2025-01-20","2025-01-21","2025-01-22","2025-01-23","2025-01-24","2025-01-25","2025-01-26","2025-01-27","2025-01-28","2025-01-29","2025-01-30","2025-01-31","2025-02-01","2025-02-02","2025-02-03","2025-02-04","2025-02-05","2025-02-06","2025-02-07","2025-02-08","2025-02-09","2025-02-10","2025-02-11","2025-02-12","2025-02-13","2025-02-14","2025-02-15","2025-02-16","2025-02-17","2025-02-18","2025-02-19","2025-02-20","2025-02-21","2025-02-22","2025-02-23","2025-02-24","2025-02-25","2025-02-26","2025-02-27","2025-02-28","2025-03-01","2025-03-02","2025-03-03","2025-03-04","2025-03-05","2025-03-06","2025-03-07","2025-03-08","2025-03-09","2025-03-10","2025-03-11","2025-03-12","2025-03-13","2025-03-14","2025-03-15"];
+var traces = [
+  {
+    name: 'Done',
+    x: dates, y: [0,0,0,0,0,0,0,1,2,3,3,3,3,4,5,5,5,6,6,7,7,8,8,8,9,9,9,10,10,11,11,11,11,12,12,13,13,13,14,14,15,15,16,16,16,16,17,17,18,18,18,19,19,19,20,20,20,21,21,22,22,22,22,23,23,23,24,24,24,24,24,24,24,24],
+    stackgroup: 'one',
+    fillcolor: 'rgba(171,99,250,0.7)',
+    line: {color: '#AB63FA', width: 1},
+    mode: 'lines',
+    hovertemplate: '%{y} done<extra>Done</extra>'
+  },
+  {
+    name: 'Canceled',
+    x: dates, y: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2],
+    stackgroup: 'one',
+    fillcolor: 'rgba(239,85,59,0.7)',
+    line: {color: '#EF553B', width: 1},
+    mode: 'lines',
+    hovertemplate: '%{y} canceled<extra>Canceled</extra>'
+  },
+  {
+    name: 'In Progress',
+    x: dates, y: [0,0,1,2,2,3,4,3,3,2,2,3,4,4,3,3,3,3,3,2,3,2,3,3,2,2,3,2,3,2,2,2,3,2,3,2,3,3,2,3,2,3,2,3,3,3,3,3,2,3,3,3,3,3,3,3,4,3,3,2,3,3,4,3,3,3,2,2,2,2,2,2,2,2],
+    stackgroup: 'one',
+    fillcolor: 'rgba(0,204,150,0.7)',
+    line: {color: '#00CC96', width: 1},
+    mode: 'lines',
+    hovertemplate: '%{y} in progress<extra>In Progress</extra>'
+  },
+  {
+    name: 'Backlog',
+    x: dates, y: [0,1,1,0,1,1,0,1,0,1,1,1,1,0,1,0,1,0,0,1,0,1,0,0,1,1,0,1,0,1,1,2,0,1,0,1,0,0,1,0,1,0,1,0,0,1,0,0,1,0,1,0,1,1,0,1,0,0,1,1,1,1,0,1,1,1,1,1,2,2,2,2,2,2],
+    stackgroup: 'one',
+    fillcolor: 'rgba(99,110,250,0.7)',
+    line: {color: '#636EFA', width: 1},
+    mode: 'lines',
+    hovertemplate: '%{y} in backlog<extra>Backlog</extra>'
+  }
+];
+
+var layout = {
+  hovermode: 'x unified',
+  xaxis: {type: 'date', title: ''},
+  yaxis: {title: 'Cumulative issues'},
+  legend: {traceorder: 'reversed'},
+  margin: {t: 20, r: 20, b: 40, l: 60},
+  height: 480,
+  paper_bgcolor: '#fff',
+  plot_bgcolor: '#fff'
+};
+
+Plotly.newPlot('chart', traces, layout, {responsive: true, displayModeBar: false});
+</script>
+</body>
+</html>
+==== stderr
+INFO  effective flag values for this run:
+INFO  FLAG          VALUE                             SOURCE
+INFO  config                                          default
+INFO  db                                              default
+INFO  end           2025-03-15                        CLI flag
+INFO  format        html                              default
+INFO  input         ../../testdata/sample-issues.csv  CLI flag
+INFO  out                                             default
+INFO  start         2025-01-01                        CLI flag
+INFO  stdin-format                                    default
+INFO  teams                                           default
+==== error
+<nil>

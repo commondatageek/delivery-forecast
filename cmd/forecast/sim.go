@@ -1,406 +1,123 @@
 package main
 
 import (
-	"context"
 	"flag"
-	"fmt"
 	"os"
-	"strings"
-	"text/tabwriter"
-	"time"
 
+	"github.com/commondatageek/delivery-forecast/internal/app"
+	"github.com/commondatageek/delivery-forecast/internal/params"
+	"github.com/commondatageek/delivery-forecast/internal/report"
 	"github.com/commondatageek/delivery-forecast/internal/util"
-	"github.com/commondatageek/delivery-forecast/simulate"
 )
 
 func cmdSimItems(args []string) error {
 	cmd := flag.NewFlagSet("sim items", flag.ExitOnError)
-	dbFile := addDBFlag(cmd)
-	inputFile := addInputFlag(cmd)
-	stdinFormat := addStdinFormatFlag(cmd)
-	sf := addSimFlags(cmd)
-	days := cmd.Int("days", 0, "number of days; mutually exclusive with -target-end-date, one must be given")
-	targetStartStr := cmd.String("target-start-date", "tomorrow", `start of the target window (YYYY-MM-DD; or: yesterday, today, tomorrow, "-3 months"); default: tomorrow`)
-	targetEndStr := cmd.String("target-end-date", "", `end of the target window, inclusive (YYYY-MM-DD; or: now, yesterday, today, tomorrow, "-3 months"); mutually exclusive with -days, one must be given`)
-	var confidences intList
-	cmd.Var(&confidences, "confidence", "comma-separated confidence levels to output, e.g. 85 means \"85% chance of completing at least N items\" (default: 50,75,85,95)")
-	manifestFile := cmd.String("manifest", "", `write a run-provenance JSON manifest to this path ("-" for stdout)`)
-	configFile := addConfigFlag(cmd)
+	c := params.NewSimItems(cmd)
 	cmd.Parse(args)
 
-	if err := util.ApplyConfig(cmd, *configFile); err != nil {
+	if err := util.ApplyConfig(cmd, *c.Config); err != nil {
 		return err
 	}
 
-	inputPath, err := resolveInput(cmd, inputFile, dbFile)
+	r, err := c.Resolve(nowFunc())
+	printWarnings(r.Warnings)
+	if err != nil {
+		return err
+	}
+	req := r.Request
+	if err := loadSimInputs(&req.SimBase, r.InputPath, *c.Input.StdinFormat, *c.Sim.ExclusionsFile); err != nil {
+		return err
+	}
+	dataFile := fingerprintForManifest(*c.Manifest, r.InputPath)
+	bar := newProgressBar(*c.Sim.Simulations)
+	req.Progress = bar.update
+
+	res, err := app.SimItems(req)
+	printWarnings(res.Warnings)
 	if err != nil {
 		return err
 	}
 
-	mode, err := simulate.ResolveMode(isFlagSet(cmd, "engineers"), *sf.WholeTeam)
-	if err != nil {
+	if err := writeSimManifest(*c.Manifest, "sim items", cmd, c.Sim, dataFile, res.Run, res.ManifestExtra()); err != nil {
 		return err
 	}
 
-	now := time.Now()
-	startDate, err := util.ParseFlexibleStartDate(*sf.SampleStart, now)
-	if err != nil {
-		return fmt.Errorf("invalid -sample-start date: %w", err)
-	}
-	endDate, err := util.ParseFlexibleDate(*sf.SampleEnd, now)
-	if err != nil {
-		return fmt.Errorf("invalid -sample-end date: %w", err)
-	}
-
-	targetStart, targetEnd, effectiveDays, err := resolveTargetWindow(cmd, *days, *targetStartStr, *targetEndStr, now)
-	if err != nil {
-		return err
-	}
-
-	if len(confidences) == 0 {
-		confidences = intList{50, 75, 85, 95}
-	}
-	for _, c := range confidences {
-		if c <= 0 || c > 100 {
-			return fmt.Errorf("-confidence: values must be in (0, 100], got %d", c)
-		}
-	}
-
-	all, err := loadIssues(context.Background(), inputPath, *stdinFormat)
-	if err != nil {
-		return fmt.Errorf("load issues: %w", err)
-	}
-
-	loaded, err := loadPool(all, *sf.ExclusionsFile, sf.TypicalEngineers, startDate, endDate, *sf.WholeTeam)
-	if err != nil {
-		return err
-	}
-	warnExclusionMismatches(loaded.Exclusions, loaded, sf)
-	pool := loaded.Pool
-	if err := simulate.ValidatePool(pool, mode, false); err != nil {
-		return err
-	}
-	seed := resolveSeed(cmd, *sf.RandomSeed, now)
-	horizon := simulate.NewCalendar(loaded.Exclusions, targetStart)
-
-	if err := writeManifest(*manifestFile, manifestInputs{
-		Subcommand: "sim items", Cmd: cmd, Mode: mode, TypicalEngineers: sf.TypicalEngineers,
-		Engineers: sf.Engineers.Count(), EngineerNames: sf.Engineers.Names(), WholeTeam: *sf.WholeTeam, Seed: seed,
-		SampleStart: startDate, SampleEnd: endDate,
-		DBPath: inputPath, ExclusionsPath: *sf.ExclusionsFile,
-		Exclusions: loaded.Exclusions, SampleCalendar: loaded.SampleCalendar, HorizonCalendar: horizon, Pool: pool, Issues: loaded.Issues, Skipped: loaded.Skipped,
-		Extra: map[string]any{
-			"effective_confidence_levels": []int(confidences),
-			"target_start_date":           targetStart.Format("2006-01-02"),
-			"target_end_date":             targetEnd.Format("2006-01-02"),
-			"effective_days":              effectiveDays,
-		},
-	}); err != nil {
-		return err
-	}
-
-	bar := newProgressBar(*sf.Simulations)
-	dist := simulate.ItemsInDays(pool, simulate.Params{
-		Mode:          mode,
-		Engineers:     sf.Engineers.Count(),
-		EngineerNames: sf.Engineers.Names(),
-		Calendar:      horizon,
-		Days:          effectiveDays,
-		Simulations:   *sf.Simulations,
-		Workers:       *sf.Goroutines,
-		Seed:          seed,
-		Progress:      bar.update,
-	})
-	fmt.Printf("%s, %s -> how many items?\n\n", simulate.ModeLabel(mode, sf.Engineers.Count(), sf.Engineers.Names()), describeWindow(targetStart, targetEnd, effectiveDays))
-
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "Confidence\tItems")
-	for _, c := range confidences {
-		n := simulate.ItemsAtConfidence(dist, float64(c))
-		fmt.Fprintf(w, "%d%%\tat least %d\n", c, n)
-	}
-	w.Flush()
+	report.SimItems(os.Stdout, res)
 	return nil
-}
-
-// printTrajectoryReport prints the grouped trajectory report for `sim days
-// -items g1,g2,...`: one row per group plus a Total row, with per-confidence
-// Days/Date columns. All thresholds are simulated with the same seed (see
-// simulate.ComputeTrajectoryTable) so the report's invariants hold.
-func printTrajectoryReport(pool *simulate.SamplePool, base simulate.Params, groups, confidences []int, targetStartDate time.Time) {
-	cum := make([]int, len(groups))
-	total := 0
-	for g, n := range groups {
-		total += n
-		cum[g] = total
-	}
-
-	dists := make([][]int, len(groups))
-	for g, threshold := range cum {
-		p := base
-		p.Items = threshold
-		dists[g] = simulate.DaysToComplete(pool, p)
-	}
-	cells, totals := simulate.ComputeTrajectoryTable(dists, confidences)
-
-	fmt.Printf("%s, starting %s -> grouped trajectory\n\n", simulate.ModeLabel(base.Mode, base.Engineers, base.EngineerNames), targetStartDate.Format("2006-01-02"))
-
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	confRow := []string{"", ""}
-	header := []string{"Group", "Items"}
-	for _, c := range confidences {
-		confRow = append(confRow, fmt.Sprintf("%d%%", c), "")
-		header = append(header, "Days", "Date")
-	}
-	fmt.Fprintln(w, strings.Join(confRow, "\t"))
-	fmt.Fprintln(w, strings.Join(header, "\t"))
-
-	for g := range groups {
-		row := []string{fmt.Sprintf("Group %d", g+1), fmt.Sprintf("%d", groups[g])}
-		for pi := range confidences {
-			cell := cells[g][pi]
-			date := targetStartDate.AddDate(0, 0, cell.CumulativeDays)
-			row = append(row, fmt.Sprintf("%d", cell.MarginalDays), date.Format("2006-01-02 (Mon)"))
-		}
-		fmt.Fprintln(w, strings.Join(row, "\t"))
-	}
-
-	totalRow := []string{"Total", fmt.Sprintf("%d", total)}
-	for pi := range confidences {
-		days := totals[pi]
-		date := targetStartDate.AddDate(0, 0, days)
-		totalRow = append(totalRow, fmt.Sprintf("%d", days), date.Format("2006-01-02 (Mon)"))
-	}
-	fmt.Fprintln(w, strings.Join(totalRow, "\t"))
-
-	w.Flush()
 }
 
 func cmdSimDays(args []string) error {
 	cmd := flag.NewFlagSet("sim days", flag.ExitOnError)
-	dbFile := addDBFlag(cmd)
-	inputFile := addInputFlag(cmd)
-	stdinFormat := addStdinFormatFlag(cmd)
-	sf := addSimFlags(cmd)
-	var items intList
-	cmd.Var(&items, "items", "number of items to complete (required); comma-separated for a grouped trajectory report (e.g. 13,12,9)")
-	targetStartStr := cmd.String("target-start-date", "tomorrow", `forecast start date used to compute calendar dates (YYYY-MM-DD; or: yesterday, today, tomorrow, "-3 months"); default: tomorrow`)
-	var confidences intList
-	cmd.Var(&confidences, "confidence", "comma-separated confidence levels to output, e.g. 85 means \"85% chance of finishing within N days\" (default: 50,75,85,95)")
-	manifestFile := cmd.String("manifest", "", `write a run-provenance JSON manifest to this path ("-" for stdout)`)
-	configFile := addConfigFlag(cmd)
+	c := params.NewSimDays(cmd)
 	cmd.Parse(args)
 
-	if err := util.ApplyConfig(cmd, *configFile); err != nil {
+	if err := util.ApplyConfig(cmd, *c.Config); err != nil {
 		return err
 	}
 
-	inputPath, err := resolveInput(cmd, inputFile, dbFile)
+	r, err := c.Resolve(nowFunc())
+	printWarnings(r.Warnings)
+	if err != nil {
+		return err
+	}
+	req := r.Request
+	if err := loadSimInputs(&req.SimBase, r.InputPath, *c.Input.StdinFormat, *c.Sim.ExclusionsFile); err != nil {
+		return err
+	}
+	// Only the single-value path reports progress; the grouped trajectory runs
+	// several simulations back to back and leaves the bar off.
+	dataFile := fingerprintForManifest(*c.Manifest, r.InputPath)
+	if len(c.Items) == 1 {
+		bar := newProgressBar(*c.Sim.Simulations)
+		req.Progress = bar.update
+	}
+
+	res, err := app.SimDays(req)
+	printWarnings(res.Warnings)
 	if err != nil {
 		return err
 	}
 
-	mode, err := simulate.ResolveMode(isFlagSet(cmd, "engineers"), *sf.WholeTeam)
-	if err != nil {
+	if err := writeSimManifest(*c.Manifest, "sim days", cmd, c.Sim, dataFile, res.Run, res.ManifestExtra()); err != nil {
 		return err
 	}
 
-	now := time.Now()
-	startDate, err := util.ParseFlexibleStartDate(*sf.SampleStart, now)
-	if err != nil {
-		return fmt.Errorf("invalid -sample-start date: %w", err)
-	}
-	endDate, err := util.ParseFlexibleDate(*sf.SampleEnd, now)
-	if err != nil {
-		return fmt.Errorf("invalid -sample-end date: %w", err)
-	}
-
-	if len(items) == 0 {
-		return fmt.Errorf("-items is required")
-	}
-	for _, n := range items {
-		if n <= 0 {
-			return fmt.Errorf("-items: group sizes must be positive, got %d", n)
-		}
-	}
-
-	all, err := loadIssues(context.Background(), inputPath, *stdinFormat)
-	if err != nil {
-		return fmt.Errorf("load issues: %w", err)
-	}
-
-	loaded, err := loadPool(all, *sf.ExclusionsFile, sf.TypicalEngineers, startDate, endDate, *sf.WholeTeam)
-	if err != nil {
-		return err
-	}
-	warnExclusionMismatches(loaded.Exclusions, loaded, sf)
-	pool := loaded.Pool
-	if err := simulate.ValidatePool(pool, mode, true); err != nil {
-		return err
-	}
-	seed := resolveSeed(cmd, *sf.RandomSeed, now)
-
-	targetStartDate, err := util.ParseFlexibleStartDate(*targetStartStr, now)
-	if err != nil {
-		return fmt.Errorf("invalid -target-start-date: %w", err)
-	}
-	horizon := simulate.NewCalendar(loaded.Exclusions, targetStartDate)
-
-	if len(confidences) == 0 {
-		confidences = intList{50, 75, 85, 95}
-	}
-
-	if err := writeManifest(*manifestFile, manifestInputs{
-		Subcommand: "sim days", Cmd: cmd, Mode: mode, TypicalEngineers: sf.TypicalEngineers,
-		Engineers: sf.Engineers.Count(), EngineerNames: sf.Engineers.Names(), WholeTeam: *sf.WholeTeam, Seed: seed,
-		SampleStart: startDate, SampleEnd: endDate,
-		DBPath: inputPath, ExclusionsPath: *sf.ExclusionsFile,
-		Exclusions: loaded.Exclusions, SampleCalendar: loaded.SampleCalendar, HorizonCalendar: horizon, Pool: pool, Issues: loaded.Issues, Skipped: loaded.Skipped,
-		Extra: map[string]any{
-			"effective_confidence_levels": []int(confidences),
-			"target_start_date":           targetStartDate.Format("2006-01-02"),
-		},
-	}); err != nil {
-		return err
-	}
-
-	params := simulate.Params{
-		Mode:          mode,
-		Engineers:     sf.Engineers.Count(),
-		EngineerNames: sf.Engineers.Names(),
-		Calendar:      horizon,
-		Simulations:   *sf.Simulations,
-		Workers:       *sf.Goroutines,
-		Seed:          seed,
-	}
-	if len(items) > 1 {
-		printTrajectoryReport(pool, params, items, confidences, targetStartDate)
-		return nil
-	}
-
-	bar := newProgressBar(*sf.Simulations)
-	params.Items = items[0]
-	params.Progress = bar.update
-	dist := simulate.DaysToComplete(pool, params)
-	fmt.Printf("%s, %d items -> how many days?\n\n", simulate.ModeLabel(mode, sf.Engineers.Count(), sf.Engineers.Names()), items[0])
-
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "Confidence\tDays\tDate")
-	for _, c := range confidences {
-		days := simulate.PercentileValue(dist, float64(c))
-		date := targetStartDate.AddDate(0, 0, days)
-		fmt.Fprintf(w, "%d%%\t%d\t%s\n", c, days, date.Format("2006-01-02 Mon"))
-	}
-	w.Flush()
+	report.SimDays(os.Stdout, res, c.Items)
 	return nil
 }
 
 func cmdSimProbability(args []string) error {
 	cmd := flag.NewFlagSet("sim probability", flag.ExitOnError)
-	dbFile := addDBFlag(cmd)
-	inputFile := addInputFlag(cmd)
-	stdinFormat := addStdinFormatFlag(cmd)
-	sf := addSimFlags(cmd)
-	days := cmd.Int("days", 0, "number of days; mutually exclusive with -target-end-date, one must be given")
-	targetStartStr := cmd.String("target-start-date", "tomorrow", `start of the target window (YYYY-MM-DD; or: yesterday, today, tomorrow, "-3 months"); default: tomorrow`)
-	targetEndStr := cmd.String("target-end-date", "", `end of the target window, inclusive (YYYY-MM-DD; or: now, yesterday, today, tomorrow, "-3 months"); mutually exclusive with -days, one must be given`)
-	items := cmd.Int("items", -1, "number of items to complete (omit to show full distribution)")
-	manifestFile := cmd.String("manifest", "", `write a run-provenance JSON manifest to this path ("-" for stdout)`)
-	configFile := addConfigFlag(cmd)
+	c := params.NewSimProbability(cmd)
 	cmd.Parse(args)
 
-	if err := util.ApplyConfig(cmd, *configFile); err != nil {
+	if err := util.ApplyConfig(cmd, *c.Config); err != nil {
 		return err
 	}
 
-	inputPath, err := resolveInput(cmd, inputFile, dbFile)
+	r, err := c.Resolve(nowFunc())
+	printWarnings(r.Warnings)
+	if err != nil {
+		return err
+	}
+	req := r.Request
+	if err := loadSimInputs(&req.SimBase, r.InputPath, *c.Input.StdinFormat, *c.Sim.ExclusionsFile); err != nil {
+		return err
+	}
+	dataFile := fingerprintForManifest(*c.Manifest, r.InputPath)
+	bar := newProgressBar(*c.Sim.Simulations)
+	req.Progress = bar.update
+
+	res, err := app.SimProbability(req)
+	printWarnings(res.Warnings)
 	if err != nil {
 		return err
 	}
 
-	mode, err := simulate.ResolveMode(isFlagSet(cmd, "engineers"), *sf.WholeTeam)
-	if err != nil {
+	if err := writeSimManifest(*c.Manifest, "sim probability", cmd, c.Sim, dataFile, res.Run, res.ManifestExtra()); err != nil {
 		return err
 	}
 
-	now := time.Now()
-	startDate, err := util.ParseFlexibleStartDate(*sf.SampleStart, now)
-	if err != nil {
-		return fmt.Errorf("invalid -sample-start date: %w", err)
-	}
-	endDate, err := util.ParseFlexibleDate(*sf.SampleEnd, now)
-	if err != nil {
-		return fmt.Errorf("invalid -sample-end date: %w", err)
-	}
-
-	targetStart, targetEnd, effectiveDays, err := resolveTargetWindow(cmd, *days, *targetStartStr, *targetEndStr, now)
-	if err != nil {
-		return err
-	}
-
-	all, err := loadIssues(context.Background(), inputPath, *stdinFormat)
-	if err != nil {
-		return fmt.Errorf("load issues: %w", err)
-	}
-
-	loaded, err := loadPool(all, *sf.ExclusionsFile, sf.TypicalEngineers, startDate, endDate, *sf.WholeTeam)
-	if err != nil {
-		return err
-	}
-	warnExclusionMismatches(loaded.Exclusions, loaded, sf)
-	pool := loaded.Pool
-	if err := simulate.ValidatePool(pool, mode, false); err != nil {
-		return err
-	}
-	seed := resolveSeed(cmd, *sf.RandomSeed, now)
-	horizon := simulate.NewCalendar(loaded.Exclusions, targetStart)
-
-	manifestExtra := map[string]any{
-		"target_start_date": targetStart.Format("2006-01-02"),
-		"target_end_date":   targetEnd.Format("2006-01-02"),
-		"effective_days":    effectiveDays,
-	}
-	if err := writeManifest(*manifestFile, manifestInputs{
-		Subcommand: "sim probability", Cmd: cmd, Mode: mode, TypicalEngineers: sf.TypicalEngineers,
-		Engineers: sf.Engineers.Count(), EngineerNames: sf.Engineers.Names(), WholeTeam: *sf.WholeTeam, Seed: seed,
-		SampleStart: startDate, SampleEnd: endDate,
-		DBPath: inputPath, ExclusionsPath: *sf.ExclusionsFile,
-		Exclusions: loaded.Exclusions, SampleCalendar: loaded.SampleCalendar, HorizonCalendar: horizon, Pool: pool, Issues: loaded.Issues, Skipped: loaded.Skipped,
-		Extra: manifestExtra,
-	}); err != nil {
-		return err
-	}
-
-	bar := newProgressBar(*sf.Simulations)
-	dist := simulate.ItemsInDays(pool, simulate.Params{
-		Mode:          mode,
-		Engineers:     sf.Engineers.Count(),
-		EngineerNames: sf.Engineers.Names(),
-		Calendar:      horizon,
-		Days:          effectiveDays,
-		Simulations:   *sf.Simulations,
-		Workers:       *sf.Goroutines,
-		Seed:          seed,
-		Progress:      bar.update,
-	})
-	modeDescription := simulate.ModeLabel(mode, sf.Engineers.Count(), sf.Engineers.Names())
-
-	windowDescription := describeWindow(targetStart, targetEnd, effectiveDays)
-
-	if *items >= 0 {
-		p := simulate.ProbabilityAtLeast(dist, *items)
-		fmt.Printf("%s, %s, %d items -> probability of completion?\n", modeDescription, windowDescription, *items)
-		fmt.Printf("  %.1f%%  (i.e. you can commit to %d items here at ~%.0f%% confidence)\n", p, *items, p)
-	} else {
-		fmt.Printf("%s, %s -> probability of completing N items\n", modeDescription, windowDescription)
-		fmt.Printf("  (each row's %% is also that many items' confidence level; see `sim items -confidence`)\n")
-		for n := 1; ; n++ {
-			p := simulate.ProbabilityAtLeast(dist, n)
-			fmt.Printf("  %d items: %.1f%%\n", n, p)
-			if p == 0 {
-				break
-			}
-		}
-	}
+	report.SimProbability(os.Stdout, res)
 	return nil
 }

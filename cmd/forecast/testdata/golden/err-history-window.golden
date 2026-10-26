@@ -1,0 +1,17 @@
+==== stdout
+==== stderr
+INFO  effective flag values for this run:
+INFO  FLAG          VALUE                             SOURCE
+INFO  config                                          default
+INFO  end           today                             default
+INFO  format        csv                               default
+INFO  input         ../../testdata/sample-issues.csv  CLI flag
+INFO  milestone                                       default
+INFO  out                                             default
+INFO  project                                         default
+INFO  start                                           default
+INFO  stdin-format                                    default
+INFO  teams                                           default
+INFO  window        0                                 CLI flag
+==== error
+-window must be positive

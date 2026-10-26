@@ -1,134 +1,14 @@
 package main
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"runtime/debug"
-	"sort"
-	"time"
 
-	"github.com/commondatageek/delivery-forecast/issues"
-	"github.com/commondatageek/delivery-forecast/simulate"
+	"github.com/commondatageek/delivery-forecast/internal/app"
 )
-
-// Manifest is a single JSON document recording everything that fed a
-// simulation run, so two disagreeing runs can be diffed: the binary's git
-// SHA, a fingerprint of the DB file, every flag (set vs. defaulted), the
-// resolved sampling mode/seed/window, the built sample pool, and a full dump
-// of the issues that fed it.
-type Manifest struct {
-	SchemaVersion int           `json:"schema_version"`
-	GeneratedAt   string        `json:"generated_at"`
-	Binary        BinaryInfo    `json:"binary"`
-	Invocation    Invocation    `json:"invocation"`
-	Flags         []FlagRecord  `json:"flags"`
-	Resolved      Resolved      `json:"resolved"`
-	Data          DataSection   `json:"data"`
-	Pool          PoolSection   `json:"pool"`
-	Issues        IssuesSection `json:"issues"`
-}
-
-type BinaryInfo struct {
-	GitSHA          string `json:"git_sha"`
-	GitTime         string `json:"git_time"`
-	Dirty           bool   `json:"dirty"`
-	GoVersion       string `json:"go_version"`
-	Module          string `json:"module"`
-	VersionOverride string `json:"version_override,omitempty"`
-}
-
-type Invocation struct {
-	Subcommand string   `json:"subcommand"`
-	Args       []string `json:"args"`
-	WorkingDir string   `json:"working_dir"`
-}
-
-type FlagRecord struct {
-	Name    string `json:"name"`
-	Default string `json:"default"`
-	Value   string `json:"value"`
-	Set     bool   `json:"set"`
-}
-
-type Resolved struct {
-	Mode             string         `json:"mode"`
-	ModeLabel        string         `json:"mode_label"`
-	Engineers        int            `json:"engineers"`
-	EngineerNames    []string       `json:"engineer_names,omitempty"`
-	TypicalEngineers []string       `json:"typical_engineers"`
-	WholeTeam        bool           `json:"whole_team"`
-	Seed             int64          `json:"seed"`
-	SampleStart      string         `json:"sample_start"`
-	SampleEnd        string         `json:"sample_end"`
-	TotalDays        int            `json:"total_days"`
-	Extra            map[string]any `json:"extra,omitempty"`
-}
-
-type DataSection struct {
-	DB         DataFile          `json:"db"`
-	Exclusions ExclusionsSection `json:"exclusions"`
-}
-
-// ExclusionsSection records both what the exclusions file said and what it
-// resolved to on each side of the forecast, so two runs that disagree can be
-// told apart without re-reading the file.
-type ExclusionsSection struct {
-	Path              string              `json:"path"`                // "" when none
-	Source            simulate.Exclusions `json:"source"`              // entries marshal as {"from","to","reason"}
-	SampleDaysDropped DaysByScope         `json:"sample_days_dropped"` // within [sample-start, sample-end)
-	HorizonDaysOff    DaysByScope         `json:"horizon_days_off"`    // every excluded date at/after target start
-}
-
-// DaysByScope lists resolved dates (YYYY-MM-DD) per scope. Engineer lists
-// include the global dates, since that is when the engineer is actually off.
-type DaysByScope struct {
-	Global    []string            `json:"global"`
-	Engineers map[string][]string `json:"engineers,omitempty"`
-}
-
-type DataFile struct {
-	Path    string `json:"path"`
-	Size    int64  `json:"size"`
-	ModTime string `json:"modtime"`
-	SHA256  string `json:"sha256"`
-	Error   string `json:"error,omitempty"`
-}
-
-type PoolSection struct {
-	EngineerCount          int            `json:"engineer_count"`
-	PerEngineerCompletions map[string]int `json:"per_engineer_completions"`
-	PerEngineerSampleDays  map[string]int `json:"per_engineer_sample_days"`
-	TotalSampleDays        int            `json:"total_sample_days"`
-	TotalCompletions       int            `json:"total_completions"`
-	CombinedSampleCount    int            `json:"combined_sample_count"`
-}
-
-type IssuesSection struct {
-	QueriedCount int           `json:"queried_count"`
-	SkippedCount int           `json:"skipped_count"`
-	Records      []IssueRecord `json:"records"`
-}
-
-// IssueRecord mirrors the subset of issues.Issue that CompletedBetween
-// populates (TeamKey, ProjectID, milestone, ArchivedAt, etc. are not selected
-// by that query and are intentionally omitted).
-type IssueRecord struct {
-	Identifier  string `json:"identifier"`
-	Title       string `json:"title"`
-	Assignee    string `json:"assignee"`
-	TeamName    string `json:"team_name"`
-	ProjectName string `json:"project_name"`
-	StateType   string `json:"state_type"`
-	StartedAt   string `json:"started_at,omitempty"`
-	CompletedAt string `json:"completed_at,omitempty"`
-	UpdatedAt   string `json:"updated_at,omitempty"`
-}
 
 // version is an optional build-time override: go build -ldflags "-X main.version=...".
 // The primary SHA source is debug.ReadBuildInfo (auto VCS stamping).
@@ -138,8 +18,8 @@ var version string
 // (Go's automatic vcs.* build settings). It degrades gracefully (empty SHA,
 // dirty=false) when build info is absent, e.g. under `go run` or for a binary
 // built outside a git checkout.
-func buildInfo() BinaryInfo {
-	bi := BinaryInfo{VersionOverride: version}
+func buildInfo() app.BinaryInfo {
+	bi := app.BinaryInfo{VersionOverride: version}
 	info, ok := debug.ReadBuildInfo()
 	if !ok {
 		return bi
@@ -159,202 +39,9 @@ func buildInfo() BinaryInfo {
 	return bi
 }
 
-// dbFingerprint identifies the exact DB file a run used: absolute path, size,
-// modtime, and a streamed sha256. Hash/stat errors are recorded as a
-// non-fatal Error field rather than aborting the run.
-func dbFingerprint(path string) DataFile {
-	d := DataFile{Path: path}
-	if abs, err := filepath.Abs(path); err == nil {
-		d.Path = abs
-	}
-	info, err := os.Stat(d.Path)
-	if err != nil {
-		d.Error = err.Error()
-		return d
-	}
-	d.Size = info.Size()
-	d.ModTime = info.ModTime().UTC().Format(time.RFC3339)
-	f, err := os.Open(d.Path)
-	if err != nil {
-		d.Error = err.Error()
-		return d
-	}
-	defer f.Close()
-	h := sha256.New()
-	if _, err := io.Copy(h, f); err != nil {
-		d.Error = err.Error()
-		return d
-	}
-	d.SHA256 = hex.EncodeToString(h.Sum(nil))
-	return d
-}
-
-func modeName(m simulate.Mode) string {
-	switch m {
-	case simulate.ModeFullTeam:
-		return "whole_team"
-	default:
-		return "anonymous"
-	}
-}
-
-func issueTime(t time.Time) string {
-	if t.IsZero() {
-		return ""
-	}
-	return t.UTC().Format(time.RFC3339)
-}
-
-// manifestInputs is the single shared parameter bag the sim subcommands
-// fill in to produce a Manifest.
-type manifestInputs struct {
-	Subcommand       string
-	Cmd              *flag.FlagSet
-	Mode             simulate.Mode
-	TypicalEngineers []string
-	Engineers        int
-	EngineerNames    []string
-	WholeTeam        bool
-	Seed             int64
-	SampleStart      time.Time
-	SampleEnd        time.Time
-	DBPath           string
-	ExclusionsPath   string
-	Exclusions       simulate.Exclusions
-	// SampleCalendar is anchored at SampleStart. HorizonCalendar is anchored at
-	// the target start; nil for commands with no single horizon (backtest).
-	SampleCalendar  *simulate.Calendar
-	HorizonCalendar *simulate.Calendar
-	Pool            *simulate.SamplePool
-	Issues          []issues.Issue
-	Skipped         int
-	Extra           map[string]any
-}
-
-// resolveDays lists, per scope in exc, the dates cal marks non-working in
-// [from, to) (to < 0: every explicit date from `from` on). Per-engineer scopes
-// are skipped in whole-team mode, which ignores them on both sides.
-func resolveDays(cal *simulate.Calendar, exc simulate.Exclusions, wholeTeam bool, from, to int) DaysByScope {
-	out := DaysByScope{Global: formatDays(cal.OffDays("", from, to))}
-	if wholeTeam {
-		return out
-	}
-	for _, name := range exc.Scopes() {
-		if out.Engineers == nil {
-			out.Engineers = make(map[string][]string)
-		}
-		out.Engineers[name] = formatDays(cal.OffDays(name, from, to))
-	}
-	return out
-}
-
-// formatDays renders dates as YYYY-MM-DD, as a non-nil slice so an empty list
-// marshals as [] rather than null.
-func formatDays(days []time.Time) []string {
-	out := make([]string, len(days))
-	for i, d := range days {
-		out[i] = d.Format("2006-01-02")
-	}
-	return out
-}
-
-// newManifest assembles a Manifest from manifestInputs. It is pure (no file
-// or DB access of its own) so it's unit-testable in isolation.
-func newManifest(in manifestInputs) *Manifest {
-	// Flags: walk the FlagSet generically — captures every flag incl. the
-	// command-unique ones (-days, -items, -start-date, -percentile, -manifest).
-	var flags []FlagRecord
-	in.Cmd.VisitAll(func(f *flag.Flag) {
-		flags = append(flags, FlagRecord{
-			Name:    f.Name,
-			Value:   f.Value.String(),
-			Default: f.DefValue,
-			Set:     isFlagSet(in.Cmd, f.Name),
-		})
-	})
-
-	// Pool summary: direct iteration works for both per-engineer and
-	// whole-team modes (the latter has the single WholeTeamKey key).
-	perComp := make(map[string]int, len(in.Pool.PerEngineer))
-	perDays := make(map[string]int, len(in.Pool.PerEngineer))
-	totalComp, totalDays := 0, 0
-	for name, samples := range in.Pool.PerEngineer {
-		s := simulate.Sum(samples)
-		perComp[name] = s
-		perDays[name] = len(samples)
-		totalComp += s
-		totalDays += len(samples)
-	}
-
-	records := make([]IssueRecord, 0, len(in.Issues))
-	for _, it := range in.Issues {
-		records = append(records, IssueRecord{
-			Identifier:  it.Identifier,
-			Title:       it.Title,
-			Assignee:    it.Assignee,
-			TeamName:    it.TeamName,
-			ProjectName: it.ProjectName,
-			StateType:   it.StateType,
-			StartedAt:   issueTime(it.StartedAt),
-			CompletedAt: issueTime(it.CompletedAt),
-			UpdatedAt:   issueTime(it.UpdatedAt),
-		})
-	}
-	// Sort by identifier so two manifests' issue lists diff cleanly regardless
-	// of the DB query's row order.
-	sort.Slice(records, func(i, j int) bool {
-		return records[i].Identifier < records[j].Identifier
-	})
-
-	wd, _ := os.Getwd()
-
-	return &Manifest{
-		SchemaVersion: 2,
-		GeneratedAt:   time.Now().UTC().Format(time.RFC3339),
-		Binary:        buildInfo(),
-		Invocation:    Invocation{Subcommand: in.Subcommand, Args: os.Args, WorkingDir: wd},
-		Flags:         flags,
-		Resolved: Resolved{
-			Mode:             modeName(in.Mode),
-			ModeLabel:        simulate.ModeLabel(in.Mode, in.Engineers, in.EngineerNames),
-			Engineers:        in.Engineers,
-			EngineerNames:    in.EngineerNames,
-			TypicalEngineers: in.TypicalEngineers,
-			WholeTeam:        in.WholeTeam,
-			Seed:             in.Seed,
-			SampleStart:      in.SampleStart.UTC().Format(time.RFC3339),
-			SampleEnd:        in.SampleEnd.UTC().Format(time.RFC3339),
-			TotalDays:        simulate.DaysBetween(in.SampleStart, in.SampleEnd),
-			Extra:            in.Extra,
-		},
-		Data: DataSection{
-			DB: dbFingerprint(in.DBPath),
-			Exclusions: ExclusionsSection{
-				Path:              in.ExclusionsPath,
-				Source:            in.Exclusions,
-				SampleDaysDropped: resolveDays(in.SampleCalendar, in.Exclusions, in.WholeTeam, 0, simulate.DaysBetween(in.SampleStart, in.SampleEnd)),
-				HorizonDaysOff:    resolveDays(in.HorizonCalendar, in.Exclusions, in.WholeTeam, 0, -1),
-			},
-		},
-		Pool: PoolSection{
-			EngineerCount:          len(in.Pool.PerEngineer),
-			PerEngineerCompletions: perComp,
-			PerEngineerSampleDays:  perDays,
-			TotalSampleDays:        totalDays,
-			TotalCompletions:       totalComp,
-			CombinedSampleCount:    len(in.Pool.Combined),
-		},
-		Issues: IssuesSection{
-			QueriedCount: len(in.Issues),
-			SkippedCount: in.Skipped,
-			Records:      records,
-		},
-	}
-}
-
 // writeManifest builds and writes a run manifest to path ("-" for stdout). It
 // is a no-op when path is empty, so the flag is opt-in and free when unset.
-func writeManifest(path string, in manifestInputs) error {
+func writeManifest(path string, in app.ManifestInputs) error {
 	if path == "" {
 		return nil // disabled
 	}
@@ -369,5 +56,5 @@ func writeManifest(path string, in manifestInputs) error {
 	}
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
-	return enc.Encode(newManifest(in))
+	return enc.Encode(app.NewManifest(in))
 }

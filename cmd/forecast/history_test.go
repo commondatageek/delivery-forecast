@@ -7,34 +7,10 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/commondatageek/delivery-forecast/internal/sqlite"
 	"github.com/commondatageek/delivery-forecast/issues"
 )
-
-func TestToHistoryIssues(t *testing.T) {
-	created := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
-	started := time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC)
-	completed := time.Date(2025, 1, 5, 0, 0, 0, 0, time.UTC)
-	canceled := time.Date(2025, 1, 6, 0, 0, 0, 0, time.UTC)
-
-	in := []issues.Issue{
-		{
-			Identifier: "ENG-1", TeamKey: "ENG", // non-timestamp fields must not leak through
-			CreatedAt: created, StartedAt: started, CompletedAt: completed, CanceledAt: canceled,
-		},
-	}
-	out := toHistoryIssues(in)
-	if len(out) != 1 {
-		t.Fatalf("got %d issues, want 1", len(out))
-	}
-	got := out[0]
-	if !got.CreatedAt.Equal(created) || !got.StartedAt.Equal(started) ||
-		!got.CompletedAt.Equal(completed) || !got.CanceledAt.Equal(canceled) {
-		t.Errorf("got %+v", got)
-	}
-}
 
 // historyFixtureCSV is a small, deterministic issue set: three issues over
 // early January, one completed, one still open, one pure backlog.

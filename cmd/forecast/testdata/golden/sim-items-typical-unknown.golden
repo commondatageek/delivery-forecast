@@ -1,0 +1,32 @@
+==== stdout
+2 equivalent engineers, 2025-03-16 to 2025-04-14 (30 days) -> how many items?
+
+Confidence  Items
+50%         at least 7
+75%         at least 6
+85%         at least 5
+95%         at least 3
+==== stderr
+INFO  effective flag values for this run:
+INFO  FLAG               VALUE                             SOURCE
+INFO  confidence                                           default
+INFO  config                                               default
+INFO  days               30                                CLI flag
+INFO  db                                                   default
+INFO  engineers          2                                 CLI flag
+INFO  exclusions                                           default
+INFO  goroutines         4                                 CLI flag
+INFO  input              ../../testdata/sample-issues.csv  CLI flag
+INFO  manifest                                             default
+INFO  random-seed        42                                CLI flag
+INFO  sample-end         2025-03-15                        CLI flag
+INFO  sample-start       2025-01-01                        CLI flag
+INFO  simulations        2000                              CLI flag
+INFO  stdin-format                                         default
+INFO  target-end-date                                      default
+INFO  target-start-date  2025-03-16                        CLI flag
+INFO  typical-engineers  alice,zed                         CLI flag
+INFO  whole-team         false                             default
+WARN  -typical-engineers engineer "zed" not found in data
+==== error
+<nil>

@@ -491,6 +491,24 @@ Per-engineer entries only take effect for engineers named in `-engineers
 alice,bob`; with `-engineers N` or `-whole-team` only `global` entries apply.
 `-whole-team` logs a warning if the file has per-engineer entries.
 
+## Web UI
+
+`forecast serve` starts a local web UI with everything the command line can do: every analysis command, every flag that changes the analysis, and every output format.
+
+```bash
+forecast serve -input data.db -open    # http://127.0.0.1:8080/
+```
+
+- **Local only by default.** It binds `127.0.0.1:8080`, refuses requests whose `Host` isn't a loopback name, and refuses a non-loopback `-addr` unless you pass `-allow-remote` together with `-data-dir` (paths are then limited to that directory and the upload directory). There is no authentication; `-allow-remote` is for trusted networks only.
+- **Flags:** `-addr`, `-input` and `-exclusions` (pre-filled in the UI), `-upload-dir`, `-max-upload-mb`, `-allow-remote`, `-data-dir`, `-open`, `-config`.
+- **Same answers as the CLI.** Forms are generated from the commands' own flag sets, and the server parses dates, lists and seeds with the same code the CLI uses, so output, warnings and error messages are identical. A test replays every CLI golden case through the HTTP API.
+- **Data sources** are paths on the machine running `forecast serve` (relative paths resolve against its working directory), or files you upload from the browser. `-input -` (stdin) isn't available.
+- **Results.** Each run shows the command's native view (tables and charts), the CLI-identical text output, and the equivalent command line and `-config` YAML. Every output format is a download, including the run manifest for `sim items`, `sim days` and `sim probability`. Downloads render from the stored run, so they always match what the page shows.
+- **Share link** reproduces a run: for forecasts it pins the effective `random-seed`.
+- **Config import/export** and **Paste CLI command…** convert between the form and `-config` files or a pasted `forecast ...` line.
+- **Offline.** The UI embeds everything (including Plotly), loads nothing from the internet, and updates with the binary (`forecast update`).
+- One simulation runs at a time; a second request waits.
+
 ## Config files
 
 Every command except `version` and `update` accepts `-config <file.yaml>`. Keys are flag names; precedence is **CLI flag > config

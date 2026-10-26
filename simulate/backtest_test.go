@@ -4,7 +4,7 @@ import "testing"
 
 // backtestFixture returns two items: one with a clean, midnight-aligned
 // completion, and one completed mid-afternoon rather than at local midnight
-// — the latter exercises D4 (HISTORY_PLAN.md): RunBacktest now counts
+// — the latter exercises D4 (docs/plans/HISTORY_PLAN.md): RunBacktest now counts
 // completed/remaining via history.Compute, which day-truncates timestamps
 // before counting, where the old inline CountAsOf loop compared them raw.
 func backtestFixture() []BacktestItem {

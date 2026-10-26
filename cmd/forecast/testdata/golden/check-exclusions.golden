@@ -1,0 +1,20 @@
+==== stdout
+Read 12 issues from testdata/golden/multiteam.csv
+  history   ok
+  cfd       ok
+  aging     ok
+  count     ok
+  sim       1 completed issue has no assignee and will be excluded
+Exclusions: testdata/golden/exclusions.json
+  entries   2 global, 2 engineers (alice: 2, zed: 1)
+  span      2025-02-03 .. 2025-03-28 (6 dates past, 7 future, as of 2025-03-15)
+  engineers zed: no assignee named "zed" in the input (fine if zed is given to sim -engineers)
+==== stderr
+INFO  effective flag values for this run:
+INFO  FLAG          VALUE                            SOURCE
+INFO  config                                         default
+INFO  exclusions    testdata/golden/exclusions.json  CLI flag
+INFO  input         testdata/golden/multiteam.csv    CLI flag
+INFO  stdin-format                                   default
+==== error
+<nil>

@@ -1,0 +1,398 @@
+==== stdout
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>In-Progress Issue Age Report</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 2rem auto; max-width: 1100px; color: #1a1a1a; background: #f5f5f5; }
+  h1 { font-size: 1.35rem; font-weight: 600; margin: 0 0 0.4rem; }
+  h2 { font-size: 1.05rem; font-weight: 600; margin: 0 0 0.6rem; }
+  .meta { color: #555; font-size: 0.875rem; margin-bottom: 1.75rem; }
+  .meta strong { color: #1a1a1a; }
+  .divider { border: none; border-top: 2px dashed #ccc; margin: 2.5rem 0 1.75rem; }
+  table { border-collapse: collapse; width: 100%; table-layout: fixed; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.10); }
+  th { background: #f0f0f0; text-align: left; padding: 0.6rem 1rem; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: #555; border-bottom: 1px solid #ddd; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  td { padding: 0.6rem 1rem; border-bottom: 1px solid #eee; font-size: 0.875rem; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #fafafa; }
+  .num { font-variant-numeric: tabular-nums; }
+  .high { color: #b91c1c; font-weight: 600; }
+  .medium { color: #c2410c; }
+  .normal { color: #1a1a1a; }
+</style>
+</head>
+<body>
+<h1>In-Progress Issue Age Report</h1>
+<p class="meta">
+  <strong>2</strong> in-progress issues &nbsp;·&nbsp;
+  P85 cycle time: <strong>8.0 days</strong> &nbsp;·&nbsp;
+  Distribution: 24 completed issues from 2025-01-01 to 2025-03-15
+</p>
+
+<table>
+  <colgroup>
+    <col style="width: 10%">
+    <col style="width: 23%">
+    <col style="width: 8%">
+    <col style="width: 11%">
+    <col style="width: 9%">
+    <col style="width: 15%">
+    <col style="width: 12%">
+    <col style="width: 12%">
+  </colgroup>
+  <thead>
+    <tr>
+      <th>Identifier</th>
+      <th>Title</th>
+      <th>Days</th>
+      <th>Percentile</th>
+      <th>Multiplier</th>
+      <th>State</th>
+      <th>Start Date</th>
+      <th>Assignee</th>
+    </tr>
+  </thead>
+  <tbody>
+    
+    <tr>
+      <td>ENG-27</td>
+      <td></td>
+      <td class="num high">13.0</td>
+      <td class="num high">100th</td>
+      <td class="num high">1.62x</td>
+      <td>started</td>
+      <td>Sun 3/2</td>
+      <td>carol</td>
+    </tr>
+    
+    <tr>
+      <td>ENG-28</td>
+      <td></td>
+      <td class="num high">11.0</td>
+      <td class="num high">100th</td>
+      <td class="num high">1.38x</td>
+      <td>started</td>
+      <td>Tue 3/4</td>
+      <td>alice</td>
+    </tr>
+    
+  </tbody>
+</table>
+
+
+<hr class="divider">
+<h2>Completed issues (percentile distribution sample)</h2>
+
+<table>
+  <colgroup>
+    <col style="width: 10%">
+    <col style="width: 23%">
+    <col style="width: 8%">
+    <col style="width: 11%">
+    <col style="width: 9%">
+    <col style="width: 15%">
+    <col style="width: 12%">
+    <col style="width: 12%">
+  </colgroup>
+  <thead>
+    <tr>
+      <th>Identifier</th>
+      <th>Title</th>
+      <th>Days</th>
+      <th>Percentile</th>
+      <th>Multiplier</th>
+      <th>State</th>
+      <th>Start Date</th>
+      <th>Assignee</th>
+    </tr>
+  </thead>
+  <tbody>
+    
+    <tr>
+      <td>ENG-26</td>
+      <td></td>
+      <td class="num high">10.0</td>
+      <td class="num high">100th</td>
+      <td class="num high">1.25x</td>
+      <td>completed</td>
+      <td>Wed 2/26</td>
+      <td>bob</td>
+    </tr>
+    
+    <tr>
+      <td>ENG-25</td>
+      <td></td>
+      <td class="num high">9.0</td>
+      <td class="num high">96th</td>
+      <td class="num high">1.12x</td>
+      <td>completed</td>
+      <td>Mon 2/24</td>
+      <td>alice</td>
+    </tr>
+    
+    <tr>
+      <td>ENG-21</td>
+      <td></td>
+      <td class="num high">8.0</td>
+      <td class="num high">92nd</td>
+      <td class="num high">1.00x</td>
+      <td>completed</td>
+      <td>Thu 2/13</td>
+      <td>carol</td>
+    </tr>
+    
+    <tr>
+      <td>ENG-4</td>
+      <td></td>
+      <td class="num high">8.0</td>
+      <td class="num high">92nd</td>
+      <td class="num high">1.00x</td>
+      <td>completed</td>
+      <td>Tue 1/7</td>
+      <td>alice</td>
+    </tr>
+    
+    <tr>
+      <td>ENG-24</td>
+      <td></td>
+      <td class="num high">8.0</td>
+      <td class="num high">92nd</td>
+      <td class="num high">1.00x</td>
+      <td>completed</td>
+      <td>Fri 2/21</td>
+      <td>carol</td>
+    </tr>
+    
+    <tr>
+      <td>ENG-6</td>
+      <td></td>
+      <td class="num high">8.0</td>
+      <td class="num high">92nd</td>
+      <td class="num high">1.00x</td>
+      <td>completed</td>
+      <td>Sun 1/12</td>
+      <td>carol</td>
+    </tr>
+    
+    <tr>
+      <td>ENG-23</td>
+      <td></td>
+      <td class="num high">8.0</td>
+      <td class="num high">92nd</td>
+      <td class="num high">1.00x</td>
+      <td>completed</td>
+      <td>Wed 2/19</td>
+      <td>bob</td>
+    </tr>
+    
+    <tr>
+      <td>ENG-22</td>
+      <td></td>
+      <td class="num high">8.0</td>
+      <td class="num high">92nd</td>
+      <td class="num high">1.00x</td>
+      <td>completed</td>
+      <td>Sun 2/16</td>
+      <td>alice</td>
+    </tr>
+    
+    <tr>
+      <td>ENG-14</td>
+      <td></td>
+      <td class="num medium">7.0</td>
+      <td class="num medium">67th</td>
+      <td class="num medium">0.88x</td>
+      <td>completed</td>
+      <td>Wed 1/29</td>
+      <td>bob</td>
+    </tr>
+    
+    <tr>
+      <td>ENG-11</td>
+      <td></td>
+      <td class="num medium">7.0</td>
+      <td class="num medium">67th</td>
+      <td class="num medium">0.88x</td>
+      <td>completed</td>
+      <td>Tue 1/21</td>
+      <td>bob</td>
+    </tr>
+    
+    <tr>
+      <td>ENG-12</td>
+      <td></td>
+      <td class="num medium">7.0</td>
+      <td class="num medium">67th</td>
+      <td class="num medium">0.88x</td>
+      <td>completed</td>
+      <td>Thu 1/23</td>
+      <td>carol</td>
+    </tr>
+    
+    <tr>
+      <td>ENG-13</td>
+      <td></td>
+      <td class="num medium">7.0</td>
+      <td class="num medium">67th</td>
+      <td class="num medium">0.88x</td>
+      <td>completed</td>
+      <td>Mon 1/27</td>
+      <td>alice</td>
+    </tr>
+    
+    <tr>
+      <td>ENG-10</td>
+      <td></td>
+      <td class="num medium">7.0</td>
+      <td class="num medium">67th</td>
+      <td class="num medium">0.88x</td>
+      <td>completed</td>
+      <td>Sat 1/18</td>
+      <td>alice</td>
+    </tr>
+    
+    <tr>
+      <td>ENG-20</td>
+      <td></td>
+      <td class="num medium">7.0</td>
+      <td class="num medium">67th</td>
+      <td class="num medium">0.88x</td>
+      <td>completed</td>
+      <td>Tue 2/11</td>
+      <td>bob</td>
+    </tr>
+    
+    <tr>
+      <td>ENG-19</td>
+      <td></td>
+      <td class="num medium">7.0</td>
+      <td class="num medium">67th</td>
+      <td class="num medium">0.88x</td>
+      <td>completed</td>
+      <td>Sun 2/9</td>
+      <td>alice</td>
+    </tr>
+    
+    <tr>
+      <td>ENG-18</td>
+      <td></td>
+      <td class="num normal">6.0</td>
+      <td class="num normal">38th</td>
+      <td class="num normal">0.75x</td>
+      <td>completed</td>
+      <td>Thu 2/6</td>
+      <td>carol</td>
+    </tr>
+    
+    <tr>
+      <td>ENG-17</td>
+      <td></td>
+      <td class="num normal">6.0</td>
+      <td class="num normal">38th</td>
+      <td class="num normal">0.75x</td>
+      <td>completed</td>
+      <td>Tue 2/4</td>
+      <td>bob</td>
+    </tr>
+    
+    <tr>
+      <td>ENG-16</td>
+      <td></td>
+      <td class="num normal">6.0</td>
+      <td class="num normal">38th</td>
+      <td class="num normal">0.75x</td>
+      <td>completed</td>
+      <td>Sun 2/2</td>
+      <td>alice</td>
+    </tr>
+    
+    <tr>
+      <td>ENG-9</td>
+      <td></td>
+      <td class="num normal">6.0</td>
+      <td class="num normal">38th</td>
+      <td class="num normal">0.75x</td>
+      <td>completed</td>
+      <td>Thu 1/16</td>
+      <td>carol</td>
+    </tr>
+    
+    <tr>
+      <td>ENG-2</td>
+      <td></td>
+      <td class="num normal">6.0</td>
+      <td class="num normal">38th</td>
+      <td class="num normal">0.75x</td>
+      <td>completed</td>
+      <td>Sat 1/4</td>
+      <td>bob</td>
+    </tr>
+    
+    <tr>
+      <td>ENG-1</td>
+      <td></td>
+      <td class="num normal">5.0</td>
+      <td class="num normal">17th</td>
+      <td class="num normal">0.62x</td>
+      <td>completed</td>
+      <td>Fri 1/3</td>
+      <td>alice</td>
+    </tr>
+    
+    <tr>
+      <td>ENG-7</td>
+      <td></td>
+      <td class="num normal">5.0</td>
+      <td class="num normal">17th</td>
+      <td class="num normal">0.62x</td>
+      <td>completed</td>
+      <td>Mon 1/13</td>
+      <td>alice</td>
+    </tr>
+    
+    <tr>
+      <td>ENG-5</td>
+      <td></td>
+      <td class="num normal">5.0</td>
+      <td class="num normal">17th</td>
+      <td class="num normal">0.62x</td>
+      <td>completed</td>
+      <td>Thu 1/9</td>
+      <td>bob</td>
+    </tr>
+    
+    <tr>
+      <td>ENG-3</td>
+      <td></td>
+      <td class="num normal">3.0</td>
+      <td class="num normal">4th</td>
+      <td class="num normal">0.38x</td>
+      <td>completed</td>
+      <td>Mon 1/6</td>
+      <td>carol</td>
+    </tr>
+    
+  </tbody>
+</table>
+
+
+</body>
+</html>
+==== stderr
+INFO  effective flag values for this run:
+INFO  FLAG            VALUE                             SOURCE
+INFO  config                                            default
+INFO  db                                                default
+INFO  format          html                              CLI flag
+INFO  input           ../../testdata/sample-issues.csv  CLI flag
+INFO  min-cycle-time                                    default
+INFO  percentile      85                                default
+INFO  sample-end      2025-03-15                        CLI flag
+INFO  sample-start    2025-01-01                        CLI flag
+INFO  show-completed  true                              CLI flag
+INFO  stdin-format                                      default
+INFO  teams                                             default
+==== error
+<nil>

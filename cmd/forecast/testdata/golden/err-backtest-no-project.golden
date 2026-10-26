@@ -1,0 +1,24 @@
+==== stdout
+==== stderr
+INFO  effective flag values for this run:
+INFO  FLAG               VALUE                             SOURCE
+INFO  config                                               default
+INFO  db                                                   default
+INFO  engineers          2                                 CLI flag
+INFO  exclusions                                           default
+INFO  format             text                              default
+INFO  goroutines         4                                 CLI flag
+INFO  input              ../../testdata/sample-issues.csv  CLI flag
+INFO  milestone                                            default
+INFO  project                                              default
+INFO  random-seed        42                                CLI flag
+INFO  replay-start-date                                    default
+INFO  sample-end         2025-03-15                        CLI flag
+INFO  sample-start       2025-01-01                        CLI flag
+INFO  simulations        2000                              CLI flag
+INFO  stdin-format                                         default
+INFO  target-end-date    2025-03-31                        CLI flag
+INFO  typical-engineers                                    default
+INFO  whole-team         false                             default
+==== error
+-project is required

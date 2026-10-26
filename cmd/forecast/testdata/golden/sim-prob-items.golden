@@ -1,0 +1,26 @@
+==== stdout
+3 equivalent engineers, 2025-03-16 to 2025-04-05 (21 days), 12 items -> probability of completion?
+  4.0%  (i.e. you can commit to 12 items here at ~4% confidence)
+==== stderr
+INFO  effective flag values for this run:
+INFO  FLAG               VALUE                             SOURCE
+INFO  config                                               default
+INFO  days               21                                CLI flag
+INFO  db                                                   default
+INFO  engineers          3                                 CLI flag
+INFO  exclusions                                           default
+INFO  goroutines         4                                 CLI flag
+INFO  input              ../../testdata/sample-issues.csv  CLI flag
+INFO  items              12                                CLI flag
+INFO  manifest                                             default
+INFO  random-seed        42                                CLI flag
+INFO  sample-end         2025-03-15                        CLI flag
+INFO  sample-start       2025-01-01                        CLI flag
+INFO  simulations        2000                              CLI flag
+INFO  stdin-format                                         default
+INFO  target-end-date                                      default
+INFO  target-start-date  2025-03-16                        CLI flag
+INFO  typical-engineers                                    default
+INFO  whole-team         false                             default
+==== error
+<nil>

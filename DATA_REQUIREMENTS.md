@@ -63,7 +63,7 @@ non-empty `assignee` — even though `aging` never filters by a specific
 assignee the way `sim -team`/`-typical-engineers` can. A completed issue with
 no assignee was silently excluded from the distribution. This was fixed for
 every source (not just files) when `aging` moved off that shared query; see
-`completedBetween` in `cmd/forecast/aging.go`.
+`completedBetween` in `internal/app/aging.go`.
 
 ² `state_type` is read by every command but is a required field for none of
 them: `IsCompleted`/`IsCanceled`/`IsTerminal`/`IsInProgress` all prefer the

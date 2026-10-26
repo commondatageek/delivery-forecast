@@ -1,0 +1,23 @@
+==== stdout
+==== stderr
+INFO  effective flag values for this run:
+INFO  FLAG               VALUE                             SOURCE
+INFO  confidence                                           default
+INFO  config                                               default
+INFO  db                                                   default
+INFO  engineers                                            default
+INFO  exclusions                                           default
+INFO  goroutines         1                                 CLI flag
+INFO  input              ../../testdata/sample-issues.csv  CLI flag
+INFO  items              5                                 CLI flag
+INFO  manifest                                             default
+INFO  random-seed        1                                 CLI flag
+INFO  sample-end         2025-03-15                        CLI flag
+INFO  sample-start       2025-03-10                        CLI flag
+INFO  simulations        10000                             default
+INFO  stdin-format                                         default
+INFO  target-start-date  tomorrow                          default
+INFO  typical-engineers                                    default
+INFO  whole-team         true                              CLI flag
+==== error
+whole-team throughput was 0 in the selected window; days-to-complete is undefined (it would never finish)

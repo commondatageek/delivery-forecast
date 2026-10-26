@@ -1,0 +1,17 @@
+==== stdout
+==== stderr
+INFO  effective flag values for this run:
+INFO  FLAG            VALUE                             SOURCE
+INFO  config                                            default
+INFO  db                                                default
+INFO  format          text                              default
+INFO  input           ../../testdata/sample-issues.csv  CLI flag
+INFO  min-cycle-time                                    default
+INFO  percentile      85                                default
+INFO  sample-end      2025-02-01                        CLI flag
+INFO  sample-start    2025-03-01                        CLI flag
+INFO  show-completed  false                             default
+INFO  stdin-format                                      default
+INFO  teams                                             default
+==== error
+-sample-start must be before -sample-end

@@ -1,0 +1,16 @@
+==== stdout
+PROJECT        ISSUES  MILESTONES
+Search Revamp  4       1
+TOTAL          4       
+==== stderr
+INFO  effective flag values for this run:
+INFO  FLAG           VALUE                             SOURCE
+INFO  config                                           default
+INFO  db                                               default
+INFO  input          ../../testdata/sample-issues.csv  CLI flag
+INFO  milestones     false                             default
+INFO  stdin-format                                     default
+INFO  teams                                            default
+INFO  updated-since  2025-01-01                        CLI flag
+==== error
+<nil>

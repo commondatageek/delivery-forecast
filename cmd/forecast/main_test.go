@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"testing"
 	"time"
 
@@ -14,15 +13,6 @@ import (
 // expected-value assertions correct regardless of the machine's timezone.
 func day(y int, m time.Month, d int) time.Time {
 	return time.Date(y, m, d, 0, 0, 0, 0, time.Local)
-}
-
-// newRandomSeedFlags returns a FlagSet defining the flag resolveSeed inspects.
-// It's only registered as "set" via fs.Set, which is exactly what isFlagSet
-// (backed by fs.Visit) keys off of.
-func newRandomSeedFlags() *flag.FlagSet {
-	fs := flag.NewFlagSet("test", flag.ContinueOnError)
-	fs.Int64("random-seed", 0, "")
-	return fs
 }
 
 // TestSampleEndNow_DaysBetween pins the invariant -sample-end's "now" default
@@ -55,24 +45,5 @@ func TestSampleEndNow_DaysBetween(t *testing.T) {
 	}
 	if got := simulate.DaysBetween(start, end); got != 4 {
 		t.Errorf("DaysBetween with explicit midnight end: got %d, want 4", got)
-	}
-}
-
-func TestResolveSeed(t *testing.T) {
-	now := time.Date(2025, 1, 5, 14, 30, 0, 0, time.Local)
-
-	// Unset -random-seed: time-based seed derived from now.
-	fs := newRandomSeedFlags()
-	if got := resolveSeed(fs, 99, now); got != now.UnixNano() {
-		t.Errorf("resolveSeed (unset) = %d, want %d", got, now.UnixNano())
-	}
-
-	// Explicit -random-seed: returned verbatim, now ignored.
-	fs = newRandomSeedFlags()
-	if err := fs.Set("random-seed", "99"); err != nil {
-		t.Fatal(err)
-	}
-	if got := resolveSeed(fs, 99, now); got != 99 {
-		t.Errorf("resolveSeed (set) = %d, want 99", got)
 	}
 }

@@ -3,7 +3,9 @@ package syncer
 import (
 	"context"
 	"errors"
+	"fmt"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 
@@ -233,5 +235,22 @@ func TestRun_TrashedIssueIsPurgedFromStore(t *testing.T) {
 	}
 	if len(got) != 1 || got[0].Identifier != "ENG-2" {
 		t.Fatalf("store after sync = %+v, want only ENG-2", got)
+	}
+}
+
+func TestRun_LogfReceivesProgress(t *testing.T) {
+	store := openTestStore(t)
+	client := &stubClient{issuesFor: map[string][]issues.Issue{"ENG": {{Identifier: "ENG-1", TeamKey: "ENG", UpdatedAt: time.Now()}}}}
+	var lines []string
+	err := Run(context.Background(), client, store, Options{
+		Teams: linear.TeamKeyList{"ENG"},
+		Logf:  func(format string, args ...any) { lines = append(lines, fmt.Sprintf(format, args...)) },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"full sync (new team): team=ENG", "upserted: team=ENG count=1 trashed-skipped=0"}
+	if !reflect.DeepEqual(lines, want) {
+		t.Errorf("lines = %q, want %q", lines, want)
 	}
 }

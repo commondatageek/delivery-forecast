@@ -11,7 +11,7 @@ import (
 	"github.com/commondatageek/delivery-forecast/issues"
 )
 
-const countFixtureCSV = `identifier,team_key,team_name,project_name,project_milestone_name,status,updated_at
+const countFixtureCSV = `identifier,team_key,team_name,project_name,milestone_name,status,updated_at
 E-1,ENG,Engineering,Foo,M1,started,2025-01-05
 E-2,ENG,Engineering,Foo,M1,backlog,2025-01-06
 E-3,ENG,Engineering,Foo,,completed,2025-01-07

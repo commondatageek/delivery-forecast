@@ -100,10 +100,9 @@ func (s *Store) Upsert(ctx context.Context, items ...issues.Issue) error {
 INSERT INTO issues
     (identifier, title, assignee, team_key, team_name, project_id, project_name,
      project_milestone_id, project_milestone_name, state_type, state_name,
-     created_at, started_at, completed_at, canceled_at, archived_at, auto_archived_at,
-     added_to_project_at, updated_at)
+     created_at, started_at, completed_at, canceled_at, updated_at)
 VALUES
-    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(identifier) DO UPDATE SET
     title                  = excluded.title,
     assignee               = excluded.assignee,
@@ -119,9 +118,6 @@ ON CONFLICT(identifier) DO UPDATE SET
     started_at             = excluded.started_at,
     completed_at           = excluded.completed_at,
     canceled_at            = excluded.canceled_at,
-    archived_at            = excluded.archived_at,
-    auto_archived_at       = excluded.auto_archived_at,
-    added_to_project_at    = excluded.added_to_project_at,
     updated_at             = excluded.updated_at`
 
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -145,17 +141,14 @@ ON CONFLICT(identifier) DO UPDATE SET
 			it.TeamName,
 			nullString(it.ProjectID),
 			nullString(it.ProjectName),
-			nullString(it.ProjectMilestoneID),
-			nullString(it.ProjectMilestoneName),
+			nullString(it.MilestoneID),
+			nullString(it.MilestoneName),
 			string(it.Status),
 			it.StatusName,
 			nullTime(it.CreatedAt),
 			nullTime(it.StartedAt),
 			nullTime(it.CompletedAt),
 			nullTime(it.CanceledAt),
-			nullTime(it.ArchivedAt),
-			nullTime(it.AutoArchivedAt),
-			nullTime(it.AddedToProjectAt),
 			nullTime(it.UpdatedAt),
 		)
 		if err != nil {
@@ -188,8 +181,7 @@ func (s *Store) AllIssues(ctx context.Context) ([]issues.Issue, error) {
 	const q = `
 SELECT identifier, title, assignee, team_key, team_name, project_id, project_name,
        project_milestone_id, project_milestone_name, state_type, state_name,
-       created_at, started_at, completed_at, canceled_at, archived_at, auto_archived_at,
-       added_to_project_at, updated_at
+       created_at, started_at, completed_at, canceled_at, updated_at
 FROM issues`
 
 	rows, err := s.db.QueryContext(ctx, q)
@@ -203,13 +195,12 @@ FROM issues`
 		var it issues.Issue
 		var status string
 		var assignee, projectID, projectName, milestoneID, milestoneName sql.NullString
-		var createdAt, startedAt, completedAt, canceledAt, archivedAt, autoArchivedAt, addedToProjectAt, updatedAt sql.NullTime
+		var createdAt, startedAt, completedAt, canceledAt, updatedAt sql.NullTime
 		if err := rows.Scan(
 			&it.Identifier, &it.Title, &assignee, &it.TeamKey, &it.TeamName,
 			&projectID, &projectName, &milestoneID, &milestoneName,
 			&status, &it.StatusName,
-			&createdAt, &startedAt, &completedAt, &canceledAt, &archivedAt, &autoArchivedAt,
-			&addedToProjectAt, &updatedAt,
+			&createdAt, &startedAt, &completedAt, &canceledAt, &updatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("AllIssues scan: %w", err)
 		}
@@ -217,8 +208,8 @@ FROM issues`
 		it.Assignee = assignee.String
 		it.ProjectID = projectID.String
 		it.ProjectName = projectName.String
-		it.ProjectMilestoneID = milestoneID.String
-		it.ProjectMilestoneName = milestoneName.String
+		it.MilestoneID = milestoneID.String
+		it.MilestoneName = milestoneName.String
 		if createdAt.Valid {
 			it.CreatedAt = createdAt.Time
 		}
@@ -230,15 +221,6 @@ FROM issues`
 		}
 		if canceledAt.Valid {
 			it.CanceledAt = canceledAt.Time
-		}
-		if archivedAt.Valid {
-			it.ArchivedAt = archivedAt.Time
-		}
-		if autoArchivedAt.Valid {
-			it.AutoArchivedAt = autoArchivedAt.Time
-		}
-		if addedToProjectAt.Valid {
-			it.AddedToProjectAt = addedToProjectAt.Time
 		}
 		if updatedAt.Valid {
 			it.UpdatedAt = updatedAt.Time

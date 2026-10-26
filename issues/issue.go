@@ -34,25 +34,27 @@ func ParseStatus(s string) (Status, bool) {
 // sources use are exactly its snake_case column names (see
 // DATA_REQUIREMENTS.md).
 type Issue struct {
-	Identifier           string    `json:"identifier"`
-	Title                string    `json:"title"`
-	Assignee             string    `json:"assignee"`
-	TeamKey              string    `json:"team_key"`
-	TeamName             string    `json:"team_name"`
-	ProjectID            string    `json:"project_id"`
-	ProjectName          string    `json:"project_name"`
-	ProjectMilestoneID   string    `json:"project_milestone_id"`
-	ProjectMilestoneName string    `json:"project_milestone_name"`
-	Status               Status    `json:"status"`      // normalized lifecycle phase
-	StatusName           string    `json:"status_name"` // the tracker's own status label, e.g. Linear's state.name
-	CreatedAt            time.Time `json:"created_at"`
-	StartedAt            time.Time `json:"started_at"`
-	CompletedAt          time.Time `json:"completed_at"`
-	CanceledAt           time.Time `json:"canceled_at"`
-	ArchivedAt           time.Time `json:"archived_at"`
-	AutoArchivedAt       time.Time `json:"auto_archived_at"`
-	AddedToProjectAt     time.Time `json:"added_to_project_at"`
-	UpdatedAt            time.Time `json:"updated_at"` // drives incremental fetch
+	Source           string    `json:"source"` // connector kind ("linear", "jira"); "" for file input
+	Identifier       string    `json:"identifier"`
+	Title            string    `json:"title"`
+	URL              string    `json:"url"` // link to the issue; display only
+	Assignee         string    `json:"assignee"`
+	TeamKey          string    `json:"team_key"`
+	TeamName         string    `json:"team_name"`
+	ProjectID        string    `json:"project_id"`
+	ProjectName      string    `json:"project_name"`
+	MilestoneID      string    `json:"milestone_id"`
+	MilestoneName    string    `json:"milestone_name"`
+	IssueType        string    `json:"issue_type"`        // the tracker's type label; "" when it has none
+	ParentIdentifier string    `json:"parent_identifier"` // the containing issue; "" when top-level
+	Status           Status    `json:"status"`            // normalized lifecycle phase
+	StatusName       string    `json:"status_name"`       // the tracker's own status label, e.g. Linear's state.name
+	Resolution       string    `json:"resolution"`        // the tracker's close reason; "" when none
+	CreatedAt        time.Time `json:"created_at"`
+	StartedAt        time.Time `json:"started_at"`
+	CompletedAt      time.Time `json:"completed_at"`
+	CanceledAt       time.Time `json:"canceled_at"`
+	UpdatedAt        time.Time `json:"updated_at"` // drives incremental fetch
 }
 
 // IsCompleted reports whether the issue finished successfully. Prefers

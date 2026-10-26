@@ -201,25 +201,22 @@ func toIssue(n issueNode) issues.Issue {
 	}
 
 	return issues.Issue{
-		Identifier:           n.Identifier,
-		Title:                n.Title,
-		Assignee:             assigneeName,
-		TeamKey:              teamKey,
-		TeamName:             teamName,
-		ProjectID:            projectID,
-		ProjectName:          projectName,
-		ProjectMilestoneID:   milestoneID,
-		ProjectMilestoneName: milestoneName,
-		Status:               status,
-		StatusName:           stateName,
-		CreatedAt:            n.CreatedAt,
-		StartedAt:            n.StartedAt,
-		CompletedAt:          n.CompletedAt,
-		CanceledAt:           n.CanceledAt,
-		ArchivedAt:           n.ArchivedAt,
-		AutoArchivedAt:       n.AutoArchivedAt,
-		AddedToProjectAt:     n.AddedToProjectAt,
-		UpdatedAt:            n.UpdatedAt,
+		Identifier:    n.Identifier,
+		Title:         n.Title,
+		Assignee:      assigneeName,
+		TeamKey:       teamKey,
+		TeamName:      teamName,
+		ProjectID:     projectID,
+		ProjectName:   projectName,
+		MilestoneID:   milestoneID,
+		MilestoneName: milestoneName,
+		Status:        status,
+		StatusName:    stateName,
+		CreatedAt:     n.CreatedAt,
+		StartedAt:     n.StartedAt,
+		CompletedAt:   n.CompletedAt,
+		CanceledAt:    n.CanceledAt,
+		UpdatedAt:     n.UpdatedAt,
 	}
 }
 
@@ -277,9 +274,6 @@ query FetchIssues($after: String) {
       completedAt
       canceledAt
       updatedAt
-      archivedAt
-      autoArchivedAt
-      addedToProjectAt
       trashed
       assignee {
         name
@@ -330,9 +324,6 @@ type issueNode struct {
 	CompletedAt      time.Time     `json:"completedAt"`
 	CanceledAt       time.Time     `json:"canceledAt"`
 	UpdatedAt        time.Time     `json:"updatedAt"`
-	ArchivedAt       time.Time     `json:"archivedAt"`
-	AutoArchivedAt   time.Time     `json:"autoArchivedAt"`
-	AddedToProjectAt time.Time     `json:"addedToProjectAt"`
 	Trashed          bool          `json:"trashed"`
 	Assignee         *assignee     `json:"assignee"`
 	Team             *teamRef      `json:"team"`

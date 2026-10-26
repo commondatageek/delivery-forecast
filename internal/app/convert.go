@@ -77,7 +77,7 @@ func toCountsIssues(items []issues.Issue) []counts.Issue {
 			TeamKey:              it.TeamKey,
 			TeamName:             it.TeamName,
 			ProjectName:          it.ProjectName,
-			ProjectMilestoneName: it.ProjectMilestoneName,
+			ProjectMilestoneName: it.MilestoneName,
 			StateType:            stateType,
 			UpdatedAt:            it.UpdatedAt,
 		}

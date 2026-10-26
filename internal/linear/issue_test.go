@@ -34,9 +34,6 @@ func TestToIssueFullyPopulated(t *testing.T) {
 	completedAt := time.Date(2024, 1, 10, 0, 0, 0, 0, time.UTC)
 	canceledAt := time.Date(2024, 1, 9, 0, 0, 0, 0, time.UTC)
 	updatedAt := time.Date(2024, 1, 10, 0, 0, 0, 0, time.UTC)
-	archivedAt := time.Date(2024, 1, 11, 0, 0, 0, 0, time.UTC)
-	autoArchivedAt := time.Date(2024, 1, 12, 0, 0, 0, 0, time.UTC)
-	addedToProjectAt := time.Date(2024, 1, 3, 0, 0, 0, 0, time.UTC)
 
 	n := issueNode{
 		Identifier:       "ENG-123",
@@ -46,9 +43,6 @@ func TestToIssueFullyPopulated(t *testing.T) {
 		CompletedAt:      completedAt,
 		CanceledAt:       canceledAt,
 		UpdatedAt:        updatedAt,
-		ArchivedAt:       archivedAt,
-		AutoArchivedAt:   autoArchivedAt,
-		AddedToProjectAt: addedToProjectAt,
 		Assignee:         &assignee{Name: "alice"},
 		Team:             &teamRef{Key: "ENG", Name: "Engineering"},
 		Project:          &projectRef{ID: "proj-1", Name: "Q3"},
@@ -59,25 +53,22 @@ func TestToIssueFullyPopulated(t *testing.T) {
 	got := toIssue(n)
 
 	want := issues.Issue{
-		Identifier:           "ENG-123",
-		Title:                "Fix bug",
-		Assignee:             "alice",
-		TeamKey:              "ENG",
-		TeamName:             "Engineering",
-		ProjectID:            "proj-1",
-		ProjectName:          "Q3",
-		ProjectMilestoneID:   "ms-1",
-		ProjectMilestoneName: "Milestone 1",
-		Status:               issues.StatusCompleted,
-		StatusName:           "Done",
-		CreatedAt:            createdAt,
-		StartedAt:            startedAt,
-		CompletedAt:          completedAt,
-		CanceledAt:           canceledAt,
-		ArchivedAt:           archivedAt,
-		AutoArchivedAt:       autoArchivedAt,
-		AddedToProjectAt:     addedToProjectAt,
-		UpdatedAt:            updatedAt,
+		Identifier:    "ENG-123",
+		Title:         "Fix bug",
+		Assignee:      "alice",
+		TeamKey:       "ENG",
+		TeamName:      "Engineering",
+		ProjectID:     "proj-1",
+		ProjectName:   "Q3",
+		MilestoneID:   "ms-1",
+		MilestoneName: "Milestone 1",
+		Status:        issues.StatusCompleted,
+		StatusName:    "Done",
+		CreatedAt:     createdAt,
+		StartedAt:     startedAt,
+		CompletedAt:   completedAt,
+		CanceledAt:    canceledAt,
+		UpdatedAt:     updatedAt,
 	}
 	if got != want {
 		t.Fatalf("toIssue() = %+v, want %+v", got, want)
@@ -94,7 +85,7 @@ func TestToIssueNilRelationsYieldEmptyStrings(t *testing.T) {
 
 	got := toIssue(n)
 	if got.TeamKey != "" || got.TeamName != "" || got.ProjectID != "" || got.ProjectName != "" ||
-		got.ProjectMilestoneID != "" || got.ProjectMilestoneName != "" ||
+		got.MilestoneID != "" || got.MilestoneName != "" ||
 		got.Status != issues.StatusUnknown || got.StatusName != "" {
 		t.Fatalf("toIssue() with nil relations = %+v, want all relation fields empty", got)
 	}

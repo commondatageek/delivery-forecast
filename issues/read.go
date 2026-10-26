@@ -17,34 +17,35 @@ import (
 // columnNames lists the recognized CSV/JSON column names, in the order
 // documented in DATA_REQUIREMENTS.md's schema table.
 var columnNames = []string{
-	"identifier", "title", "assignee", "team_key", "team_name",
-	"project_id", "project_name", "project_milestone_id", "project_milestone_name",
-	"status", "status_name",
-	"created_at", "started_at", "completed_at", "canceled_at",
-	"archived_at", "auto_archived_at", "added_to_project_at", "updated_at",
+	"source", "identifier", "title", "url", "assignee", "team_key", "team_name",
+	"project_id", "project_name", "milestone_id", "milestone_name",
+	"issue_type", "parent_identifier", "status", "status_name", "resolution",
+	"created_at", "started_at", "completed_at", "canceled_at", "updated_at",
 }
 
 // fieldSetters assigns a parsed column value onto an Issue.
 var fieldSetters = map[string]func(*Issue, string) error{
-	"identifier":             func(i *Issue, v string) error { i.Identifier = v; return nil },
-	"title":                  func(i *Issue, v string) error { i.Title = v; return nil },
-	"assignee":               func(i *Issue, v string) error { i.Assignee = v; return nil },
-	"team_key":               func(i *Issue, v string) error { i.TeamKey = v; return nil },
-	"team_name":              func(i *Issue, v string) error { i.TeamName = v; return nil },
-	"project_id":             func(i *Issue, v string) error { i.ProjectID = v; return nil },
-	"project_name":           func(i *Issue, v string) error { i.ProjectName = v; return nil },
-	"project_milestone_id":   func(i *Issue, v string) error { i.ProjectMilestoneID = v; return nil },
-	"project_milestone_name": func(i *Issue, v string) error { i.ProjectMilestoneName = v; return nil },
-	"status":                 func(i *Issue, v string) error { i.Status, _ = ParseStatus(v); return nil },
-	"status_name":            func(i *Issue, v string) error { i.StatusName = v; return nil },
-	"created_at":             func(i *Issue, v string) error { return setTimestamp(&i.CreatedAt, v) },
-	"started_at":             func(i *Issue, v string) error { return setTimestamp(&i.StartedAt, v) },
-	"completed_at":           func(i *Issue, v string) error { return setTimestamp(&i.CompletedAt, v) },
-	"canceled_at":            func(i *Issue, v string) error { return setTimestamp(&i.CanceledAt, v) },
-	"archived_at":            func(i *Issue, v string) error { return setTimestamp(&i.ArchivedAt, v) },
-	"auto_archived_at":       func(i *Issue, v string) error { return setTimestamp(&i.AutoArchivedAt, v) },
-	"added_to_project_at":    func(i *Issue, v string) error { return setTimestamp(&i.AddedToProjectAt, v) },
-	"updated_at":             func(i *Issue, v string) error { return setTimestamp(&i.UpdatedAt, v) },
+	"source":            func(i *Issue, v string) error { i.Source = v; return nil },
+	"identifier":        func(i *Issue, v string) error { i.Identifier = v; return nil },
+	"title":             func(i *Issue, v string) error { i.Title = v; return nil },
+	"url":               func(i *Issue, v string) error { i.URL = v; return nil },
+	"assignee":          func(i *Issue, v string) error { i.Assignee = v; return nil },
+	"team_key":          func(i *Issue, v string) error { i.TeamKey = v; return nil },
+	"team_name":         func(i *Issue, v string) error { i.TeamName = v; return nil },
+	"project_id":        func(i *Issue, v string) error { i.ProjectID = v; return nil },
+	"project_name":      func(i *Issue, v string) error { i.ProjectName = v; return nil },
+	"milestone_id":      func(i *Issue, v string) error { i.MilestoneID = v; return nil },
+	"milestone_name":    func(i *Issue, v string) error { i.MilestoneName = v; return nil },
+	"issue_type":        func(i *Issue, v string) error { i.IssueType = v; return nil },
+	"parent_identifier": func(i *Issue, v string) error { i.ParentIdentifier = v; return nil },
+	"status":            func(i *Issue, v string) error { i.Status, _ = ParseStatus(v); return nil },
+	"status_name":       func(i *Issue, v string) error { i.StatusName = v; return nil },
+	"resolution":        func(i *Issue, v string) error { i.Resolution = v; return nil },
+	"created_at":        func(i *Issue, v string) error { return setTimestamp(&i.CreatedAt, v) },
+	"started_at":        func(i *Issue, v string) error { return setTimestamp(&i.StartedAt, v) },
+	"completed_at":      func(i *Issue, v string) error { return setTimestamp(&i.CompletedAt, v) },
+	"canceled_at":       func(i *Issue, v string) error { return setTimestamp(&i.CanceledAt, v) },
+	"updated_at":        func(i *Issue, v string) error { return setTimestamp(&i.UpdatedAt, v) },
 }
 
 func setTimestamp(dst *time.Time, v string) error {
@@ -142,25 +143,27 @@ func ReadCSV(r io.Reader) ([]Issue, error) {
 // they can be parsed with the same flexible formats ReadCSV accepts, rather
 // than encoding/json's default (RFC3339-only) time.Time unmarshaling.
 type jsonIssue struct {
-	Identifier           string          `json:"identifier"`
-	Title                string          `json:"title"`
-	Assignee             string          `json:"assignee"`
-	TeamKey              string          `json:"team_key"`
-	TeamName             string          `json:"team_name"`
-	ProjectID            string          `json:"project_id"`
-	ProjectName          string          `json:"project_name"`
-	ProjectMilestoneID   string          `json:"project_milestone_id"`
-	ProjectMilestoneName string          `json:"project_milestone_name"`
-	Status               string          `json:"status"`
-	StatusName           string          `json:"status_name"`
-	CreatedAt            json.RawMessage `json:"created_at"`
-	StartedAt            json.RawMessage `json:"started_at"`
-	CompletedAt          json.RawMessage `json:"completed_at"`
-	CanceledAt           json.RawMessage `json:"canceled_at"`
-	ArchivedAt           json.RawMessage `json:"archived_at"`
-	AutoArchivedAt       json.RawMessage `json:"auto_archived_at"`
-	AddedToProjectAt     json.RawMessage `json:"added_to_project_at"`
-	UpdatedAt            json.RawMessage `json:"updated_at"`
+	Source           string          `json:"source"`
+	Identifier       string          `json:"identifier"`
+	Title            string          `json:"title"`
+	URL              string          `json:"url"`
+	Assignee         string          `json:"assignee"`
+	TeamKey          string          `json:"team_key"`
+	TeamName         string          `json:"team_name"`
+	ProjectID        string          `json:"project_id"`
+	ProjectName      string          `json:"project_name"`
+	MilestoneID      string          `json:"milestone_id"`
+	MilestoneName    string          `json:"milestone_name"`
+	IssueType        string          `json:"issue_type"`
+	ParentIdentifier string          `json:"parent_identifier"`
+	Status           string          `json:"status"`
+	StatusName       string          `json:"status_name"`
+	Resolution       string          `json:"resolution"`
+	CreatedAt        json.RawMessage `json:"created_at"`
+	StartedAt        json.RawMessage `json:"started_at"`
+	CompletedAt      json.RawMessage `json:"completed_at"`
+	CanceledAt       json.RawMessage `json:"canceled_at"`
+	UpdatedAt        json.RawMessage `json:"updated_at"`
 }
 
 func rawTimestamp(raw json.RawMessage) (time.Time, error) {
@@ -182,37 +185,38 @@ func decodeJSONIssue(data []byte) (Issue, error) {
 		return Issue{}, err
 	}
 	it := Issue{
-		Identifier:           raw.Identifier,
-		Title:                raw.Title,
-		Assignee:             raw.Assignee,
-		TeamKey:              raw.TeamKey,
-		TeamName:             raw.TeamName,
-		ProjectID:            raw.ProjectID,
-		ProjectName:          raw.ProjectName,
-		ProjectMilestoneID:   raw.ProjectMilestoneID,
-		ProjectMilestoneName: raw.ProjectMilestoneName,
-		StatusName:           raw.StatusName,
+		Source:           raw.Source,
+		Identifier:       raw.Identifier,
+		Title:            raw.Title,
+		URL:              raw.URL,
+		Assignee:         raw.Assignee,
+		TeamKey:          raw.TeamKey,
+		TeamName:         raw.TeamName,
+		ProjectID:        raw.ProjectID,
+		ProjectName:      raw.ProjectName,
+		MilestoneID:      raw.MilestoneID,
+		MilestoneName:    raw.MilestoneName,
+		IssueType:        raw.IssueType,
+		ParentIdentifier: raw.ParentIdentifier,
+		StatusName:       raw.StatusName,
+		Resolution:       raw.Resolution,
 	}
 	it.Status, _ = ParseStatus(raw.Status)
 	fields := []struct {
-		raw string
+		raw json.RawMessage
+		col string
 		dst *time.Time
 	}{
-		{"created_at", &it.CreatedAt}, {"started_at", &it.StartedAt},
-		{"completed_at", &it.CompletedAt}, {"canceled_at", &it.CanceledAt},
-		{"archived_at", &it.ArchivedAt}, {"auto_archived_at", &it.AutoArchivedAt},
-		{"added_to_project_at", &it.AddedToProjectAt}, {"updated_at", &it.UpdatedAt},
-	}
-	rawByName := map[string]json.RawMessage{
-		"created_at": raw.CreatedAt, "started_at": raw.StartedAt,
-		"completed_at": raw.CompletedAt, "canceled_at": raw.CanceledAt,
-		"archived_at": raw.ArchivedAt, "auto_archived_at": raw.AutoArchivedAt,
-		"added_to_project_at": raw.AddedToProjectAt, "updated_at": raw.UpdatedAt,
+		{raw.CreatedAt, "created_at", &it.CreatedAt},
+		{raw.StartedAt, "started_at", &it.StartedAt},
+		{raw.CompletedAt, "completed_at", &it.CompletedAt},
+		{raw.CanceledAt, "canceled_at", &it.CanceledAt},
+		{raw.UpdatedAt, "updated_at", &it.UpdatedAt},
 	}
 	for _, f := range fields {
-		t, err := rawTimestamp(rawByName[f.raw])
+		t, err := rawTimestamp(f.raw)
 		if err != nil {
-			return Issue{}, fmt.Errorf("column %q: %w", f.raw, err)
+			return Issue{}, fmt.Errorf("column %q: %w", f.col, err)
 		}
 		*f.dst = t
 	}

@@ -1,0 +1,14 @@
+﻿Summary,Issue key,Issue id,Issue Type,Status,Project key,Project name,Project type,Priority,Resolution,Assignee,Created,Updated,Resolved,Fix versions,Fix versions,Sprint,Sprint,Sprint,Custom field (Dev),Parent key,Parent summary,Status category,Status category changed,Comment,Comment
+Checkout revamp,DEMO-1,10001,Epic,In Dev,DEMO,Demo Delivery,software,High,,Alice Example,01/Sep/26 9:00 AM,20/Oct/26 4:10 PM,,Release 1,,Apollo,,,,,,In Progress,15/Sep/26 10:00 AM,,
+Cart page layout,DEMO-2,10002,Story,Done,DEMO,Demo Delivery,software,Medium,Done,Alice Example,02/Sep/26 9:30 AM,10/Oct/26 3:00 PM,10/Oct/26 2:45 PM,Release 1,Release 2,Apollo,Brahma,,Alice Example,DEMO-1,Checkout revamp,Done,10/Oct/26 2:45 PM,"Looks good, shipping",
+Update tax table,DEMO-3,10003,Task,Done,DEMO,Demo Delivery,software,Low,,Bob Example,03/Sep/26 11:00 AM,08/Oct/26 9:20 AM,,,,Apollo,,,Bob Example,,,Done,08/Oct/26 9:15 AM,,
+Old coupon bug,DEMO-4,10004,Bug,won't do,DEMO,Demo Delivery,software,Low,,Bob Example,04/Sep/26 1:00 PM,12/Oct/26 10:00 AM,,,,,,,,,,Done,12/Oct/26 10:00 AM,Not reproducible,
+Legacy export,DEMO-5,10005,Task,Wont Do,DEMO,Demo Delivery,software,Medium,Done,Carol Example,05/Sep/26 2:00 PM,14/Oct/26 11:30 AM,14/Oct/26 11:25 AM,,,,,,,,,Done,14/Oct/26 11:25 AM,,
+Address autocomplete,DEMO-6,10006,Story,In Dev,DEMO,Demo Delivery,software,High,,Carol Example,06/Sep/26 9:00 AM,21/Oct/26 8:00 AM,,Release 2,,Brahma,,,Carol Example,DEMO-1,Checkout revamp,In Progress,13/Oct/26 9:30 AM,,
+Payment retry,DEMO-7,10007,Story,In UAT,DEMO,Demo Delivery,software,Highest,Done,Alice Example,07/Sep/26 10:00 AM,21/Oct/26 1:00 PM,20/Oct/26 5:00 PM,Release 2,,Brahma,,,Alice Example,DEMO-1,Checkout revamp,In Progress,01/Oct/26 9:00 AM,,
+Gift cards,DEMO-8,10008,Story,Backlog,DEMO,Demo Delivery,software,No priority,,,08/Sep/26 9:00 AM,08/Sep/26 9:00 AM,,,,,,,,,,To Do,08/Sep/26 9:00 AM,,
+Shipping rules review,DEMO-9,10009,Task,Analysis,DEMO,Demo Delivery,software,Medium,,Bob Example,09/Sep/26 3:00 PM,18/Oct/26 2:00 PM,,,,,,,,,,To Do,09/Sep/26 3:00 PM,,
+Write cart tests,DEMO-10,10010,Sub-task,Done,DEMO,Demo Delivery,software,Medium,Done,,10/Sep/26 9:00 AM,30/Sep/26 4:00 PM,30/Sep/26 3:55 PM,Release 1,,Apollo,,,,DEMO-2,Cart page layout,Done,30/Sep/26 3:55 PM,,
+"Fix ""Save"" button, again",DEMO-11,10011,Bug,Done,DEMO,Demo Delivery,software,Urgent,Done,Carol Example,11/Sep/26 8:00 AM,02/Oct/26 12:10 PM,02/Oct/26 12:00 PM,,,Apollo,Brahma,Comet,Carol Example,,,Done,02/Oct/26 12:00 PM,"First line
+second line","Another, comment"
+Loyalty points,DEMO-12,10012,Story,Waiting for Info,DEMO,Demo Delivery,software,Lowest,,Alice Example,12/Sep/26 9:00 AM,19/Oct/26 9:00 AM,,,,,,,,,,To Do,12/Sep/26 9:00 AM,,

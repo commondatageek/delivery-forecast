@@ -13,3 +13,5 @@ scratch
 .claude
 
 !cmd/forecast/testdata/**
+!testdata/jira-export-sample.csv
+!internal/importmap/templates/*.yaml

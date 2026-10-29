@@ -38,8 +38,8 @@ func Summarize(items []issues.Issue) DatasetSummary {
 			if milestones[it.ProjectName] == nil {
 				milestones[it.ProjectName] = make(map[string]bool)
 			}
-			if it.ProjectMilestoneName != "" {
-				milestones[it.ProjectName][it.ProjectMilestoneName] = true
+			if it.MilestoneName != "" {
+				milestones[it.ProjectName][it.MilestoneName] = true
 			}
 		}
 		if !it.CreatedAt.IsZero() && (s.EarliestCreated.IsZero() || it.CreatedAt.Before(s.EarliestCreated)) {

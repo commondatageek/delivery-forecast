@@ -35,7 +35,6 @@ type Issue struct {
 	StartedAt   time.Time
 	CompletedAt time.Time
 	CanceledAt  time.Time
-	StateType   string
 }
 
 // NormalizedIssue holds per-issue lifecycle event times clamped to be
@@ -85,8 +84,8 @@ type FlowHealth struct {
 // non-decreasing timestamps. Returns false if the issue has no created_at and
 // should be dropped.
 //
-// This delegates to history.Normalize (Issue's four timestamp fields are a
-// superset of history.Issue's — StateType has no bearing on normalization),
+// This delegates to history.Normalize (Issue has exactly history.Issue's four
+// timestamp fields),
 // so cfd and history can never disagree on which day a boundary event lands
 // on; see NormalizedIssue's doc comment for why the delegation runs this
 // direction.

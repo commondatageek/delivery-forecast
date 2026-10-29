@@ -51,17 +51,17 @@ func TestNewManifest_Assembly(t *testing.T) {
 		Flags:          flags,
 		Invocation:     Invocation{Subcommand: "sim items", Args: []string{"forecast"}, WorkingDir: "/w"},
 		Binary:         BinaryInfo{GitSHA: "abc"},
-		DB:             DataFile{Path: "/data/test.db"},
+		Input:          DataFile{Path: "/data/test.db"},
 		GeneratedAt:    generated,
 	})
 
-	if m.SchemaVersion != 2 {
-		t.Fatalf("SchemaVersion = %d, want 2", m.SchemaVersion)
+	if m.SchemaVersion != 3 {
+		t.Fatalf("SchemaVersion = %d, want 3", m.SchemaVersion)
 	}
 	if m.GeneratedAt != "2025-03-15T10:30:00Z" {
 		t.Errorf("GeneratedAt = %q", m.GeneratedAt)
 	}
-	if m.Binary.GitSHA != "abc" || m.Data.DB.Path != "/data/test.db" || !reflect.DeepEqual(m.Flags, flags) || m.Invocation.WorkingDir != "/w" {
+	if m.Binary.GitSHA != "abc" || m.Data.Input.Path != "/data/test.db" || !reflect.DeepEqual(m.Flags, flags) || m.Invocation.WorkingDir != "/w" {
 		t.Errorf("caller-supplied sections not passed through: %+v", m)
 	}
 

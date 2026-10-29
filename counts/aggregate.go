@@ -3,30 +3,17 @@ package counts
 import "time"
 
 // Issue is the neutral per-issue input Aggregate reads: just the grouping
-// keys, the raw state_type, and updated_at. The caller maps its source's
-// fields onto it (the CLI maps issues.Issue).
-//
-// Unlike aging/sim, there is no timestamp-based fallback for "is this
-// terminal" here — count's source data carries no completed_at/canceled_at
-// at all, only state_type — so a file source that omits state_type entirely
-// will count every issue as outstanding, including ones a spreadsheet
-// exporter (or a human) would call done. This is the sharpest edge of D7's
-// "state_type is optional" story; document it, don't paper over it.
+// keys, whether the issue is finished, and updated_at. The caller maps its
+// source's fields onto it and decides Terminal (the CLI uses
+// issues.Issue.IsTerminal, which prefers completed_at/canceled_at and falls
+// back to the normalized status).
 type Issue struct {
 	TeamKey              string
 	TeamName             string
 	ProjectName          string
 	ProjectMilestoneName string
-	StateType            string
+	Terminal             bool // completed or canceled; excluded from the outstanding counts
 	UpdatedAt            time.Time
-}
-
-// isTerminalState reports whether stateType is one of the three terminal
-// states Aggregate excludes from the not-completed counts: completed,
-// canceled, or duplicate. Mirrors NotCompletedCounts' SQL predicate
-// (`state_type NOT IN ('completed', 'canceled', 'duplicate')`) exactly.
-func isTerminalState(stateType string) bool {
-	return stateType == "completed" || stateType == "canceled" || stateType == "duplicate"
 }
 
 // Aggregate computes not-completed issue counts (grouped by team, project,
@@ -57,7 +44,7 @@ func Aggregate(all []Issue) ([]ProjectMilestoneCount, []ProjectActivity) {
 	counted := make(map[countKey]int)
 	var countOrder []countKey
 	for _, it := range all {
-		if isTerminalState(it.StateType) {
+		if it.Terminal {
 			continue
 		}
 		k := countKey{it.TeamKey, it.TeamName, it.ProjectName, it.ProjectMilestoneName}

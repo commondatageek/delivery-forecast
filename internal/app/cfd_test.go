@@ -9,7 +9,7 @@ import (
 	"github.com/commondatageek/delivery-forecast/cfd"
 )
 
-const multiTeamCSV = `identifier,team_key,state_type,project_name,project_milestone_name,created_at,started_at,completed_at,canceled_at,updated_at
+const multiTeamCSV = `identifier,team_key,status,project_name,milestone_name,created_at,started_at,completed_at,canceled_at,updated_at
 ENG-1,ENG,completed,P,M1,2025-01-02,2025-01-03,2025-01-08,,2025-01-08
 ENG-2,ENG,started,P,,2025-01-06,2025-01-07,,,2025-01-15
 DATA-1,DATA,completed,Q,,2025-01-05,2025-01-06,2025-01-14,,2025-01-14

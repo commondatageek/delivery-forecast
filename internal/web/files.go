@@ -27,8 +27,12 @@ func (s *Server) handleFiles(w http.ResponseWriter, r *http.Request) {
 		exts = []string{".json"}
 	case "db":
 		exts = []string{".db", ".sqlite", ".sqlite3"}
+	case "raw":
+		exts = []string{".csv"}
+	case "map":
+		exts = mapExts
 	default:
-		writeError(w, http.StatusBadRequest, errors.New(`kind must be "input", "exclusions" or "db"`), nil)
+		writeError(w, http.StatusBadRequest, errors.New(`kind must be "input", "exclusions", "db", "raw" or "map"`), nil)
 		return
 	}
 

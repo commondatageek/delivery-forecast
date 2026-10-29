@@ -54,7 +54,7 @@ func Run(ctx context.Context, client client, store *sqlite.Store, opts Options) 
 		return fmt.Errorf("-teams and -all-teams are mutually exclusive")
 	}
 
-	existing, err := store.DistinctTeamKeys(ctx)
+	existing, err := store.DistinctTeams(ctx, linear.Kind)
 	if err != nil {
 		return fmt.Errorf("distinct team keys: %w", err)
 	}
@@ -93,7 +93,7 @@ func Run(ctx context.Context, client client, store *sqlite.Store, opts Options) 
 				logf("full sync (new team): team=%s", key)
 			}
 		} else {
-			since, err = store.LatestUpdatedAtForTeam(ctx, key)
+			since, err = store.LatestUpdatedAt(ctx, linear.Kind, key)
 			if err != nil {
 				return fmt.Errorf("watermark for %s: %w", key, err)
 			}
@@ -104,6 +104,10 @@ func Run(ctx context.Context, client client, store *sqlite.Store, opts Options) 
 		if err != nil {
 			return fmt.Errorf("fetch %s: %w", key, err)
 		}
+		// Every stored issue carries its source; the store keys on it.
+		for i := range fetched {
+			fetched[i].Source = linear.Kind
+		}
 		if len(fetched) > 0 {
 			if err := store.Upsert(ctx, fetched...); err != nil {
 				return fmt.Errorf("upsert %s: %w", key, err)
@@ -111,7 +115,7 @@ func Run(ctx context.Context, client client, store *sqlite.Store, opts Options) 
 		}
 		// An issue trashed after an earlier sync is still in the store; drop it.
 		if len(trashed) > 0 {
-			if err := store.Delete(ctx, trashed...); err != nil {
+			if err := store.Delete(ctx, linear.Kind, trashed...); err != nil {
 				return fmt.Errorf("delete trashed %s: %w", key, err)
 			}
 		}

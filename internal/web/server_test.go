@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -161,6 +162,11 @@ func TestUploads(t *testing.T) {
 	if rec := upload(t, s, "evil.exe", "x"); rec.Code != 400 {
 		t.Errorf("bad extension: %d", rec.Code)
 	}
+	for _, name := range []string{"mapping.yaml", "mapping.YML"} {
+		if rec := upload(t, s, name, "version: 1\n"); rec.Code != 200 {
+			t.Errorf("%s upload: %d %s", name, rec.Code, rec.Body)
+		}
+	}
 
 	small := newTestServer(t, func(o *Options) { o.MaxUploadBytes = 10 })
 	if rec := upload(t, small, "a.csv", strings.Repeat("x", 100)); rec.Code != 413 {
@@ -197,6 +203,32 @@ func TestFiles(t *testing.T) {
 	}
 	if rec := do(s, "GET", "/api/files?kind=bogus", nil, nil); rec.Code != 400 {
 		t.Errorf("bad kind: %d", rec.Code)
+	}
+}
+
+func TestFiles_ImportKinds(t *testing.T) {
+	dir := t.TempDir()
+	for _, p := range []string{"export.csv", "data.db", "jira.yaml", "other.yml", "notes.json"} {
+		os.WriteFile(filepath.Join(dir, p), []byte("x"), 0o644)
+	}
+	s := newTestServer(t, func(o *Options) { o.AllowRemote = true; o.DataDir = dir })
+	for kind, want := range map[string][]string{"raw": {"export.csv"}, "map": {"jira.yaml", "other.yml"}} {
+		var res struct {
+			Files []fileEntry `json:"files"`
+		}
+		rec := do(s, "GET", "/api/files?kind="+kind, nil, nil)
+		if rec.Code != 200 {
+			t.Fatalf("kind=%s: %d %s", kind, rec.Code, rec.Body)
+		}
+		decode(t, rec, &res)
+		var names []string
+		for _, f := range res.Files {
+			names = append(names, filepath.Base(f.Path))
+		}
+		sort.Strings(names)
+		if !reflect.DeepEqual(names, want) {
+			t.Errorf("kind=%s: files = %v, want %v", kind, names, want)
+		}
 	}
 }
 

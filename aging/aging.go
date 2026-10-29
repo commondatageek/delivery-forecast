@@ -41,8 +41,8 @@ type Issue struct {
 	Title       string
 	Assignee    string
 	ProjectName string
-	StateType   string
-	StateName   string
+	Status      string // normalized lifecycle phase (issues.Status), display only
+	StatusName  string // the tracker's own status label, display only
 	StartedAt   time.Time
 	CompletedAt time.Time
 }
@@ -54,8 +54,8 @@ type Item struct {
 	Title       string
 	Assignee    string
 	ProjectName string
-	StateType   string
-	StateName   string
+	Status      string // normalized lifecycle phase (issues.Status), display only
+	StatusName  string // the tracker's own status label, display only
 	StartedAt   time.Time
 	AgeDays     float64
 	Percentile  int
@@ -129,8 +129,8 @@ func InProgressItems(issues []Issue, today time.Time) []Item {
 			Title:       it.Title,
 			Assignee:    it.Assignee,
 			ProjectName: it.ProjectName,
-			StateType:   it.StateType,
-			StateName:   it.StateName,
+			Status:      it.Status,
+			StatusName:  it.StatusName,
 			StartedAt:   it.StartedAt,
 			AgeDays:     ageDays,
 		})
@@ -162,8 +162,8 @@ func CompletedItems(issues []Issue, minCycleTime time.Duration) []Item {
 			Title:       it.Title,
 			Assignee:    it.Assignee,
 			ProjectName: it.ProjectName,
-			StateType:   it.StateType,
-			StateName:   it.StateName,
+			Status:      it.Status,
+			StatusName:  it.StatusName,
 			StartedAt:   it.StartedAt,
 			AgeDays:     days,
 		})
@@ -190,16 +190,16 @@ func formatStartDate(t time.Time) string {
 }
 
 // FormatState renders an issue's workflow state for display, e.g.
-// "In Review (started)": the state name with its type in parentheses, or
-// whichever of the two is present.
-func FormatState(name, typ string) string {
+// "In Review (started)": the tracker's status name with the normalized
+// status in parentheses, or whichever of the two is present.
+func FormatState(name, status string) string {
 	switch {
-	case name != "" && typ != "":
-		return fmt.Sprintf("%s (%s)", name, typ)
+	case name != "" && status != "":
+		return fmt.Sprintf("%s (%s)", name, status)
 	case name != "":
 		return name
 	default:
-		return typ
+		return status
 	}
 }
 
@@ -269,7 +269,7 @@ func writeItemRow(tw *tabwriter.Writer, item Item, meta Meta) {
 		item.AgeDays,
 		pct, util.OrdinalSuffix(pct),
 		FormatMultiplier(item.Multiplier, meta),
-		FormatState(item.StateName, item.StateType),
+		FormatState(item.StatusName, item.Status),
 		formatStartDate(item.StartedAt),
 		item.Assignee,
 	)
@@ -308,8 +308,8 @@ type jsonItem struct {
 	Title       string   `json:"title"`
 	Assignee    string   `json:"assignee"`
 	ProjectName string   `json:"project_name,omitempty"`
-	StateType   string   `json:"state_type,omitempty"`
-	StateName   string   `json:"state_name,omitempty"`
+	Status      string   `json:"status,omitempty"`
+	StatusName  string   `json:"status_name,omitempty"`
 	StartedAt   string   `json:"started_at"`
 	AgeDays     float64  `json:"age_days"`
 	Percentile  int      `json:"percentile"`
@@ -332,8 +332,8 @@ func RenderJSON(w io.Writer, items []Item, meta Meta) error {
 			Title:       item.Title,
 			Assignee:    item.Assignee,
 			ProjectName: item.ProjectName,
-			StateType:   item.StateType,
-			StateName:   item.StateName,
+			Status:      item.Status,
+			StatusName:  item.StatusName,
 			StartedAt:   item.StartedAt.Format("2006-01-02"),
 			AgeDays:     math.Round(item.AgeDays*10) / 10,
 			Percentile:  item.Percentile,
@@ -459,7 +459,7 @@ func toHTMLItems(items []Item, meta Meta) []htmlItemData {
 			Suffix:     util.OrdinalSuffix(item.Percentile),
 			Multiplier: FormatMultiplier(item.Multiplier, meta),
 			AgeClass:   AgeClass(item.Multiplier, meta.HasThreshold()),
-			State:      FormatState(item.StateName, item.StateType),
+			State:      FormatState(item.StatusName, item.Status),
 			StartDate:  formatStartDate(item.StartedAt),
 			Assignee:   item.Assignee,
 		})

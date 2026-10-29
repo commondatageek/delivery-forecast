@@ -14,10 +14,10 @@ import (
 // issues (two completed, one open) and one canceled one.
 func backtestIssues() []issues.Issue {
 	return []issues.Issue{
-		{Identifier: "E-1", Assignee: "alice", ProjectName: "Foo", StateType: "completed", CreatedAt: localDay(2025, 1, 1), StartedAt: localDay(2025, 1, 2), CompletedAt: localDay(2025, 1, 5)},
-		{Identifier: "E-2", Assignee: "alice", ProjectName: "Foo", ProjectMilestoneName: "M1", StateType: "completed", CreatedAt: localDay(2025, 1, 2), StartedAt: localDay(2025, 1, 3), CompletedAt: localDay(2025, 1, 9)},
-		{Identifier: "E-3", Assignee: "alice", ProjectName: "Foo", StateType: "started", CreatedAt: localDay(2025, 1, 3), StartedAt: localDay(2025, 1, 4)},
-		{Identifier: "E-4", Assignee: "alice", ProjectName: "Foo", StateType: "canceled", CreatedAt: localDay(2025, 1, 4), StartedAt: localDay(2025, 1, 5), CanceledAt: localDay(2025, 1, 6)},
+		{Identifier: "E-1", Assignee: "alice", ProjectName: "Foo", Status: issues.StatusCompleted, CreatedAt: localDay(2025, 1, 1), StartedAt: localDay(2025, 1, 2), CompletedAt: localDay(2025, 1, 5)},
+		{Identifier: "E-2", Assignee: "alice", ProjectName: "Foo", MilestoneName: "M1", Status: issues.StatusCompleted, CreatedAt: localDay(2025, 1, 2), StartedAt: localDay(2025, 1, 3), CompletedAt: localDay(2025, 1, 9)},
+		{Identifier: "E-3", Assignee: "alice", ProjectName: "Foo", Status: issues.StatusStarted, CreatedAt: localDay(2025, 1, 3), StartedAt: localDay(2025, 1, 4)},
+		{Identifier: "E-4", Assignee: "alice", ProjectName: "Foo", Status: issues.StatusCanceled, CreatedAt: localDay(2025, 1, 4), StartedAt: localDay(2025, 1, 5), CanceledAt: localDay(2025, 1, 6)},
 	}
 }
 

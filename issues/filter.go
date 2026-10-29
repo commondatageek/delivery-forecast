@@ -8,7 +8,7 @@ type Filter struct {
 	Teams []string
 	// Project matches Issue.ProjectName exactly. Empty means all projects.
 	Project string
-	// Milestone matches Issue.ProjectMilestoneName exactly. Empty means all
+	// Milestone matches Issue.MilestoneName exactly. Empty means all
 	// milestones. Only meaningful together with Project.
 	Milestone string
 }
@@ -32,7 +32,7 @@ func (f Filter) Apply(in []Issue) []Issue {
 		if f.Project != "" && it.ProjectName != f.Project {
 			continue
 		}
-		if f.Milestone != "" && it.ProjectMilestoneName != f.Milestone {
+		if f.Milestone != "" && it.MilestoneName != f.Milestone {
 			continue
 		}
 		out = append(out, it)

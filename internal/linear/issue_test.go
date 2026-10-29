@@ -34,50 +34,46 @@ func TestToIssueFullyPopulated(t *testing.T) {
 	completedAt := time.Date(2024, 1, 10, 0, 0, 0, 0, time.UTC)
 	canceledAt := time.Date(2024, 1, 9, 0, 0, 0, 0, time.UTC)
 	updatedAt := time.Date(2024, 1, 10, 0, 0, 0, 0, time.UTC)
-	archivedAt := time.Date(2024, 1, 11, 0, 0, 0, 0, time.UTC)
-	autoArchivedAt := time.Date(2024, 1, 12, 0, 0, 0, 0, time.UTC)
-	addedToProjectAt := time.Date(2024, 1, 3, 0, 0, 0, 0, time.UTC)
 
 	n := issueNode{
 		Identifier:       "ENG-123",
 		Title:            "Fix bug",
+		URL:              "https://linear.app/acme/issue/ENG-123",
 		CreatedAt:        createdAt,
 		StartedAt:        startedAt,
 		CompletedAt:      completedAt,
 		CanceledAt:       canceledAt,
 		UpdatedAt:        updatedAt,
-		ArchivedAt:       archivedAt,
-		AutoArchivedAt:   autoArchivedAt,
-		AddedToProjectAt: addedToProjectAt,
 		Assignee:         &assignee{Name: "alice"},
 		Team:             &teamRef{Key: "ENG", Name: "Engineering"},
 		Project:          &projectRef{ID: "proj-1", Name: "Q3"},
 		ProjectMilestone: &milestoneRef{ID: "ms-1", Name: "Milestone 1"},
 		State:            &stateRef{Type: "completed", Name: "Done"},
+		Parent:           &parentRef{Identifier: "ENG-100"},
 	}
 
 	got := toIssue(n)
 
 	want := issues.Issue{
-		Identifier:           "ENG-123",
-		Title:                "Fix bug",
-		Assignee:             "alice",
-		TeamKey:              "ENG",
-		TeamName:             "Engineering",
-		ProjectID:            "proj-1",
-		ProjectName:          "Q3",
-		ProjectMilestoneID:   "ms-1",
-		ProjectMilestoneName: "Milestone 1",
-		StateType:            "completed",
-		StateName:            "Done",
-		CreatedAt:            createdAt,
-		StartedAt:            startedAt,
-		CompletedAt:          completedAt,
-		CanceledAt:           canceledAt,
-		ArchivedAt:           archivedAt,
-		AutoArchivedAt:       autoArchivedAt,
-		AddedToProjectAt:     addedToProjectAt,
-		UpdatedAt:            updatedAt,
+		Source:           Kind,
+		Identifier:       "ENG-123",
+		Title:            "Fix bug",
+		URL:              "https://linear.app/acme/issue/ENG-123",
+		ParentIdentifier: "ENG-100",
+		Assignee:         "alice",
+		TeamKey:          "ENG",
+		TeamName:         "Engineering",
+		ProjectID:        "proj-1",
+		ProjectName:      "Q3",
+		MilestoneID:      "ms-1",
+		MilestoneName:    "Milestone 1",
+		Status:           issues.StatusCompleted,
+		StatusName:       "Done",
+		CreatedAt:        createdAt,
+		StartedAt:        startedAt,
+		CompletedAt:      completedAt,
+		CanceledAt:       canceledAt,
+		UpdatedAt:        updatedAt,
 	}
 	if got != want {
 		t.Fatalf("toIssue() = %+v, want %+v", got, want)
@@ -94,8 +90,8 @@ func TestToIssueNilRelationsYieldEmptyStrings(t *testing.T) {
 
 	got := toIssue(n)
 	if got.TeamKey != "" || got.TeamName != "" || got.ProjectID != "" || got.ProjectName != "" ||
-		got.ProjectMilestoneID != "" || got.ProjectMilestoneName != "" ||
-		got.StateType != "" || got.StateName != "" {
+		got.MilestoneID != "" || got.MilestoneName != "" ||
+		got.Status != issues.StatusUnknown || got.StatusName != "" {
 		t.Fatalf("toIssue() with nil relations = %+v, want all relation fields empty", got)
 	}
 }
@@ -103,5 +99,33 @@ func TestToIssueNilRelationsYieldEmptyStrings(t *testing.T) {
 func TestBuildQueryRequestsTrashed(t *testing.T) {
 	if !strings.Contains(buildQuery(nil, time.Time{}), "\n      trashed\n") {
 		t.Fatal("query does not request the trashed field")
+	}
+}
+
+func TestStatusFromStateType(t *testing.T) {
+	for in, want := range map[string]issues.Status{
+		"triage":    issues.StatusBacklog,
+		"backlog":   issues.StatusBacklog,
+		"unstarted": issues.StatusBacklog,
+		"started":   issues.StatusStarted,
+		"completed": issues.StatusCompleted,
+		"canceled":  issues.StatusCanceled,
+		"duplicate": issues.StatusCanceled,
+		"mystery":   issues.StatusUnknown,
+	} {
+		if got := statusFromStateType(in); got != want {
+			t.Errorf("statusFromStateType(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestToIssueDuplicateKeepsResolution(t *testing.T) {
+	got := toIssue(issueNode{Identifier: "ENG-2", State: &stateRef{Type: "duplicate", Name: "Duplicate"}})
+	if got.Status != issues.StatusCanceled || got.Resolution != "duplicate" {
+		t.Fatalf("duplicate: Status=%q Resolution=%q, want canceled/duplicate", got.Status, got.Resolution)
+	}
+	got = toIssue(issueNode{Identifier: "ENG-3", State: &stateRef{Type: "canceled", Name: "Canceled"}})
+	if got.Status != issues.StatusCanceled || got.Resolution != "" {
+		t.Fatalf("canceled: Status=%q Resolution=%q, want canceled/\"\"", got.Status, got.Resolution)
 	}
 }

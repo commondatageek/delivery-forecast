@@ -14,6 +14,9 @@ import (
 
 var dataExts = []string{".csv", ".json", ".jsonl", ".ndjson", ".db", ".sqlite", ".sqlite3"}
 
+// mapExts are the mapping files `import` reads, uploadable alongside data.
+var mapExts = []string{".yaml", ".yml"}
+
 func hasExt(name string, exts []string) bool {
 	ext := strings.ToLower(filepath.Ext(name))
 	for _, e := range exts {
@@ -69,7 +72,7 @@ func (s *Server) uploadReadError(w http.ResponseWriter, err error) {
 }
 
 func (s *Server) storeUpload(w http.ResponseWriter, origName string, body io.Reader) {
-	if !hasExt(origName, dataExts) {
+	if !hasExt(origName, dataExts) && !hasExt(origName, mapExts) {
 		writeError(w, http.StatusBadRequest, fmt.Errorf("unsupported file type %q", filepath.Ext(origName)), nil)
 		return
 	}

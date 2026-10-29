@@ -23,8 +23,8 @@ func TestCheckResults_EmptyInput(t *testing.T) {
 
 func TestCheckResults_AllClean(t *testing.T) {
 	items := []issues.Issue{
-		{Identifier: "E-1", Assignee: "alice", StateType: "completed", CreatedAt: day(2025, 1, 1), StartedAt: day(2025, 1, 2), CompletedAt: day(2025, 1, 5), UpdatedAt: day(2025, 1, 5)},
-		{Identifier: "E-2", Assignee: "bob", StateType: "started", CreatedAt: day(2025, 1, 3), StartedAt: day(2025, 1, 4), UpdatedAt: day(2025, 1, 4)},
+		{Identifier: "E-1", Assignee: "alice", Status: issues.StatusCompleted, CreatedAt: day(2025, 1, 1), StartedAt: day(2025, 1, 2), CompletedAt: day(2025, 1, 5), UpdatedAt: day(2025, 1, 5)},
+		{Identifier: "E-2", Assignee: "bob", Status: issues.StatusStarted, CreatedAt: day(2025, 1, 3), StartedAt: day(2025, 1, 4), UpdatedAt: day(2025, 1, 4)},
 	}
 	for _, r := range CheckReadiness(items) {
 		if r.Status != "ok" {
@@ -36,15 +36,15 @@ func TestCheckResults_AllClean(t *testing.T) {
 func TestCheckResults_FlagsEachGap(t *testing.T) {
 	items := []issues.Issue{
 		// Clean, complete issue.
-		{Identifier: "E-1", Assignee: "alice", StateType: "completed", CreatedAt: day(2025, 1, 1), StartedAt: day(2025, 1, 2), CompletedAt: day(2025, 1, 5), UpdatedAt: day(2025, 1, 5)},
+		{Identifier: "E-1", Assignee: "alice", Status: issues.StatusCompleted, CreatedAt: day(2025, 1, 1), StartedAt: day(2025, 1, 2), CompletedAt: day(2025, 1, 5), UpdatedAt: day(2025, 1, 5)},
 		// Completed but unassigned: hits sim only.
-		{Identifier: "E-2", StateType: "completed", CreatedAt: day(2025, 1, 1), StartedAt: day(2025, 1, 2), CompletedAt: day(2025, 1, 6), UpdatedAt: day(2025, 1, 6)},
+		{Identifier: "E-2", Status: issues.StatusCompleted, CreatedAt: day(2025, 1, 1), StartedAt: day(2025, 1, 2), CompletedAt: day(2025, 1, 6), UpdatedAt: day(2025, 1, 6)},
 		// Completed but never started: hits aging only.
-		{Identifier: "E-3", Assignee: "bob", StateType: "completed", CreatedAt: day(2025, 1, 1), CompletedAt: day(2025, 1, 7), UpdatedAt: day(2025, 1, 7)},
+		{Identifier: "E-3", Assignee: "bob", Status: issues.StatusCompleted, CreatedAt: day(2025, 1, 1), CompletedAt: day(2025, 1, 7), UpdatedAt: day(2025, 1, 7)},
 		// No created_at, and in progress (not completed, so aging/sim untouched): hits history/cfd only.
-		{Identifier: "E-4", Assignee: "carol", StateType: "started", StartedAt: day(2025, 1, 4), UpdatedAt: day(2025, 1, 4)},
+		{Identifier: "E-4", Assignee: "carol", Status: issues.StatusStarted, StartedAt: day(2025, 1, 4), UpdatedAt: day(2025, 1, 4)},
 		// No updated_at, otherwise clean: hits count only.
-		{Identifier: "E-5", Assignee: "dave", StateType: "backlog", CreatedAt: day(2025, 1, 1)},
+		{Identifier: "E-5", Assignee: "dave", Status: issues.StatusBacklog, CreatedAt: day(2025, 1, 1)},
 	}
 
 	want := map[string]string{
@@ -116,8 +116,8 @@ func TestAssignees(t *testing.T) {
 
 func TestCheckReadiness_ExcludedCounts(t *testing.T) {
 	items := []issues.Issue{
-		{Identifier: "E-1", StateType: "completed", CompletedAt: day(2025, 1, 5)},
-		{Identifier: "E-2", StateType: "completed", CompletedAt: day(2025, 1, 6)},
+		{Identifier: "E-1", Status: issues.StatusCompleted, CompletedAt: day(2025, 1, 5)},
+		{Identifier: "E-2", Status: issues.StatusCompleted, CompletedAt: day(2025, 1, 6)},
 	}
 	for _, r := range CheckReadiness(items) {
 		want := map[string]int{"history": 2, "cfd": 2, "aging": 2, "count": 2, "sim": 2}[r.Command]

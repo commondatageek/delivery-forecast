@@ -130,7 +130,7 @@ func SimManifest(subcommand string, fs *flag.FlagSet, sf *SimFlags, run app.SimR
 		Flags:            FlagRecords(fs),
 		Invocation:       mc.Invocation,
 		Binary:           mc.Binary,
-		DB:               mc.Data,
+		Input:            mc.Data,
 		GeneratedAt:      mc.GeneratedAt,
 	}
 }

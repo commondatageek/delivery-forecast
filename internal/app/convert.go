@@ -18,8 +18,8 @@ func toAgingIssues(items []issues.Issue) []aging.Issue {
 			Title:       it.Title,
 			Assignee:    it.Assignee,
 			ProjectName: it.ProjectName,
-			StateType:   it.StateType,
-			StateName:   it.StateName,
+			Status:      string(it.Status),
+			StatusName:  it.StatusName,
 			StartedAt:   it.StartedAt,
 			CompletedAt: it.CompletedAt,
 		}
@@ -36,7 +36,6 @@ func toCFDIssues(items []issues.Issue) []cfd.Issue {
 			StartedAt:   it.StartedAt,
 			CompletedAt: it.CompletedAt,
 			CanceledAt:  it.CanceledAt,
-			StateType:   it.StateType,
 		}
 	}
 	return out
@@ -56,31 +55,19 @@ func toHistoryIssues(items []issues.Issue) []history.Issue {
 	return out
 }
 
-// toCountsIssues converts issues.Issue records to counts.Issue.
-//
-// counts.Aggregate decides "terminal" from StateType alone, so a file source
-// that carries completed_at/canceled_at but no state_type would otherwise
-// count every finished issue as outstanding. Terminal issues are therefore
-// given a terminal StateType here, via issues.Issue.IsCompleted/IsCanceled —
-// the same timestamp-first rule every other command uses.
+// toCountsIssues converts issues.Issue records to counts.Issue. Terminal is
+// issues.Issue.IsTerminal — the same timestamp-first rule every other
+// command uses, so a file with completed_at/canceled_at but no status still
+// counts finished work as finished.
 func toCountsIssues(items []issues.Issue) []counts.Issue {
 	out := make([]counts.Issue, len(items))
 	for i, it := range items {
-		stateType := it.StateType
-		switch {
-		case stateType == "completed" || stateType == "canceled" || stateType == "duplicate":
-			// Already terminal; keep it as-is (preserves duplicate).
-		case it.IsCompleted():
-			stateType = "completed"
-		case it.IsCanceled():
-			stateType = "canceled"
-		}
 		out[i] = counts.Issue{
 			TeamKey:              it.TeamKey,
 			TeamName:             it.TeamName,
 			ProjectName:          it.ProjectName,
-			ProjectMilestoneName: it.ProjectMilestoneName,
-			StateType:            stateType,
+			ProjectMilestoneName: it.MilestoneName,
+			Terminal:             it.IsTerminal(),
 			UpdatedAt:            it.UpdatedAt,
 		}
 	}

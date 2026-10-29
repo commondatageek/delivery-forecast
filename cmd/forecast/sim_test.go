@@ -14,7 +14,7 @@ import (
 	"github.com/commondatageek/delivery-forecast/issues"
 )
 
-const simFixtureCSV = `identifier,team_key,assignee,state_type,created_at,started_at,completed_at
+const simFixtureCSV = `identifier,team_key,assignee,status,created_at,started_at,completed_at
 E-1,ENG,alice,completed,2025-01-01,2025-01-02,2025-01-03
 E-2,ENG,alice,completed,2025-01-02,2025-01-03,2025-01-04
 E-3,ENG,alice,completed,2025-01-03,2025-01-04,2025-01-05
@@ -165,7 +165,7 @@ func TestCmdSimItems_TargetEndEquivalentToDays(t *testing.T) {
 // constantFixtureCSV has alice completing exactly one issue on each day from
 // 2025-01-01 through 2025-01-10, so with -sample-start 2025-01-01 -sample-end
 // 2025-01-11 every sample is 1 and forecasts are exact.
-const constantFixtureCSV = `identifier,team_key,assignee,state_type,created_at,started_at,completed_at
+const constantFixtureCSV = `identifier,team_key,assignee,status,created_at,started_at,completed_at
 C-1,ENG,alice,completed,2024-12-30,2024-12-31,2025-01-01
 C-2,ENG,alice,completed,2024-12-31,2025-01-01,2025-01-02
 C-3,ENG,alice,completed,2025-01-01,2025-01-02,2025-01-03
@@ -303,8 +303,8 @@ func TestCmdSimItems_SampleExclusionsInManifest(t *testing.T) {
 	if err := json.NewDecoder(strings.NewReader(out)).Decode(&m); err != nil {
 		t.Fatalf("decoding manifest: %v\n%s", err, out)
 	}
-	if m.SchemaVersion != 2 {
-		t.Errorf("schema_version = %d, want 2", m.SchemaVersion)
+	if m.SchemaVersion != 3 {
+		t.Errorf("schema_version = %d, want 3", m.SchemaVersion)
 	}
 	if got := m.Pool.PerEngineerSampleDays["alice"]; got != 9 {
 		t.Errorf("per_engineer_sample_days[alice] = %d, want 9 (10 days minus the excluded one)", got)

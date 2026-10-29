@@ -32,9 +32,9 @@ func TestFilter_TeamsCaseInsensitive(t *testing.T) {
 
 func TestFilter_ProjectAndMilestone(t *testing.T) {
 	in := []Issue{
-		{Identifier: "A", ProjectName: "Foo", ProjectMilestoneName: "M1"},
-		{Identifier: "B", ProjectName: "Foo", ProjectMilestoneName: "M2"},
-		{Identifier: "C", ProjectName: "Bar", ProjectMilestoneName: "M1"},
+		{Identifier: "A", ProjectName: "Foo", MilestoneName: "M1"},
+		{Identifier: "B", ProjectName: "Foo", MilestoneName: "M2"},
+		{Identifier: "C", ProjectName: "Bar", MilestoneName: "M1"},
 	}
 	out := Filter{Project: "Foo", Milestone: "M1"}.Apply(in)
 	if len(out) != 1 || out[0].Identifier != "A" {

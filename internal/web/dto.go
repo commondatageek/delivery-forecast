@@ -10,6 +10,8 @@ import (
 
 	"github.com/commondatageek/delivery-forecast/aging"
 	"github.com/commondatageek/delivery-forecast/internal/app"
+	"github.com/commondatageek/delivery-forecast/internal/importmap"
+	"github.com/commondatageek/delivery-forecast/internal/source"
 	"github.com/commondatageek/delivery-forecast/internal/util"
 )
 
@@ -250,7 +252,7 @@ func newAgingItems(items []aging.Item, meta aging.Meta) []agingItemDTO {
 	for _, it := range items {
 		d := agingItemDTO{
 			Identifier: it.Identifier, Title: it.Title, Assignee: it.Assignee, ProjectName: it.ProjectName,
-			State: aging.FormatState(it.StateName, it.StateType), StartedAt: date(it.StartedAt.Local()),
+			State: aging.FormatState(it.StatusName, it.Status), StartedAt: date(it.StartedAt.Local()),
 			AgeDays: it.AgeDays, Percentile: it.Percentile,
 			PercentileLabel: strconv.Itoa(it.Percentile) + util.OrdinalSuffix(it.Percentile),
 			MultiplierLabel: aging.FormatMultiplier(it.Multiplier, meta),
@@ -364,6 +366,21 @@ type exclusionsDTO struct {
 	Future         int                  `json:"future"`
 	Today          *string              `json:"today"`
 	UnmatchedNames []string             `json:"unmatched_names"`
+}
+
+type importDTO struct {
+	Report    importmap.Report `json:"report"`
+	Readiness []readinessDTO   `json:"readiness"`
+	Wrote     bool             `json:"wrote"`
+	Deleted   int              `json:"deleted"`
+}
+
+func newImportDTO(res source.ImportResult, ready []app.CheckResult) importDTO {
+	d := importDTO{Report: res.Report, Readiness: []readinessDTO{}, Wrote: res.Wrote, Deleted: res.Deleted}
+	for _, r := range ready {
+		d.Readiness = append(d.Readiness, readinessDTO{r.Command, r.Excluded, r.Status})
+	}
+	return d
 }
 
 type checkDTO struct {

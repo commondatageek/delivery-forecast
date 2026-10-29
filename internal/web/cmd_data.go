@@ -1,8 +1,11 @@
 package web
 
 import (
+	"context"
+	"errors"
 	"flag"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/commondatageek/delivery-forecast/internal/app"
@@ -12,7 +15,8 @@ import (
 	"github.com/commondatageek/delivery-forecast/internal/util"
 )
 
-func newCheckFlags(fs *flag.FlagSet, _ time.Time) any { return params.NewCheck(fs) }
+func newCheckFlags(fs *flag.FlagSet, _ time.Time) any  { return params.NewCheck(fs) }
+func newImportFlags(fs *flag.FlagSet, _ time.Time) any { return params.NewImport(fs) }
 
 func prepareCheck(rc *runContext, b any) (*runner, error) {
 	c := b.(*params.Check)
@@ -53,6 +57,64 @@ func prepareCheck(rc *runContext, b any) (*runner, error) {
 				if excReport != nil {
 					report.Exclusions(w, excPath, *excReport)
 				}
+				return nil
+			}),
+			"json": jsonExport(out.Result),
+		}
+		return out, nil
+	}}, nil
+}
+
+func prepareImport(rc *runContext, b any) (*runner, error) {
+	c := b.(*params.Import)
+	r, err := c.Resolve()
+	rc.warnings = append(rc.warnings, r.Warnings...)
+	if err != nil {
+		return nil, err
+	}
+	req := r.Request
+	if req.Example != "" {
+		// meta.go hides -example; this is defense in depth.
+		return nil, &app.FieldError{Fields: []string{"example"}, Msg: "-example is CLI-only; download a template with forecast import -example"}
+	}
+	absFrom, err := rc.s.resolvePath("from", req.From)
+	if err != nil {
+		return nil, err
+	}
+	absMap, err := rc.s.resolvePath("map", req.Map)
+	if err != nil {
+		return nil, err
+	}
+	var absOut string
+	if !req.DryRun {
+		if absOut, err = rc.s.resolvePath("out", req.Out); err != nil {
+			return nil, err
+		}
+	}
+	// Errors and the report quote the paths as typed, like the CLI's.
+	typed := strings.NewReplacer(absFrom, req.From, absMap, req.Map)
+	if absOut != "" {
+		typed = strings.NewReplacer(absFrom, req.From, absMap, req.Map, absOut, req.Out)
+	}
+	return &runner{run: func(events) (*runOutput, error) {
+		out := &runOutput{}
+		// Not the request context: a closed tab must not abort a write midway.
+		res, err := source.Import(context.Background(), absFrom, absMap, absOut, req.DryRun)
+		if res.Wrote {
+			rc.s.datasets.invalidate(absOut)
+		}
+		if err != nil {
+			var fe *app.FieldError
+			if errors.As(err, &fe) {
+				return out, &app.FieldError{Fields: fe.Fields, Msg: typed.Replace(fe.Msg)}
+			}
+			return out, errors.New(typed.Replace(err.Error()))
+		}
+		readiness := app.CheckReadiness(res.Issues)
+		out.Result = newImportDTO(res, readiness)
+		out.Exports = map[string]export{
+			"text": textExport(func(w io.Writer) error {
+				report.Import(w, req.From, req.Out, req.DryRun, res.Deleted, res.Report, readiness)
 				return nil
 			}),
 			"json": jsonExport(out.Result),

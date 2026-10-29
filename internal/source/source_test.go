@@ -102,3 +102,57 @@ func TestReadExclusions(t *testing.T) {
 		t.Errorf("valid file: %v", err)
 	}
 }
+
+func TestLoad_TrackerExportHint(t *testing.T) {
+	const path = "../../testdata/jira-export-sample.csv"
+	_, err := Load(context.Background(), path, "", nil)
+	if err == nil {
+		t.Fatal("Load of a raw Jira export = nil error")
+	}
+	want := path + `: this looks like a Jira Cloud CSV export (template "jira-cloud-csv"), which needs converting first:
+  forecast import -example jira-cloud-csv > mapping.yaml
+  forecast import -from ` + path + ` -map mapping.yaml -out data.db`
+	if err.Error() != want {
+		t.Fatalf("error =\n%s\nwant\n%s", err, want)
+	}
+}
+
+func TestLoad_TrackerExportHintQuotesPath(t *testing.T) {
+	data, err := os.ReadFile("../../testdata/jira-export-sample.csv")
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "Workload Export (Jira).csv")
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, err = Load(context.Background(), path, "", nil)
+	if err == nil || !strings.Contains(err.Error(), "forecast import -from '"+path+"' -map") {
+		t.Fatalf("error = %v, want the path single-quoted in the suggested command", err)
+	}
+}
+
+func TestLoad_HeaderErrorWithoutTemplate(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "export.csv")
+	if err := os.WriteFile(path, []byte("Summary,Status\nx,Done\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, err := Load(context.Background(), path, "", nil)
+	want := path + `: no "identifier" column; expected the forecast column names (see DATA_REQUIREMENTS.md)`
+	if err == nil || err.Error() != want {
+		t.Fatalf("error = %v, want %q", err, want)
+	}
+}
+
+func TestShellQuote(t *testing.T) {
+	for in, want := range map[string]string{
+		"data/export.csv":      "data/export.csv",
+		"My Export (1).csv":    "'My Export (1).csv'",
+		"it's.csv":             `'it'\''s.csv'`,
+		"C:/x/report-2026.csv": "C:/x/report-2026.csv",
+	} {
+		if got := shellQuote(in); got != want {
+			t.Errorf("shellQuote(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

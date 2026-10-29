@@ -31,6 +31,7 @@ var registry = []*commandDef{
 	{ID: "aging", Name: "aging", Summary: "WIP-age and cycle-time report.", Group: "flow", Title: "What's aging in progress?", Exports: []string{"text", "html", "json"}, newFlags: newAgingFlags, prepare: prepareAging},
 	{ID: "count", Name: "count", Summary: "Count of non-terminal issues, grouped by project.", Group: "flow", Title: "What's still open?", Exports: []string{"text", "json"}, newFlags: newCountFlags, prepare: prepareCount},
 	{ID: "check", Name: "check", Summary: "Validate a source file/db and report per-command data readiness.", Group: "data", Title: "Check my data", Exports: []string{"text", "json"}, newFlags: newCheckFlags, prepare: prepareCheck},
+	{ID: "import", Name: "import", Summary: "Convert a tracker export into a forecast data source using a mapping file.", Group: "data", Title: "Import a tracker export", Exports: []string{"text", "json"}, newFlags: newImportFlags, prepare: prepareImport},
 	{ID: "linear-sync", Name: "linear sync", Summary: "Sync issues from Linear into the database.", Group: "data", Title: "Sync from Linear", Stream: true, newFlags: newLinearSyncFlags, prepare: prepareLinearSync},
 	{ID: "linear-teams", Name: "linear teams", Summary: "List accessible Linear teams.", Group: "data", Title: "Linear teams", Exports: []string{"json"}, newFlags: newLinearTeamsFlags, prepare: prepareLinearTeams},
 }

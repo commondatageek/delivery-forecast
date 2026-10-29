@@ -14,11 +14,11 @@ func findCount(t *testing.T, rows []ProjectMilestoneCount, project, milestone st
 
 func TestAggregate_ExcludesTerminalStates(t *testing.T) {
 	all := []Issue{
-		{TeamKey: "ENG", TeamName: "Engineering", ProjectName: "Alpha", ProjectMilestoneName: "M1", StateType: "started", UpdatedAt: mustTime("2024-03-01")},
-		{TeamKey: "ENG", TeamName: "Engineering", ProjectName: "Alpha", ProjectMilestoneName: "M1", StateType: "backlog", UpdatedAt: mustTime("2024-03-02")},
-		{TeamKey: "ENG", TeamName: "Engineering", ProjectName: "Alpha", ProjectMilestoneName: "M1", StateType: "completed", UpdatedAt: mustTime("2024-03-03")},
-		{TeamKey: "ENG", TeamName: "Engineering", ProjectName: "Alpha", ProjectMilestoneName: "M1", StateType: "canceled", UpdatedAt: mustTime("2024-03-04")},
-		{TeamKey: "ENG", TeamName: "Engineering", ProjectName: "Alpha", ProjectMilestoneName: "M1", StateType: "duplicate", UpdatedAt: mustTime("2024-03-05")},
+		{TeamKey: "ENG", TeamName: "Engineering", ProjectName: "Alpha", ProjectMilestoneName: "M1", UpdatedAt: mustTime("2024-03-01")},
+		{TeamKey: "ENG", TeamName: "Engineering", ProjectName: "Alpha", ProjectMilestoneName: "M1", UpdatedAt: mustTime("2024-03-02")},
+		{TeamKey: "ENG", TeamName: "Engineering", ProjectName: "Alpha", ProjectMilestoneName: "M1", Terminal: true, UpdatedAt: mustTime("2024-03-03")},
+		{TeamKey: "ENG", TeamName: "Engineering", ProjectName: "Alpha", ProjectMilestoneName: "M1", Terminal: true, UpdatedAt: mustTime("2024-03-04")},
+		{TeamKey: "ENG", TeamName: "Engineering", ProjectName: "Alpha", ProjectMilestoneName: "M1", Terminal: true, UpdatedAt: mustTime("2024-03-05")},
 	}
 
 	pmCounts, activity := Aggregate(all)
@@ -28,11 +28,11 @@ func TestAggregate_ExcludesTerminalStates(t *testing.T) {
 		t.Fatal("expected a count row for Alpha/M1")
 	}
 	if row.Count != 2 {
-		t.Errorf("Count = %d, want 2 (only started+backlog are non-terminal)", row.Count)
+		t.Errorf("Count = %d, want 2 (only the non-terminal issues count)", row.Count)
 	}
 
 	// Activity spans ALL issues, including terminal ones: the most recent
-	// updated_at (2024-03-05, the duplicate) must still be reflected.
+	// updated_at (2024-03-05, a terminal issue) must still be reflected.
 	if len(activity) != 1 {
 		t.Fatalf("got %d activity rows, want 1", len(activity))
 	}
@@ -43,11 +43,11 @@ func TestAggregate_ExcludesTerminalStates(t *testing.T) {
 
 func TestAggregate_GroupsByTeamProjectMilestone(t *testing.T) {
 	all := []Issue{
-		{TeamKey: "ENG", TeamName: "Engineering", ProjectName: "Alpha", ProjectMilestoneName: "M1", StateType: "started", UpdatedAt: mustTime("2024-01-01")},
-		{TeamKey: "ENG", TeamName: "Engineering", ProjectName: "Alpha", ProjectMilestoneName: "M1", StateType: "started", UpdatedAt: mustTime("2024-01-02")},
-		{TeamKey: "ENG", TeamName: "Engineering", ProjectName: "Alpha", ProjectMilestoneName: "M2", StateType: "started", UpdatedAt: mustTime("2024-01-03")},
-		{TeamKey: "DATA", TeamName: "Data", ProjectName: "Alpha", ProjectMilestoneName: "M1", StateType: "started", UpdatedAt: mustTime("2024-01-04")},
-		{TeamKey: "ENG", TeamName: "Engineering", ProjectName: "", ProjectMilestoneName: "", StateType: "started", UpdatedAt: mustTime("2024-01-05")},
+		{TeamKey: "ENG", TeamName: "Engineering", ProjectName: "Alpha", ProjectMilestoneName: "M1", UpdatedAt: mustTime("2024-01-01")},
+		{TeamKey: "ENG", TeamName: "Engineering", ProjectName: "Alpha", ProjectMilestoneName: "M1", UpdatedAt: mustTime("2024-01-02")},
+		{TeamKey: "ENG", TeamName: "Engineering", ProjectName: "Alpha", ProjectMilestoneName: "M2", UpdatedAt: mustTime("2024-01-03")},
+		{TeamKey: "DATA", TeamName: "Data", ProjectName: "Alpha", ProjectMilestoneName: "M1", UpdatedAt: mustTime("2024-01-04")},
+		{TeamKey: "ENG", TeamName: "Engineering", ProjectName: "", ProjectMilestoneName: "", UpdatedAt: mustTime("2024-01-05")},
 	}
 
 	pmCounts, activity := Aggregate(all)
@@ -93,8 +93,8 @@ func TestAggregate_GroupsByTeamProjectMilestone(t *testing.T) {
 
 func TestAggregate_EndToEndThroughCompute(t *testing.T) {
 	all := []Issue{
-		{TeamKey: "ENG", TeamName: "Engineering", ProjectName: "Alpha", ProjectMilestoneName: "M1", StateType: "started", UpdatedAt: mustTime("2024-03-01")},
-		{TeamKey: "ENG", TeamName: "Engineering", ProjectName: "Beta", ProjectMilestoneName: "", StateType: "backlog", UpdatedAt: mustTime("2024-01-01")},
+		{TeamKey: "ENG", TeamName: "Engineering", ProjectName: "Alpha", ProjectMilestoneName: "M1", UpdatedAt: mustTime("2024-03-01")},
+		{TeamKey: "ENG", TeamName: "Engineering", ProjectName: "Beta", ProjectMilestoneName: "", UpdatedAt: mustTime("2024-01-01")},
 	}
 	pmCounts, activity := Aggregate(all)
 	projects, total := Compute(pmCounts, activity, mustTime("2024-02-01"))

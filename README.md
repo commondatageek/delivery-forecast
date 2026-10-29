@@ -9,8 +9,10 @@ list of issues (with created / started / completed timestamps) into:
 - **Flow reports** — cumulative flow diagrams, cycle-time and WIP-age reports,
   outstanding-work counts, and per-day flow metrics.
 
-Issues can come straight from [Linear](https://linear.app), or from a plain
-CSV/JSON file exported from any tracker. No Linear account is required.
+Issues can come straight from [Linear](https://linear.app), from a tracker's
+own CSV export (Jira Cloud's works out of the box) converted with
+`forecast import`, or from a plain CSV/JSON file in `forecast`'s own column
+names. No Linear account is required.
 
 ## What do you want to know?
 
@@ -146,12 +148,59 @@ Which columns does each command need?
 |---|---|
 | `history`, `cfd` | `created_at` (issues without it are skipped); `started_at`, `completed_at`, `canceled_at` sharpen the picture |
 | `aging` | `started_at` and `completed_at` on completed issues; `started_at` on in-progress ones |
-| `count` | `updated_at`, `state_type` (or `completed_at`/`canceled_at`), and `project_name` for grouping. Projects with no recent `updated_at` are hidden. |
+| `count` | `updated_at`, `status` (or `completed_at`/`canceled_at`), and `project_name` for grouping. Projects with no recent `updated_at` are hidden. |
 | `sim *` | `completed_at` and a non-empty `assignee` on completed issues |
 
 `forecast check` tests your file against this list and tells you how many
 issues each command will silently ignore. Run it first. The full column
 list and timestamp formats are in [DATA_REQUIREMENTS.md](https://github.com/commondatageek/delivery-forecast/blob/main/DATA_REQUIREMENTS.md).
+
+`-input` reads files in `forecast`'s own column names only: a CSV without an
+`identifier` column is rejected. A tracker's raw export goes through
+`forecast import` first (next section); pass one to `-input` by mistake and
+the error says so and gives the commands.
+
+### From a Jira export
+
+`forecast import` converts a tracker's CSV export into a data file, using a
+mapping file that says which export column fills which field, how your
+workflow's statuses map onto backlog / started / completed / canceled, and
+which rows to drop. No renaming columns or editing the spreadsheet:
+
+```bash
+forecast import -example jira-cloud-csv > team-jira.yaml   # once; set its timezone, edit to taste
+forecast import -from "Jira Export.csv" -map team-jira.yaml -out team.db
+forecast sim items -input team.db -whole-team -days 30
+forecast serve -input team.db
+```
+
+Repeat only the second line, with a fresh export, to refresh: importing into
+a `.db` replaces every issue from that mapping's `source` and leaves other
+sources alone. `-out` may also be a `.csv` or `.json`/`.jsonl` file, and
+`-dry-run` prints the import report without writing anything. Every rule is
+checked against the export; anything that doesn't fit (an unknown status, a
+misspelled column, an unparseable date) stops the import with a message
+naming the rule, the column and example rows. The mapping file's format is
+documented in [docs/IMPORT_MAPPING.md](https://github.com/commondatageek/delivery-forecast/blob/main/docs/IMPORT_MAPPING.md).
+
+What a Jira CSV export can and can't support:
+
+| Command | With a Jira CSV export |
+|---|---|
+| `sim items` / `days` / `probability` | Works (needs only `completed_at`, plus `assignee` unless `-whole-team`). |
+| `count` | Works; "project" is the parent epic by default (the mapping can use the fix version instead). |
+| `aging`, current WIP | Works; age counts from when the issue entered its current In Progress status category. |
+| `aging` cycle-time distribution | Empty: the export doesn't record when finished work started. |
+| `cfd`, `history` | Created / completed / canceled lines are right; the in-progress band, cycle time and Little's Law check aren't. |
+| `sim backtest` | Needs an explicit `-replay-start-date`. |
+
+The export only knows when an issue entered its *current* status category, so
+finished work has no `started_at`. A Jira automation that stamps a "Work
+Started" date field on the first move into an In Progress status fixes this
+from that day on; the template's comments show the one-line mapping change.
+Also note `Assignee` is whoever holds the issue at export time; if issues are
+handed between people, map a role field such as `Custom field (Dev)` instead,
+or forecast with `-whole-team`.
 
 ### From Linear
 
@@ -504,6 +553,7 @@ forecast serve -input data.db -open    # http://127.0.0.1:8080/
 - **Same answers as the CLI.** Forms are generated from the commands' own flag sets, and the server parses dates, lists and seeds with the same code the CLI uses, so output, warnings and error messages are identical. A test replays every CLI golden case through the HTTP API.
 - **Data sources** are paths on the machine running `forecast serve` (relative paths resolve against its working directory), or files you upload from the browser. `-input -` (stdin) isn't available.
 - **Results.** Each run shows the command's native view (tables and charts), the CLI-identical text output, and the equivalent command line and `-config` YAML. Every output format is a download, including the run manifest for `sim items`, `sim days` and `sim probability`. Downloads render from the stored run, so they always match what the page shows.
+- **Import a tracker export** runs `forecast import`: upload the export and the mapping file (`.yaml`), dry-run to see the report, then write a `.db` and point the data bar at it. `-example` stays CLI-only; get a template with `forecast import -example jira-cloud-csv`.
 - **Share link** reproduces a run: for forecasts it pins the effective `random-seed`.
 - **Config import/export** and **Paste CLI command…** convert between the form and `-config` files or a pasted `forecast ...` line.
 - **Offline.** The UI embeds everything (including Plotly), loads nothing from the internet, and updates with the binary (`forecast update`).

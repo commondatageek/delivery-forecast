@@ -9,7 +9,7 @@ import (
 
 // Manifest is a single JSON document recording everything that fed a
 // simulation run, so two disagreeing runs can be diffed: the binary's git
-// SHA, a fingerprint of the DB file, every flag (set vs. defaulted), the
+// SHA, a fingerprint of the input file, every flag (set vs. defaulted), the
 // resolved sampling mode/seed/window, the built sample pool, and a full dump
 // of the issues that fed it.
 type Manifest struct {
@@ -61,7 +61,7 @@ type Resolved struct {
 }
 
 type DataSection struct {
-	DB         DataFile          `json:"db"`
+	Input      DataFile          `json:"input"`
 	Exclusions ExclusionsSection `json:"exclusions"`
 }
 
@@ -105,16 +105,17 @@ type IssuesSection struct {
 	Records      []IssueRecord `json:"records"`
 }
 
-// IssueRecord mirrors the subset of issues.Issue that CompletedBetween
-// populates (TeamKey, ProjectID, milestone, ArchivedAt, etc. are not selected
-// by that query and are intentionally omitted).
+// IssueRecord is the subset of issues.Issue that identifies a pool issue and
+// explains why it is in the pool (team key, project id, milestone, etc. are
+// intentionally omitted).
 type IssueRecord struct {
+	Source      string `json:"source"`
 	Identifier  string `json:"identifier"`
 	Title       string `json:"title"`
 	Assignee    string `json:"assignee"`
 	TeamName    string `json:"team_name"`
 	ProjectName string `json:"project_name"`
-	StateType   string `json:"state_type"`
+	Status      string `json:"status"`
 	StartedAt   string `json:"started_at,omitempty"`
 	CompletedAt string `json:"completed_at,omitempty"`
 	UpdatedAt   string `json:"updated_at,omitempty"`
@@ -179,7 +180,7 @@ type ManifestInputs struct {
 	Flags       []FlagRecord
 	Invocation  Invocation
 	Binary      BinaryInfo
-	DB          DataFile
+	Input       DataFile
 	GeneratedAt time.Time
 }
 
@@ -203,25 +204,29 @@ func NewManifest(in ManifestInputs) *Manifest {
 	records := make([]IssueRecord, 0, len(run.PoolIssues))
 	for _, it := range run.PoolIssues {
 		records = append(records, IssueRecord{
+			Source:      it.Source,
 			Identifier:  it.Identifier,
 			Title:       it.Title,
 			Assignee:    it.Assignee,
 			TeamName:    it.TeamName,
 			ProjectName: it.ProjectName,
-			StateType:   it.StateType,
+			Status:      string(it.Status),
 			StartedAt:   issueTime(it.StartedAt),
 			CompletedAt: issueTime(it.CompletedAt),
 			UpdatedAt:   issueTime(it.UpdatedAt),
 		})
 	}
-	// Sort by identifier so two manifests' issue lists diff cleanly regardless
-	// of the DB query's row order.
+	// Sort by (source, identifier) so two manifests' issue lists diff cleanly
+	// regardless of the source's row order.
 	sort.Slice(records, func(i, j int) bool {
+		if records[i].Source != records[j].Source {
+			return records[i].Source < records[j].Source
+		}
 		return records[i].Identifier < records[j].Identifier
 	})
 
 	return &Manifest{
-		SchemaVersion: 2,
+		SchemaVersion: 3,
 		GeneratedAt:   in.GeneratedAt.UTC().Format(time.RFC3339),
 		Binary:        in.Binary,
 		Invocation:    in.Invocation,
@@ -240,7 +245,7 @@ func NewManifest(in ManifestInputs) *Manifest {
 			Extra:            in.Extra,
 		},
 		Data: DataSection{
-			DB: in.DB,
+			Input: in.Input,
 			Exclusions: ExclusionsSection{
 				Path:              in.ExclusionsPath,
 				Source:            run.Exclusions,

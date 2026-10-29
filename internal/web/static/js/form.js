@@ -127,10 +127,12 @@ export function renderForm(container, command, params, ctx) {
           extra = el('div', {}, input, toggleChips(input, summary?.assignees ?? []));
           break;
         case 'exclusions-path':
-        case 'db-path': {
+        case 'db-path':
+        case 'raw-path':
+        case 'map-path': {
           const listId = id + '-list';
           const list = el('datalist', { id: listId });
-          const kind = f.kind === 'db-path' ? 'db' : 'exclusions';
+          const kind = { 'db-path': 'db', 'raw-path': 'raw', 'map-path': 'map' }[f.kind] ?? 'exclusions';
           const start = initial || (f.name === 'exclusions' ? ctx.defaults?.exclusions ?? '' : '');
           input = el('input', { type: 'text', id, list: listId, placeholder, value: start });
           filesFor(kind).then((paths) => paths.forEach((p) => list.append(el('option', { value: p }))));

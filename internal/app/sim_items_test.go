@@ -24,7 +24,7 @@ func constantIssues() []issues.Issue {
 		out = append(out, issues.Issue{
 			Identifier:  "C-" + string(rune('A'+d)),
 			Assignee:    "alice",
-			StateType:   "completed",
+			Status:      issues.StatusCompleted,
 			CreatedAt:   localDay(2024, 12, 30),
 			StartedAt:   localDay(2024, 12, 31),
 			CompletedAt: localDay(2025, 1, d),
@@ -78,9 +78,9 @@ func TestSimItems_RowsMatchItemsAtConfidence(t *testing.T) {
 	}
 	// A noisy pool, so the rows differ by confidence.
 	req.Issues = append(req.Issues, issues.Issue{
-		Identifier: "N-1", Assignee: "bob", StateType: "completed", CompletedAt: localDay(2025, 1, 3),
+		Identifier: "N-1", Assignee: "bob", Status: issues.StatusCompleted, CompletedAt: localDay(2025, 1, 3),
 	}, issues.Issue{
-		Identifier: "N-2", Assignee: "bob", StateType: "completed", CompletedAt: localDay(2025, 1, 3),
+		Identifier: "N-2", Assignee: "bob", Status: issues.StatusCompleted, CompletedAt: localDay(2025, 1, 3),
 	})
 	res, err := SimItems(req)
 	if err != nil {

@@ -1,8 +1,11 @@
 package issues
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -13,8 +16,8 @@ func mustLocal(y int, m time.Month, d, hh, mm, ss int) time.Time {
 }
 
 func TestReadCSV_RoundTrip(t *testing.T) {
-	csv := `identifier,title,assignee,team_key,team_name,project_id,project_name,project_milestone_id,project_milestone_name,state_type,state_name,created_at,started_at,completed_at,canceled_at,archived_at,auto_archived_at,added_to_project_at,updated_at
-ENG-1,Fix bug,alice,ENG,Engineering,proj-1,Project One,ms-1,Milestone One,completed,Done,2025-06-01T00:00:00Z,2025-06-02 09:00:00,2025-06-05T10:30:00,2025-06-06,2025-06-07,2025-06-08T00:00:00Z,2025-06-01,2025-06-05T10:30:00Z
+	csv := `source,identifier,title,url,assignee,team_key,team_name,project_id,project_name,milestone_id,milestone_name,issue_type,parent_identifier,status,status_name,resolution,created_at,started_at,completed_at,canceled_at,updated_at
+linear,ENG-1,Fix bug,https://example.test/ENG-1,alice,ENG,Engineering,proj-1,Project One,ms-1,Milestone One,Bug,ENG-0,completed,Done,Fixed,2025-06-01T00:00:00Z,2025-06-02 09:00:00,2025-06-05T10:30:00,2025-06-06,2025-06-05T10:30:00Z
 `
 	issues, err := ReadCSV(strings.NewReader(csv))
 	if err != nil {
@@ -25,46 +28,64 @@ ENG-1,Fix bug,alice,ENG,Engineering,proj-1,Project One,ms-1,Milestone One,comple
 	}
 	got := issues[0]
 	want := Issue{
-		Identifier:           "ENG-1",
-		Title:                "Fix bug",
-		Assignee:             "alice",
-		TeamKey:              "ENG",
-		TeamName:             "Engineering",
-		ProjectID:            "proj-1",
-		ProjectName:          "Project One",
-		ProjectMilestoneID:   "ms-1",
-		ProjectMilestoneName: "Milestone One",
-		StateType:            "completed",
-		StateName:            "Done",
-		CreatedAt:            time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC),
-		StartedAt:            mustLocal(2025, 6, 2, 9, 0, 0),
-		CompletedAt:          mustLocal(2025, 6, 5, 10, 30, 0),
-		CanceledAt:           mustLocal(2025, 6, 6, 0, 0, 0),
-		ArchivedAt:           mustLocal(2025, 6, 7, 0, 0, 0),
-		AutoArchivedAt:       time.Date(2025, 6, 8, 0, 0, 0, 0, time.UTC),
-		AddedToProjectAt:     mustLocal(2025, 6, 1, 0, 0, 0),
-		UpdatedAt:            time.Date(2025, 6, 5, 10, 30, 0, 0, time.UTC),
+		Source:           "linear",
+		Identifier:       "ENG-1",
+		Title:            "Fix bug",
+		URL:              "https://example.test/ENG-1",
+		Assignee:         "alice",
+		TeamKey:          "ENG",
+		TeamName:         "Engineering",
+		ProjectID:        "proj-1",
+		ProjectName:      "Project One",
+		MilestoneID:      "ms-1",
+		MilestoneName:    "Milestone One",
+		IssueType:        "Bug",
+		ParentIdentifier: "ENG-0",
+		Status:           StatusCompleted,
+		StatusName:       "Done",
+		Resolution:       "Fixed",
+		CreatedAt:        time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC),
+		StartedAt:        mustLocal(2025, 6, 2, 9, 0, 0),
+		CompletedAt:      mustLocal(2025, 6, 5, 10, 30, 0),
+		CanceledAt:       mustLocal(2025, 6, 6, 0, 0, 0),
+		UpdatedAt:        time.Date(2025, 6, 5, 10, 30, 0, 0, time.UTC),
 	}
-	if got.Identifier != want.Identifier || got.Title != want.Title || got.Assignee != want.Assignee ||
-		got.TeamKey != want.TeamKey || got.TeamName != want.TeamName || got.ProjectID != want.ProjectID ||
-		got.ProjectName != want.ProjectName || got.ProjectMilestoneID != want.ProjectMilestoneID ||
-		got.ProjectMilestoneName != want.ProjectMilestoneName || got.StateType != want.StateType ||
-		got.StateName != want.StateName {
-		t.Fatalf("string fields mismatch:\ngot  %+v\nwant %+v", got, want)
+	if !got.CreatedAt.Equal(want.CreatedAt) || !got.StartedAt.Equal(want.StartedAt) ||
+		!got.CompletedAt.Equal(want.CompletedAt) || !got.CanceledAt.Equal(want.CanceledAt) ||
+		!got.UpdatedAt.Equal(want.UpdatedAt) {
+		t.Fatalf("timestamps mismatch:\ngot  %+v\nwant %+v", got, want)
 	}
-	for name, pair := range map[string][2]time.Time{
-		"created_at":          {got.CreatedAt, want.CreatedAt},
-		"started_at":          {got.StartedAt, want.StartedAt},
-		"completed_at":        {got.CompletedAt, want.CompletedAt},
-		"canceled_at":         {got.CanceledAt, want.CanceledAt},
-		"archived_at":         {got.ArchivedAt, want.ArchivedAt},
-		"auto_archived_at":    {got.AutoArchivedAt, want.AutoArchivedAt},
-		"added_to_project_at": {got.AddedToProjectAt, want.AddedToProjectAt},
-		"updated_at":          {got.UpdatedAt, want.UpdatedAt},
-	} {
-		if !pair[0].Equal(pair[1]) {
-			t.Errorf("%s: got %v, want %v", name, pair[0], pair[1])
-		}
+	got.CreatedAt, got.StartedAt, got.CompletedAt, got.CanceledAt, got.UpdatedAt = want.CreatedAt, want.StartedAt, want.CompletedAt, want.CanceledAt, want.UpdatedAt
+	if got != want {
+		t.Fatalf("ReadCSV:\ngot  %+v\nwant %+v", got, want)
+	}
+
+	// The same record as JSON decodes identically.
+	js := `{"source":"linear","identifier":"ENG-1","title":"Fix bug","url":"https://example.test/ENG-1","assignee":"alice","team_key":"ENG","team_name":"Engineering","project_id":"proj-1","project_name":"Project One","milestone_id":"ms-1","milestone_name":"Milestone One","issue_type":"Bug","parent_identifier":"ENG-0","status":"completed","status_name":"Done","resolution":"Fixed","created_at":"2025-06-01T00:00:00Z","started_at":"2025-06-02 09:00:00","completed_at":"2025-06-05T10:30:00","canceled_at":"2025-06-06","updated_at":"2025-06-05T10:30:00Z"}`
+	fromJSON, err := ReadJSON(strings.NewReader(js))
+	if err != nil {
+		t.Fatalf("ReadJSON: %v", err)
+	}
+	j := fromJSON[0]
+	if !j.CreatedAt.Equal(want.CreatedAt) || !j.StartedAt.Equal(want.StartedAt) ||
+		!j.CompletedAt.Equal(want.CompletedAt) || !j.CanceledAt.Equal(want.CanceledAt) ||
+		!j.UpdatedAt.Equal(want.UpdatedAt) {
+		t.Fatalf("JSON timestamps mismatch:\ngot  %+v\nwant %+v", j, want)
+	}
+	j.CreatedAt, j.StartedAt, j.CompletedAt, j.CanceledAt, j.UpdatedAt = want.CreatedAt, want.StartedAt, want.CompletedAt, want.CanceledAt, want.UpdatedAt
+	if j != want {
+		t.Fatalf("ReadJSON:\ngot  %+v\nwant %+v", j, want)
+	}
+}
+
+func TestReaders_IgnoreRemovedV1Columns(t *testing.T) {
+	csv := "identifier,state_type,project_milestone_name,archived_at\nA-1,completed,M1,2025-01-01\n"
+	got, err := ReadCSV(strings.NewReader(csv))
+	if err != nil {
+		t.Fatalf("ReadCSV: %v", err)
+	}
+	if got[0] != (Issue{Identifier: "A-1"}) {
+		t.Fatalf("v1 columns should be ignored, got %+v", got[0])
 	}
 }
 
@@ -120,6 +141,63 @@ func TestReadCSV_NoRecognizedColumns(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "no recognized columns") {
 		t.Errorf("unexpected error: %v", err)
+	}
+	var he *HeaderError
+	if !errors.As(err, &he) || !slices.Equal(he.Header, []string{"foo", "bar"}) {
+		t.Errorf("error = %#v, want a *HeaderError carrying the header", err)
+	}
+}
+
+func TestReadCSV_BOMHeaderReadsSameAsWithout(t *testing.T) {
+	const body = "identifier,assignee\nENG-1,alice\n"
+	plain, err := ReadCSV(strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("ReadCSV: %v", err)
+	}
+	withBOM, err := ReadCSV(strings.NewReader("\uFEFF" + body))
+	if err != nil {
+		t.Fatalf("ReadCSV with BOM: %v", err)
+	}
+	if !reflect.DeepEqual(plain, withBOM) || withBOM[0].Identifier != "ENG-1" {
+		t.Fatalf("with BOM = %+v, without = %+v", withBOM, plain)
+	}
+}
+
+func TestReadCSV_RepeatedRecognizedHeader(t *testing.T) {
+	_, err := ReadCSV(strings.NewReader("identifier,assignee,Assignee\nENG-1,a,b\n"))
+	if err == nil || err.Error() != `column "assignee" appears 2 times` {
+		t.Fatalf("err = %v, want repeated-column error", err)
+	}
+	// Repeated unrecognized headers are fine: they are ignored.
+	if _, err := ReadCSV(strings.NewReader("identifier,Comment,Comment\nENG-1,a,b\n")); err != nil {
+		t.Fatalf("repeated unrecognized header: %v", err)
+	}
+}
+
+func TestReadCSV_NoIdentifierColumn(t *testing.T) {
+	_, err := ReadCSV(strings.NewReader("Summary,Status,Assignee\nx,Done,alice\n"))
+	var he *HeaderError
+	if !errors.As(err, &he) {
+		t.Fatalf("err = %v, want *HeaderError", err)
+	}
+	if he.Error() != `no "identifier" column; expected the forecast column names (see DATA_REQUIREMENTS.md)` {
+		t.Errorf("message = %q", he.Error())
+	}
+	if !slices.Equal(he.Header, []string{"Summary", "Status", "Assignee"}) {
+		t.Errorf("Header = %q", he.Header)
+	}
+}
+
+// A tracker export that happens to share a few column names (status,
+// assignee, resolution) must not load as identifier-less garbage.
+func TestReadFile_JiraExportIsAHeaderError(t *testing.T) {
+	_, err := ReadFile("../testdata/jira-export-sample.csv")
+	var he *HeaderError
+	if !errors.As(err, &he) {
+		t.Fatalf("err = %v, want *HeaderError", err)
+	}
+	if he.Header[0] != "Summary" {
+		t.Errorf("first header cell = %q, want the BOM stripped", he.Header[0])
 	}
 }
 
@@ -221,11 +299,12 @@ func TestStatusHelpers(t *testing.T) {
 		{"timestamp-only completed", Issue{CompletedAt: completedAt}, true, false, true, false},
 		{"timestamp-only canceled", Issue{CanceledAt: canceledAt}, false, true, true, false},
 		{"timestamp-only in progress", Issue{StartedAt: startedAt}, false, false, false, true},
-		{"state-type-only completed", Issue{StateType: "completed"}, true, false, true, false},
-		{"state-type-only canceled", Issue{StateType: "canceled"}, false, true, true, false},
-		{"state-type-only duplicate", Issue{StateType: "duplicate"}, false, true, true, false},
-		{"state-type-only started", Issue{StateType: "started"}, false, false, false, true},
-		{"timestamp wins over disagreeing state_type", Issue{CompletedAt: completedAt, StateType: "started"}, true, false, true, false},
+		{"status-only backlog", Issue{Status: StatusBacklog}, false, false, false, false},
+		{"status-only started", Issue{Status: StatusStarted}, false, false, false, true},
+		{"status-only completed", Issue{Status: StatusCompleted}, true, false, true, false},
+		{"status-only canceled", Issue{Status: StatusCanceled}, false, true, true, false},
+		{"status-only unknown", Issue{Status: StatusUnknown}, false, false, false, false},
+		{"timestamp wins over disagreeing status", Issue{CompletedAt: completedAt, Status: StatusStarted}, true, false, true, false},
 		{"neither set", Issue{}, false, false, false, false},
 	}
 	for _, tt := range tests {
@@ -243,5 +322,50 @@ func TestStatusHelpers(t *testing.T) {
 				t.Errorf("IsInProgress() = %v, want %v", got, tt.inProgress)
 			}
 		})
+	}
+}
+
+func TestParseStatus(t *testing.T) {
+	tests := []struct {
+		in   string
+		want Status
+		ok   bool
+	}{
+		{"backlog", StatusBacklog, true},
+		{"started", StatusStarted, true},
+		{"completed", StatusCompleted, true},
+		{"canceled", StatusCanceled, true},
+		{" Completed ", StatusCompleted, true},
+		{"CANCELED", StatusCanceled, true},
+		{"", StatusUnknown, false},
+		{"duplicate", StatusUnknown, false},
+		{"unstarted", StatusUnknown, false},
+		{"cancelled", StatusUnknown, false},
+	}
+	for _, tt := range tests {
+		got, ok := ParseStatus(tt.in)
+		if got != tt.want || ok != tt.ok {
+			t.Errorf("ParseStatus(%q) = (%q, %v), want (%q, %v)", tt.in, got, ok, tt.want, tt.ok)
+		}
+	}
+}
+
+func TestReaders_UnknownStatusIsUnknownNotError(t *testing.T) {
+	csv := "identifier,status\nA-1,duplicate\nA-2,Started\n"
+	got, err := ReadCSV(strings.NewReader(csv))
+	if err != nil {
+		t.Fatalf("ReadCSV: %v", err)
+	}
+	if got[0].Status != StatusUnknown || got[1].Status != StatusStarted {
+		t.Fatalf("CSV statuses = %q, %q; want unknown, started", got[0].Status, got[1].Status)
+	}
+	js := `{"identifier":"A-1","status":"triage"}
+{"identifier":"A-2","status":"completed"}`
+	got, err = ReadJSON(strings.NewReader(js))
+	if err != nil {
+		t.Fatalf("ReadJSON: %v", err)
+	}
+	if got[0].Status != StatusUnknown || got[1].Status != StatusCompleted {
+		t.Fatalf("JSON statuses = %q, %q; want unknown, completed", got[0].Status, got[1].Status)
 	}
 }
